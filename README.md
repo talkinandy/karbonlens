@@ -3,63 +3,76 @@
 > Indonesia's carbon market, in one terminal.
 > *Pasar karbon Indonesia dalam satu layar.*
 
-Bloomberg Terminal for Indonesian carbon markets — unified intelligence across project registries (Verra, SRN-PPI, Gold Standard), price feeds (IDXCarbon), satellite reversal alerts (GFW/RADD, VIIRS), and regulatory tracking (Permenhut, Perpres, POJK).
+A carbon-market intelligence terminal reconciling SRN-PPI, IDXCarbon, Verra, Gold Standard, Sentinel (RADD / VIIRS / NDVI), and JDIH into a single workspace for developers, corporates, banks, and regulators.
 
 ## Run it
 
-`KarbonLens.html` is a single self-contained file. Open it in any modern browser:
+`index.html` is the entry. Serve the folder — no build step:
 
 ```sh
-open KarbonLens.html          # macOS
-xdg-open KarbonLens.html      # Linux
+python -m http.server 8000
+# open http://localhost:8000
 ```
 
-No build step, no install. It uses React + ReactDOM + Babel-standalone via CDN.
+Or open `index.html` directly in a modern browser. Fonts load from Google Fonts; React + Babel-standalone from unpkg.
 
 ## Screens
 
-Hash-based routing — bookmarkable, deep-linkable.
+Hash-based routing.
 
-| URL            | Screen                                                                 |
-| -------------- | ---------------------------------------------------------------------- |
-| `#/`           | Landing — hero, live market stats, featured projects, pricing          |
-| `#/projects`   | Projects explorer — filterable table of 127 Indonesian carbon projects |
-| `#/projects/:id` | Project detail — satellite imagery viewer, score breakdown, VCU chart, news |
-| `#/prices`     | Price intelligence — IDXCarbon stats, multi-line price chart, transactions |
-| `#/regulatory` | Regulatory timeline — Perpres, Permen, POJK, Kepmen                    |
-| `#/alerts`     | Alerts inbox — reversal, price, regulatory, news, retirement, issuance |
+| URL              | Screen |
+| ---------------- | ------ |
+| `#/`             | Landing — editorial split-hero, live satellite monitor, ticker, pipelines, featured projects, roles, methodology, closer |
+| `#/projects`     | Registry table — 214 indexed Indonesian carbon projects with filters |
+| `#/projects/:id` | Dossier — satellite MRV, score breakdown, VCU timeline, news & signals |
+| `#/prices`       | IDXCarbon snapshot — multi-series price chart, transactions table |
+| `#/regulatory`   | Policy timeline — Permenhut 6/2026, Perpres 110/2025, POJK, Kepmen |
+| `#/alerts`       | Inbox — reversal, price, regulatory, news, retirement, issuance |
 
-## Satellite imagery viewer
+## Design
 
-Project detail (`#/projects/katingan-peatland`) includes a full-chrome satellite viewer:
+Restraint-first, editorial. No gradients, no drop-shadows, no emoji in product UI.
 
-- Basemap selector: Sentinel-2 / Planet / Landsat 9
-- Toggleable layers: True color, NDVI vegetation, Canopy height, RADD deforestation, VIIRS thermal, project polygon, graticule
-- Opacity slider for overlay blending
-- Click any RADD alert or VIIRS hotspot for metadata callout (confidence, coords, sensor, FRP)
-- Scalebar, EPSG, lat/lon graticule, monospace metadata panel
+**Type**
+- `Instrument Serif` — display (hero H1, section H2s, stat values)
+- `IBM Plex Sans` — body
+- `IBM Plex Mono` — eyebrows, uppercase labels, tabular values, coordinates
 
-## Design tokens
+**Palette**
+- Base: `#FAFAF7` cream · Surface: `#FFFFFF` · Surface-2: `#F1EFE8`
+- Text: `#1A1A1A` / `#5F5E5A` / `#888780`
+- Brand accent (teal): `#0F6E56`
+- Semantic: info `#185FA5`, warning `#854F0B`, danger `#A32D2D`
+- Satellite viewer dark: bg `#0F1411`, toolbar `#161B18`, accent `#4FB89C`
 
-Flat, neutral, data-dense. No gradients, no shadows, no emoji in product UI.
+**Elevation via 0.5px hairlines** (no shadows). Radii 8/12/16.
 
-- **Base:** `#FAFAF7` warm off-white
-- **Text:** `#1A1A1A` (never pure black)
-- **Borders:** 0.5px, rgba black at 8% / 14%
-- **Semantic:** success teal `#0F6E56`, info blue `#185FA5`, warning amber `#854F0B`, danger red `#A32D2D`
-- **Type:** `-apple-system` / Inter, weights 400 and 500 only (never 600/700)
-- **Numbers:** tabular-nums everywhere
+## Satellite map
 
-Full spec: see Design Brief (bundled context).
+`src/SatelliteMap.jsx` is the visual anchor, reused on landing hero and project detail. Togglable layers — base (True color / NDVI / Sentinel-1), overlays (boundary, graticule, RADD, GFW loss, VIIRS, community). Opacity slider, click any alert for a callout, pulsing RADD dots.
+
+## Files
+
+```
+index.html         entry
+styles.css         1100 lines — source of truth for all styling
+data.js            window.KL_DATA — mock dataset
+src/
+├─ shared.jsx      router hook, TopNav, helpers, Pill, ScoreBadge, Tag
+├─ SatelliteMap.jsx
+├─ Landing.jsx
+├─ Projects.jsx
+├─ ProjectDetail.jsx
+├─ Prices.jsx
+├─ Regulatory.jsx
+├─ Alerts.jsx
+└─ App.jsx         hash router
+```
 
 ## Bilingual
 
 Indonesian regulatory and place-name terms are kept verbatim — never translated:
 Permenhut, Perpres, POJK, Kepmen, Padiatapa, Nesting, Mitra Pendamping, PBPH, Hutan Adat, Hutan Hak, SRN-PPI, SRUK, SPE-GRK, IDXCarbon, BPDLH.
-
-## Data
-
-All data is mocked inline in the `window.KL_DATA` block — 10 projects, 4 IDXCarbon transactions, 7 regulatory events, 7 alerts. No network calls.
 
 ## License
 
