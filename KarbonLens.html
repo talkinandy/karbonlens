@@ -1,0 +1,2539 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KarbonLens — Indonesia's carbon market, in one terminal</title>
+  <style>
+    :root {
+      --bg: #FAFAF7;
+      --surface: #FFFFFF;
+      --surface-2: #F1EFE8;
+
+      --border: rgba(0,0,0,0.08);
+      --border-strong: rgba(0,0,0,0.14);
+
+      --text: #1A1A1A;
+      --text-2: #5F5E5A;
+      --text-3: #888780;
+
+      --info-bg: #E6F1FB;
+      --info-fg: #185FA5;
+      --success-bg: #E1F5EE;
+      --success-fg: #0F6E56;
+      --warning-bg: #FAEEDA;
+      --warning-fg: #854F0B;
+      --danger-bg: #FCEBEB;
+      --danger-fg: #A32D2D;
+
+      --chart-blue: #378ADD;
+      --chart-teal: #1D9E75;
+      --chart-coral: #D85A30;
+      --chart-amber: #BA7517;
+      --chart-red: #E24B4A;
+
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; }
+
+    .tnum { font-variant-numeric: tabular-nums; }
+
+    /* ===== Top nav ===== */
+    .topnav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--surface);
+      border-bottom: 0.5px solid var(--border);
+      height: 52px;
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+    }
+    .topnav-inner {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .brand-mark {
+      width: 24px;
+      height: 24px;
+      background: var(--info-bg);
+      color: var(--info-fg);
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      font-weight: 500;
+      font-size: 13px;
+    }
+    .brand-word {
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: -0.1px;
+    }
+    .nav-links {
+      display: flex;
+      gap: 2px;
+      margin-left: 8px;
+      flex: 1;
+    }
+    .nav-link {
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: var(--text-2);
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s;
+    }
+    .nav-link:hover { background: var(--surface-2); }
+    .nav-link.active { color: var(--text); background: var(--surface-2); }
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .bell {
+      position: relative;
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--text-2);
+    }
+    .bell:hover { background: var(--surface-2); }
+    .bell .dot {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--danger-fg);
+    }
+    .pro-badge {
+      font-size: 11px;
+      color: var(--info-fg);
+      background: var(--info-bg);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 500;
+    }
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--surface-2);
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-2);
+      cursor: pointer;
+    }
+
+    /* ===== Page layout ===== */
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 24px 60px;
+    }
+    .page-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .page-title {
+      font-size: 22px;
+      font-weight: 500;
+      margin: 0 0 4px;
+      letter-spacing: -0.2px;
+    }
+    .page-subtitle {
+      font-size: 13px;
+      color: var(--text-2);
+      margin: 0;
+    }
+    .page-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    /* ===== Section labels ===== */
+    .section-label {
+      font-size: 11px;
+      color: var(--text-2);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+
+    /* ===== Cards ===== */
+    .card {
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+    }
+    .card-pad-lg { padding: 20px 24px; }
+
+    .stat-card {
+      background: var(--surface-2);
+      border-radius: var(--radius-md);
+      padding: 14px;
+    }
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-2);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 500;
+    }
+    .stat-value {
+      font-size: 22px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.3px;
+    }
+    .stat-value.warning { color: var(--warning-fg); }
+    .stat-value.success { color: var(--success-fg); }
+    .stat-delta {
+      font-size: 11px;
+      margin-top: 3px;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-delta.up { color: var(--success-fg); }
+    .stat-delta.down { color: var(--danger-fg); }
+    .stat-delta.neutral { color: var(--text-3); }
+
+    /* ===== Buttons ===== */
+    .btn {
+      background: transparent;
+      color: var(--text);
+      border: 0.5px solid var(--border-strong);
+      padding: 7px 14px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .btn:hover { background: var(--surface-2); }
+    .btn-primary {
+      background: var(--text);
+      color: var(--surface);
+      border-color: var(--text);
+    }
+    .btn-primary:hover { background: #2a2a2a; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+    /* ===== Inputs ===== */
+    .input, .select {
+      background: var(--surface);
+      color: var(--text);
+      border: 0.5px solid var(--border-strong);
+      padding: 7px 12px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .input:focus, .select:focus {
+      outline: 2px solid var(--info-fg);
+      outline-offset: -1px;
+    }
+    .input::placeholder { color: var(--text-3); }
+    .select {
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4l3 3 3-3' fill='none' stroke='%235F5E5A' stroke-width='1.2'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 28px;
+    }
+
+    /* ===== Score badge ===== */
+    .score-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: var(--radius-md);
+      font-size: 12px;
+      font-weight: 500;
+      min-width: 36px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .score-high { background: var(--success-bg); color: var(--success-fg); }
+    .score-mid  { background: var(--info-bg);    color: var(--info-fg); }
+    .score-low  { background: var(--warning-bg); color: var(--warning-fg); }
+
+    /* ===== Pills ===== */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: var(--radius-md);
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .pill-info    { background: var(--info-bg);    color: var(--info-fg); }
+    .pill-success { background: var(--success-bg); color: var(--success-fg); }
+    .pill-warning { background: var(--warning-bg); color: var(--warning-fg); }
+    .pill-danger  { background: var(--danger-bg);  color: var(--danger-fg); }
+    .pill-neutral { background: var(--surface-2);  color: var(--text-2); }
+    .pill .pill-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* ===== Tags ===== */
+    .tag {
+      display: inline-block;
+      font-size: 10px;
+      color: var(--text-3);
+      border: 0.5px solid var(--border-strong);
+      padding: 2px 7px;
+      border-radius: 4px;
+      margin-right: 4px;
+      white-space: nowrap;
+    }
+
+    /* ===== Tables ===== */
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    table.data thead tr {
+      border-bottom: 0.5px solid var(--border-strong);
+    }
+    table.data th {
+      text-align: left;
+      padding: 10px 12px 10px 0;
+      font-size: 11px;
+      color: var(--text-2);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    table.data tbody tr {
+      border-bottom: 0.5px solid var(--border);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    table.data tbody tr:hover { background: var(--surface-2); }
+    table.data tbody tr:last-child { border-bottom: none; }
+    table.data td {
+      padding: 12px 12px 12px 0;
+      vertical-align: middle;
+    }
+    table.data td.right {
+      text-align: right;
+      padding-right: 12px;
+      padding-left: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+    table.data td.right:last-child,
+    table.data th.right:last-child { padding-right: 0; }
+    table.data .row-name {
+      font-weight: 500;
+    }
+    table.data .row-sub {
+      font-size: 11px;
+      color: var(--text-3);
+      margin-top: 2px;
+    }
+
+    /* ===== Grids ===== */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+    .project-card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    .detail-two-col {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    /* ===== Project preview card (landing) ===== */
+    .proj-preview {
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+    .proj-preview:hover {
+      border-color: var(--border-strong);
+      transform: translateY(-1px);
+    }
+    .proj-preview-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .proj-preview-name {
+      font-size: 15px;
+      font-weight: 500;
+      margin: 0 0 6px;
+    }
+    .proj-preview-meta {
+      font-size: 12px;
+      color: var(--text-2);
+      margin-bottom: 12px;
+    }
+    .proj-preview-tags {
+      margin-top: 4px;
+    }
+
+    /* ===== Score breakdown bars ===== */
+    .score-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: baseline;
+      margin-bottom: 6px;
+    }
+    .score-row-label {
+      font-size: 13px;
+      color: var(--text-2);
+    }
+    .score-row-value {
+      font-size: 13px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+    .score-track {
+      grid-column: 1 / -1;
+      height: 5px;
+      background: var(--surface-2);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+    .score-fill { height: 100%; border-radius: 3px; }
+    .score-fill.success { background: var(--success-fg); }
+    .score-fill.info { background: var(--info-fg); }
+    .score-fill.warning { background: var(--warning-fg); }
+
+    /* ===== News items ===== */
+    .news-item {
+      background: var(--surface-2);
+      border-left: 2px solid var(--border-strong);
+      padding: 10px 14px;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 8px;
+    }
+    .news-item.positive { border-left-color: var(--info-fg); }
+    .news-item.warning  { border-left-color: var(--chart-amber); }
+    .news-item.neutral  { border-left-color: var(--border-strong); }
+    .news-item-title {
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 3px;
+      line-height: 1.4;
+    }
+    .news-item-meta {
+      font-size: 11px;
+      color: var(--text-3);
+    }
+
+    /* ===== Timeline ===== */
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 20px;
+      padding: 18px 0;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .timeline-item:last-child { border-bottom: none; }
+    .timeline-date-status {
+      font-size: 11px;
+      color: var(--text-2);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 500;
+    }
+    .timeline-date {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+      text-transform: none;
+      letter-spacing: 0;
+      margin-bottom: 4px;
+    }
+    .timeline-title {
+      font-size: 15px;
+      font-weight: 500;
+      margin: 0 0 6px;
+      line-height: 1.4;
+    }
+    .timeline-desc {
+      font-size: 13px;
+      color: var(--text-2);
+      font-style: italic;
+      line-height: 1.6;
+      margin-bottom: 10px;
+    }
+    .timeline-meta {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    /* ===== Alerts ===== */
+    .alert-row {
+      display: grid;
+      grid-template-columns: 24px 1fr auto;
+      gap: 12px;
+      padding: 14px 0;
+      border-bottom: 0.5px solid var(--border);
+      cursor: pointer;
+      align-items: flex-start;
+    }
+    .alert-row:last-child { border-bottom: none; }
+    .alert-row:hover { background: var(--surface-2); margin: 0 -12px; padding-left: 12px; padding-right: 12px; border-radius: 6px; }
+    .alert-status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-top: 7px;
+      margin-left: 8px;
+      background: var(--border-strong);
+    }
+    .alert-status-dot.unread { background: var(--info-fg); }
+    .alert-top-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .alert-project {
+      font-size: 12px;
+      color: var(--text-3);
+    }
+    .alert-title {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 3px;
+    }
+    .alert-desc {
+      font-size: 13px;
+      color: var(--text-2);
+    }
+    .alert-time {
+      font-size: 11px;
+      color: var(--text-3);
+      white-space: nowrap;
+      margin-top: 2px;
+    }
+
+    /* ===== Filter bar ===== */
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+    .filter-bar .input { flex: 1; min-width: 240px; }
+
+    /* ===== Footer ===== */
+    .page-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-3);
+      margin-top: 16px;
+      padding-top: 14px;
+    }
+
+    /* ===== Landing page specifics ===== */
+    .landing-hero {
+      max-width: 760px;
+      padding: 64px 0 48px;
+    }
+    .kicker {
+      display: inline-block;
+      margin-bottom: 24px;
+    }
+    .hero-h1 {
+      font-size: 40px;
+      font-weight: 500;
+      line-height: 1.15;
+      letter-spacing: -0.5px;
+      margin: 0 0 20px;
+      white-space: pre-line;
+    }
+    .hero-tag-en {
+      font-size: 17px;
+      color: var(--text-2);
+      margin: 0 0 8px;
+      line-height: 1.5;
+      max-width: 640px;
+    }
+    .hero-tag-id {
+      font-size: 14px;
+      color: var(--text-3);
+      font-style: italic;
+      margin: 0 0 28px;
+      max-width: 640px;
+    }
+    .hero-cta {
+      display: flex;
+      gap: 10px;
+    }
+
+    .section-block {
+      margin-bottom: 48px;
+    }
+    .section-block-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 16px;
+    }
+    .section-h2 {
+      font-size: 17px;
+      font-weight: 500;
+      margin: 0;
+    }
+    .section-link {
+      font-size: 13px;
+      color: var(--info-fg);
+      cursor: pointer;
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    .price-card {
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px 22px;
+      position: relative;
+    }
+    .price-card.featured {
+      border: 1.5px solid var(--info-fg);
+    }
+    .price-card-badge {
+      position: absolute;
+      top: -10px;
+      left: 22px;
+      background: var(--info-fg);
+      color: var(--surface);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 10px;
+      border-radius: 4px;
+      letter-spacing: 0.3px;
+    }
+    .price-tier {
+      font-size: 13px;
+      color: var(--text-2);
+      margin-bottom: 4px;
+    }
+    .price-amount {
+      font-size: 28px;
+      font-weight: 500;
+      letter-spacing: -0.4px;
+      margin-bottom: 14px;
+      font-variant-numeric: tabular-nums;
+    }
+    .price-amount .per { font-size: 14px; color: var(--text-3); font-weight: 400; }
+    .price-features {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 18px;
+    }
+    .price-features li {
+      font-size: 13px;
+      color: var(--text-2);
+      padding: 6px 0;
+      border-top: 0.5px solid var(--border);
+    }
+    .price-features li:first-child { border-top: none; }
+
+    .public-nav {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-left: auto;
+      font-size: 13px;
+      color: var(--text-2);
+    }
+    .public-nav a { cursor: pointer; padding: 6px 8px; border-radius: 6px; }
+    .public-nav a:hover { background: var(--surface-2); }
+
+    .footer-bar {
+      border-top: 0.5px solid var(--border);
+      padding: 24px;
+      font-size: 12px;
+      color: var(--text-3);
+      display: flex;
+      justify-content: space-between;
+      max-width: 1200px;
+      margin: 40px auto 0;
+    }
+
+    .breadcrumb {
+      font-size: 12px;
+      color: var(--text-2);
+      margin-bottom: 14px;
+    }
+    .breadcrumb a {
+      color: var(--info-fg);
+      cursor: pointer;
+    }
+    .breadcrumb a:hover { text-decoration: underline; }
+
+    .range-pills {
+      display: inline-flex;
+      background: var(--surface-2);
+      border-radius: var(--radius-md);
+      padding: 2px;
+      gap: 2px;
+    }
+    .range-pill {
+      padding: 5px 12px;
+      font-size: 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--text-2);
+      background: transparent;
+      border: none;
+      font-family: inherit;
+    }
+    .range-pill.active {
+      background: var(--surface);
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .legend {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--text-2);
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+    .legend-line {
+      width: 14px;
+      height: 2px;
+    }
+
+    /* ===== Satellite map viewer ===== */
+    .sat-viewer {
+      background: #0f1411;
+      border: 0.5px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      color: #E8E8E5;
+      font-size: 12px;
+    }
+    .sat-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 10px 14px;
+      background: #161b18;
+      border-bottom: 0.5px solid rgba(255,255,255,0.08);
+      flex-wrap: wrap;
+    }
+    .sat-toolbar-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sat-toolbar-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: rgba(255,255,255,0.5);
+      font-weight: 500;
+    }
+    .sat-pill-mono {
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 11px;
+      color: #E8E8E5;
+      background: rgba(255,255,255,0.06);
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+    .sat-segmented {
+      display: inline-flex;
+      background: rgba(255,255,255,0.05);
+      border-radius: 6px;
+      padding: 2px;
+      gap: 1px;
+    }
+    .sat-seg-btn {
+      background: transparent;
+      border: none;
+      color: rgba(255,255,255,0.65);
+      padding: 4px 10px;
+      font-size: 11px;
+      font-family: inherit;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .sat-seg-btn:hover { color: #FFFFFF; }
+    .sat-seg-btn.active {
+      background: rgba(255,255,255,0.14);
+      color: #FFFFFF;
+      font-weight: 500;
+    }
+    .sat-opacity {
+      width: 110px;
+      accent-color: #4FB89C;
+    }
+
+    .sat-stage {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      min-height: 460px;
+    }
+    .sat-layers {
+      background: rgba(255,255,255,0.02);
+      border-right: 0.5px solid rgba(255,255,255,0.08);
+      padding: 14px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .sat-section-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: rgba(255,255,255,0.45);
+      font-weight: 500;
+      margin-bottom: 6px;
+      margin-top: 2px;
+    }
+    .sat-layer-toggle {
+      display: grid;
+      grid-template-columns: 16px 1fr auto auto;
+      gap: 8px;
+      align-items: center;
+      width: 100%;
+      background: transparent;
+      border: 0.5px solid transparent;
+      color: rgba(255,255,255,0.78);
+      font-size: 12px;
+      font-family: inherit;
+      padding: 6px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .sat-layer-toggle:hover {
+      background: rgba(255,255,255,0.05);
+      color: #FFFFFF;
+    }
+    .sat-layer-toggle.active {
+      background: rgba(79, 184, 156, 0.10);
+      border-color: rgba(79, 184, 156, 0.35);
+      color: #FFFFFF;
+    }
+    .sat-layer-swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      overflow: hidden;
+      display: inline-block;
+      border: 0.5px solid rgba(255,255,255,0.2);
+    }
+    .sat-layer-label { font-size: 12px; }
+    .sat-layer-count {
+      font-size: 10px;
+      color: rgba(255,255,255,0.55);
+      background: rgba(255,255,255,0.08);
+      padding: 1px 6px;
+      border-radius: 8px;
+      font-variant-numeric: tabular-nums;
+    }
+    .sat-layer-check {
+      font-size: 10px;
+      color: rgba(255,255,255,0.45);
+    }
+    .sat-layer-toggle.active .sat-layer-check {
+      color: #4FB89C;
+    }
+
+    .sat-meta {
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 0.5px solid rgba(255,255,255,0.08);
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 10.5px;
+    }
+    .sat-meta-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      color: rgba(255,255,255,0.55);
+    }
+    .sat-meta-row span:last-child {
+      color: rgba(255,255,255,0.85);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .sat-map-wrap {
+      position: relative;
+      background: #0a0d0c;
+      overflow: hidden;
+    }
+    .sat-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      min-height: 460px;
+    }
+
+    .sat-callout {
+      position: absolute;
+      background: rgba(15, 20, 17, 0.94);
+      border: 0.5px solid rgba(255,255,255,0.18);
+      border-radius: 8px;
+      padding: 12px 14px;
+      min-width: 240px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      color: #FFFFFF;
+    }
+    .sat-callout-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .sat-callout-close {
+      background: transparent;
+      border: none;
+      color: rgba(255,255,255,0.6);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+    .sat-callout-close:hover { color: #FFFFFF; }
+    .sat-callout-title {
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    .sat-callout-meta {
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 10.5px;
+    }
+    .sat-callout-meta > div {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 0;
+      color: rgba(255,255,255,0.6);
+    }
+    .sat-callout-meta > div span:last-child {
+      color: rgba(255,255,255,0.95);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .sat-legend {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: rgba(15, 20, 17, 0.78);
+      border: 0.5px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      padding: 8px 12px;
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      flex-wrap: wrap;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      max-width: calc(100% - 140px);
+    }
+    .sat-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: rgba(255,255,255,0.85);
+      font-size: 11px;
+    }
+    .sat-legend-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: rgba(255,255,255,0.55);
+      font-weight: 500;
+    }
+    .sat-legend-bar {
+      width: 110px;
+      height: 8px;
+      border-radius: 2px;
+    }
+    .sat-legend-scale {
+      display: flex;
+      justify-content: space-between;
+      width: 110px;
+      font-size: 9px;
+      color: rgba(255,255,255,0.55);
+      margin-top: -2px;
+    }
+    .sat-legend-dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      display: inline-block;
+    }
+    .sat-legend-square {
+      width: 9px; height: 9px;
+      display: inline-block;
+    }
+
+    .sat-footer {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: #161b18;
+      border-top: 0.5px solid rgba(255,255,255,0.08);
+      font-size: 11px;
+      color: rgba(255,255,255,0.55);
+      font-family: ui-monospace, Menlo, monospace;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    @media (max-width: 768px) {
+      .sat-stage { grid-template-columns: 1fr; }
+      .sat-layers { border-right: none; border-bottom: 0.5px solid rgba(255,255,255,0.08); }
+      .sat-legend { position: static; max-width: 100%; margin: 8px; }
+    }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 768px) {
+      .topnav { padding: 0 16px; }
+      .nav-links { display: none; }
+      .page { padding: 16px 16px 60px; }
+      .hero-h1 { font-size: 30px; }
+      .landing-hero { padding: 32px 0 24px; }
+      .detail-two-col { grid-template-columns: 1fr; }
+      .timeline-item { grid-template-columns: 1fr; gap: 8px; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .public-nav { gap: 8px; font-size: 12px; }
+      table.data { font-size: 12px; }
+      table.data th, table.data td { padding-right: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+
+  <script>
+    // ============== Mock data ==============
+    window.KL_DATA = {
+      projects: [
+        {
+          id: 'katingan-peatland',
+          name: 'Katingan Peatland Restoration',
+          shortName: 'Katingan Peatland',
+          developer: 'Rimba Makmur Utama',
+          type: 'REDD+',
+          subtype: 'Peatland',
+          province: 'Central Kalimantan',
+          provinceShort: 'C. Kalimantan',
+          provinceId: 'Kalimantan Tengah',
+          hectares: 149800,
+          centroid: [-1.8, 113.2],
+          status: 'active',
+          score: 82,
+          breakdown: { validation: 90, reversal: 72, community: 85, transparency: 80 },
+          issued: '32.5M',
+          retired: '28.9M',
+          available: '3.6M',
+          availableSort: 3600000,
+          lastVintage: 2020,
+          registries: ['Verra', 'SRN-PPI'],
+          registriesShort: 'V · SRN',
+          issuances: [
+            { year: 2017, value: 5.8 },
+            { year: 2018, value: 7.9 },
+            { year: 2019, value: 9.5 },
+            { year: 2020, value: 8.7 }
+          ],
+          alerts: [
+            { x: 170, y: 80, conf: 'high' },
+            { x: 215, y: 110, conf: 'high' },
+            { x: 305, y: 90, conf: 'high' },
+            { x: 250, y: 145, conf: 'nominal' },
+            { x: 340, y: 155, conf: 'nominal' }
+          ],
+          news: [
+            { sentiment: 'positive', title: 'Katingan signs fresh offtake with Japanese trading house at implied US$9.2/tCO₂e', source: 'Mongabay', daysAgo: 3 },
+            { sentiment: 'warning', title: 'RADD alert fired: 1.8 ha canopy loss in northeast quadrant', source: 'GFW', daysAgo: 6 },
+            { sentiment: 'neutral', title: 'Kemenhut publishes Permenhut 6/2026 — forestry credits re-enabled for SRUK registration', source: 'JDIH', daysAgo: 14 },
+            { sentiment: 'neutral', title: 'Rimba Makmur Utama to deploy additional fire monitoring towers across eastern blocks', source: 'Press release', daysAgo: 21 }
+          ]
+        },
+        { id: 'sumatra-merang', shortName: 'Sumatra Merang', name: 'Sumatra Merang Peatland Project', developer: 'Forest Carbon', type: 'Peatland', province: 'South Sumatra', provinceShort: 'S. Sumatra', hectares: 22900, status: 'active', score: 74, available: '1.2M', availableSort: 1200000, registries: ['Verra', 'SRN-PPI'], registriesShort: 'V · SRN' },
+        { id: 'muara-teweh', shortName: 'Muara Teweh Conservation', name: 'Muara Teweh Conservation', developer: 'Fairatmos + South Pole', type: 'REDD+', province: 'Central Kalimantan', provinceShort: 'C. Kalimantan', hectares: 41000, status: 'pipeline', score: 68, available: 'Pipeline', availableSort: 0, registries: ['Verra', 'SRN-PPI'], registriesShort: 'V · SRN' },
+        { id: 'pesisir-biru', shortName: 'Pesisir Biru Nusantara', name: 'Pesisir Biru Nusantara', developer: 'Multi-site mangrove', type: 'Blue Carbon', province: 'Multiple', provinceShort: 'Multiple', hectares: 8500, status: 'pipeline', score: 65, available: 'Pipeline', availableSort: 0, registries: ['SRN-PPI'], registriesShort: 'SRN' },
+        { id: 'rimba-raya', shortName: 'Rimba Raya Conservation', name: 'Rimba Raya Conservation', developer: 'PT Rimba Raya', type: 'REDD+', province: 'Central Kalimantan', provinceShort: 'C. Kalimantan', hectares: 36000, status: 'flagged', score: 58, available: '4.1M', availableSort: 4100000, registries: ['Verra'], registriesShort: 'V' },
+        { id: 'pertamina-lahendong', shortName: 'Pertamina Geothermal Lahendong', name: 'Pertamina Geothermal Lahendong', developer: 'Pertamina Geothermal', type: 'Geothermal', province: 'North Sulawesi', provinceShort: 'N. Sulawesi', hectares: 0, status: 'active', score: 79, available: '845k', availableSort: 845000, registries: ['SRN-PPI', 'IDXCarbon'], registriesShort: 'SRN · IDX' },
+        { id: 'pltgu-muara-karang', shortName: 'PLTGU Muara Karang', name: 'PLTGU Muara Karang', developer: 'PLN Indonesia Power', type: 'Gas power', province: 'Jakarta', provinceShort: 'Jakarta', hectares: 0, status: 'active', score: 71, available: '312k', availableSort: 312000, registries: ['SRN-PPI', 'IDXCarbon'], registriesShort: 'SRN · IDX' },
+        { id: 'pltm-gunung-wugul', shortName: 'PLTM Gunung Wugul', name: 'PLTM Gunung Wugul', developer: 'PT Cahaya Listrik', type: 'Hydro', province: 'Central Java', provinceShort: 'C. Java', hectares: 0, status: 'active', score: 69, available: '184k', availableSort: 184000, registries: ['SRN-PPI', 'IDXCarbon'], registriesShort: 'SRN · IDX' },
+        { id: 'cendrawasih-aru', shortName: 'Cendrawasih Aru Conservation', name: 'Cendrawasih Aru Conservation', developer: '(under review)', type: 'REDD+', province: 'Maluku', provinceShort: 'Maluku', hectares: 12000, status: 'suspended', score: 42, available: 'Suspended', availableSort: -1, registries: ['Verra'], registriesShort: 'V' },
+        { id: 'bukit-tigapuluh', shortName: 'Bukit Tigapuluh Ecosystem', name: 'Bukit Tigapuluh Ecosystem', developer: 'PT Alam Bukit Tigapuluh', type: 'REDD+', province: 'Riau / Jambi', provinceShort: 'Riau / Jambi', hectares: 38000, status: 'active', score: 77, available: '2.8M', availableSort: 2800000, registries: ['Verra', 'SRN-PPI'], registriesShort: 'V · SRN' }
+      ],
+      priceStats: {
+        janValue: 'Rp 4.7B',
+        janValueDelta: '↓ 36% vs Dec',
+        volume: '117k t',
+        volumeDelta: '↓ 38% vs Dec',
+        avgPrice: 'Rp 40k',
+        avgPriceDelta: '≈ US$2.50/t',
+        participants: '132',
+        participantsDelta: '↑ 4 in month'
+      },
+      priceSeries: {
+        months: ['Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan 26'],
+        'IDTBS-RE': [60, 58, 55, 62, 68, 64],
+        'IDTBS':    [40, 41, 39, 40, 42, 38],
+        'IDNBS':    [38, null, 37, null, 39, 38]
+      },
+      transactions: [
+        { date: '29 Jan', market: 'Negotiated', creditType: 'IDTBS', project: 'Pertamina Lahendong', volume: '100,000 t', price: 'Rp 37,500' },
+        { date: '22 Jan', market: 'Negotiated', creditType: 'IDTBS-RE', project: 'PLTM Gunung Wugul', volume: '16,596 t', price: 'Rp 54,000' },
+        { date: '15 Jan', market: 'Marketplace', creditType: 'IDTBS-RE', project: 'PLTGU Muara Karang', volume: '846 t', price: 'Rp 64,100' },
+        { date: '9 Jan',  market: 'Negotiated', creditType: 'IDTBS', project: 'Pertamina Lahendong', volume: '45,000 t', price: 'Rp 38,200' }
+      ],
+      regulatory: [
+        {
+          date: '13 Apr 2026', status: 'Diundangkan',
+          title: 'Permenhut 6/2026 — Tata Cara Perdagangan Karbon Offset GRK Kehutanan',
+          desc: 'Implements forestry offset pathway under Perpres 110/2025. Re-enables forestry REDD+/peatland credits after 4-year freeze. Establishes eligible actors (PBPH, perhutanan sosial, hutan adat, hutan hak, PB-PJL Karbon), registered mitra/pendamping requirement, Padiatapa mandate, Nesting requirement, and PNBP on transactions.',
+          importance: 'critical', importanceLabel: 'Critical', tags: ['Kemenhut', 'Forestry', 'REDD+']
+        },
+        {
+          date: 'Oct 2025', status: 'Diundangkan',
+          title: 'Perpres 110/2025 — Penyelenggaraan Instrumen NEK',
+          desc: 'Replaces Perpres 98/2021. Establishes SRUK (Sistem Registri Unit Karbon) alongside SRN-PPI, introduces Corresponding Adjustment framework, re-opens international carbon trade after 2021 moratorium.',
+          importance: 'critical', importanceLabel: 'Critical', tags: ['Presidential', 'All sectors']
+        },
+        {
+          date: 'Oct 2025', status: 'MoU signed',
+          title: 'Verra–Indonesia Mutual Recognition Agreement',
+          desc: 'VCS projects may pursue parallel registration with SRN-PPI. VCUs remain in Verra Registry but mirrored in SRN-PPI for NDC accounting. Dual-track process operational.',
+          importance: 'high', importanceLabel: 'High', tags: ['KLH', 'International']
+        },
+        {
+          date: 'Aug 2025', status: 'Launched',
+          title: 'SRN-PPI v2 — Upgraded climate registry',
+          desc: 'Improved data visualization, streamlined verification procedures, enhanced NDC tracking. API access roadmap announced.',
+          importance: 'medium', importanceLabel: 'Medium', tags: ['KLH']
+        },
+        {
+          date: 'Jan 2025', status: 'Opened',
+          title: 'IDXCarbon opens to international buyers',
+          desc: 'First international transactions: ~41,822 tCO₂e on day one. Natural gas credits traded at ~US$5.87/ton, hydroelectric at US$8.82/ton.',
+          importance: 'high', importanceLabel: 'High', tags: ['OJK', 'IDX']
+        },
+        {
+          date: 'Expected Q3 2026', status: 'Upcoming',
+          title: 'PNBP rate determination (Permenhut follow-up)',
+          desc: 'Rate for Non-Tax State Revenue on carbon trading transactions (mandated by Permenhut 6/2026 Pasal 46) expected to be set via separate Permen. Industry estimates 10–20% of gross transaction value.',
+          importance: 'high', importanceLabel: 'High', tags: ['Upcoming', 'Kemenhut']
+        },
+        {
+          date: 'Expected Oct 2026', status: 'Upcoming',
+          title: 'Fiscal regime & buffer mechanism Permen',
+          desc: 'Technical parameters for buffer pool contributions, fiscal treatment of CA-authorized credits, and ITMO accounting.',
+          importance: 'medium', importanceLabel: 'Medium', tags: ['Upcoming', 'Multi-ministry']
+        }
+      ],
+      alerts: [
+        { id: 1, type: 'reversal', severity: 'warning', typeLabel: 'Reversal warning', project: 'Sumatra Merang', time: '06:42 today', read: false, title: 'Deforestation detected: 2.4 ha canopy loss', desc: 'RADD high-confidence alert inside project polygon. Third alert this quarter.' },
+        { id: 2, type: 'price', severity: 'info', typeLabel: 'Price', project: 'IDTBS-RE', time: '2h ago', read: false, title: 'IDTBS-RE crossed Rp 55,000 threshold', desc: 'Latest marketplace transaction at Rp 64,100/ton, 4% above your configured threshold.' },
+        { id: 3, type: 'regulatory', severity: 'danger', typeLabel: 'Regulatory', project: 'Kemenhut', time: '1d ago', read: false, title: 'Permenhut 6/2026 published to JDIH', desc: 'Forestry offset pathway now implementable. Affects 48 of your watched projects.' },
+        { id: 4, type: 'news', severity: 'info', typeLabel: 'News', project: 'Katingan Peatland', time: '3d ago', read: true, title: 'Fresh offtake signed with Japanese trading house', desc: 'Reported implied price US$9.2/tCO₂e for vintage 2020 credits. Source: Mongabay.' },
+        { id: 5, type: 'reversal', severity: 'warning', typeLabel: 'Reversal warning', project: 'Rimba Raya', time: '5d ago', read: true, title: 'Fire alert cluster detected near eastern boundary', desc: 'VIIRS thermal anomaly, 3 hotspots within 2km of project polygon.' },
+        { id: 6, type: 'retirement', severity: 'info', typeLabel: 'Retirement', project: 'Katingan Peatland', time: '1w ago', read: true, title: '450,000 VCUs retired by large corporate buyer', desc: 'Vintage 2019 credits retired for 2024 inventory offset. Beneficiary undisclosed.' },
+        { id: 7, type: 'issuance', severity: 'success', typeLabel: 'Issuance', project: 'Pertamina Lahendong', time: '1w ago', read: true, title: 'New issuance: 125,000 VCUs vintage 2024', desc: 'SPE-GRK issued by Ministry of Environment. Available for trading on IDXCarbon.' }
+      ]
+    };
+  </script>
+
+  <script type="text/babel" data-presets="react">
+    // ============== Shared helpers & components ==============
+    const { useState, useEffect, useMemo } = React;
+
+    function scoreClass(s) {
+      if (s >= 70) return 'score-high';
+      if (s >= 50) return 'score-mid';
+      return 'score-low';
+    }
+
+    function statusPill(status) {
+      switch (status) {
+        case 'active':    return <span className="pill pill-success"><span className="pill-dot" />Active</span>;
+        case 'pipeline':  return <span className="pill pill-info"><span className="pill-dot" />Pipeline</span>;
+        case 'flagged':   return <span className="pill pill-warning"><span className="pill-dot" />Flagged</span>;
+        case 'suspended': return <span className="pill pill-danger"><span className="pill-dot" />Suspended</span>;
+        default: return null;
+      }
+    }
+
+    function navigate(hash) {
+      window.location.hash = hash;
+    }
+
+    function TopNav({ active, isPublic }) {
+      const items = [
+        { key: 'projects', label: 'Projects', hash: '#/projects' },
+        { key: 'prices', label: 'Prices', hash: '#/prices' },
+        { key: 'regulatory', label: 'Regulatory', hash: '#/regulatory' },
+        { key: 'alerts', label: 'Alerts', hash: '#/alerts' }
+      ];
+      return (
+        <header className="topnav">
+          <div className="topnav-inner">
+            <div className="brand" onClick={() => navigate(isPublic ? '#/' : '#/projects')}>
+              <div className="brand-mark">K</div>
+              <div className="brand-word">KarbonLens</div>
+            </div>
+
+            {isPublic ? (
+              <nav className="public-nav">
+                <a onClick={() => navigate('#/projects')}>Projects</a>
+                <a onClick={() => navigate('#/prices')}>Prices</a>
+                <a onClick={() => navigate('#/regulatory')}>Regulatory</a>
+                <a onClick={() => navigate('#/projects')}>Docs</a>
+                <button className="btn btn-sm btn-primary" onClick={() => navigate('#/projects')}>Sign in →</button>
+              </nav>
+            ) : (
+              <>
+                <nav className="nav-links">
+                  {items.map(it => (
+                    <div
+                      key={it.key}
+                      className={'nav-link ' + (active === it.key ? 'active' : '')}
+                      onClick={() => navigate(it.hash)}
+                    >
+                      {it.label}
+                    </div>
+                  ))}
+                </nav>
+                <div className="nav-right">
+                  <div className="bell" title="Alerts" onClick={() => navigate('#/alerts')}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path d="M3.5 11.5L4 10.5V7a4 4 0 1 1 8 0v3.5l.5 1h-9z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                      <path d="M6.5 13a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.2"/>
+                    </svg>
+                    <span className="dot" />
+                  </div>
+                  <span className="pro-badge">Pro</span>
+                  <div className="avatar" title="Account">A</div>
+                </div>
+              </>
+            )}
+          </div>
+        </header>
+      );
+    }
+
+    // Map SVG with project polygon + alerts (for project detail)
+    function ProjectMap({ alerts }) {
+      return (
+        <svg viewBox="0 0 500 220" xmlns="http://www.w3.org/2000/svg" style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 8 }}>
+          <rect width="500" height="220" fill="#E1F5EE"/>
+          <g opacity="0.4">
+            <path d="M 0 50 Q 80 45 160 55 T 320 50 T 500 60" stroke="#C5E5D8" strokeWidth="0.6" fill="none"/>
+            <path d="M 0 110 Q 80 100 160 115 T 320 108 T 500 118" stroke="#C5E5D8" strokeWidth="0.6" fill="none"/>
+            <path d="M 0 170 Q 80 165 160 175 T 320 168 T 500 178" stroke="#C5E5D8" strokeWidth="0.6" fill="none"/>
+          </g>
+          <path
+            d="M 70,45 Q 120,25 200,35 Q 290,40 360,60 Q 420,85 400,150 Q 360,200 260,195 Q 160,190 110,160 Q 55,115 70,45 Z"
+            fill="#1D9E75" fillOpacity="0.32"
+            stroke="#0F6E56" strokeWidth="1.5"
+          />
+          <path d="M 110 80 Q 180 100 230 90 T 360 130" stroke="#5BBEA0" strokeWidth="1.2" fill="none" opacity="0.6"/>
+          {alerts && alerts.map((a, i) => (
+            <g key={i}>
+              <circle cx={a.x} cy={a.y} r="7" fill={a.conf === 'high' ? '#E24B4A' : '#BA7517'} opacity="0.18" />
+              <circle cx={a.x} cy={a.y} r="4" fill={a.conf === 'high' ? '#E24B4A' : '#BA7517'} opacity="0.95" />
+            </g>
+          ))}
+          <text x="16" y="210" fontSize="10" fill="#0F6E56" fontFamily="-apple-system, sans-serif">
+            149,800 ha · peat swamp forest · 1.8°S, 113.2°E
+          </text>
+        </svg>
+      );
+    }
+
+    function BarChart({ data }) {
+      const W = 720, H = 200;
+      const max = 10;
+      const padL = 48, padR = 16, padT = 28, padB = 32;
+      const innerW = W - padL - padR;
+      const innerH = H - padT - padB;
+      const barW = (innerW / data.length) * 0.55;
+      const gap = (innerW / data.length) * 0.45;
+      const yTicks = [0, 3, 6, 10];
+      return (
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+          {yTicks.map(t => {
+            const y = padT + innerH - (t / max) * innerH;
+            return (
+              <g key={t}>
+                <line x1={padL} y1={y} x2={W - padR} y2={y} stroke={t === 0 ? '#B4B2A9' : '#D3D1C7'} strokeWidth="0.5" strokeDasharray={t === 0 ? '' : '2,3'} />
+                <text x={padL - 6} y={y + 3} textAnchor="end" fontSize="10" fill="#888780">{t === 0 ? '0' : t + 'M'}</text>
+              </g>
+            );
+          })}
+          {data.map((d, i) => {
+            const x = padL + i * (innerW / data.length) + gap / 2;
+            const h = (d.value / max) * innerH;
+            const y = padT + innerH - h;
+            return (
+              <g key={d.year}>
+                <rect x={x} y={y} width={barW} height={h} fill="#378ADD" opacity="0.88" rx="2"/>
+                <text x={x + barW / 2} y={y - 6} textAnchor="middle" fontSize="11" fontWeight="500" fill="#185FA5">{d.value}M</text>
+                <text x={x + barW / 2} y={H - 12} textAnchor="middle" fontSize="11" fill="#888780">{d.year}</text>
+              </g>
+            );
+          })}
+        </svg>
+      );
+    }
+
+    function PriceChart({ series, months }) {
+      const W = 800, H = 240;
+      const padL = 56, padR = 16, padT = 16, padB = 36;
+      const innerW = W - padL - padR;
+      const innerH = H - padT - padB;
+      const max = 150;
+      const yTicks = [0, 50, 100, 150];
+
+      const lineDefs = [
+        { key: 'IDTBS-RE', color: '#378ADD' },
+        { key: 'IDTBS', color: '#1D9E75' },
+        { key: 'IDNBS', color: '#D85A30' }
+      ];
+
+      const xFor = (i) => padL + (i / (months.length - 1)) * innerW;
+      const yFor = (v) => padT + innerH - (v / max) * innerH;
+
+      return (
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+          {yTicks.map(t => {
+            const y = yFor(t);
+            return (
+              <g key={t}>
+                <line x1={padL} y1={y} x2={W - padR} y2={y} stroke={t === 0 ? '#B4B2A9' : '#E5E3DA'} strokeWidth="0.5" strokeDasharray={t === 0 ? '' : '2,3'} />
+                <text x={padL - 8} y={y + 3} textAnchor="end" fontSize="10" fill="#888780">{t === 0 ? '0' : t + 'k'}</text>
+              </g>
+            );
+          })}
+          {months.map((m, i) => (
+            <text key={m} x={xFor(i)} y={H - 14} textAnchor="middle" fontSize="11" fill="#888780">{m}</text>
+          ))}
+          {lineDefs.map(({ key, color }) => {
+            const pts = series[key];
+            const segments = [];
+            let cur = [];
+            pts.forEach((v, i) => {
+              if (v == null) {
+                if (cur.length) segments.push(cur);
+                cur = [];
+              } else {
+                cur.push([xFor(i), yFor(v)]);
+              }
+            });
+            if (cur.length) segments.push(cur);
+            return (
+              <g key={key}>
+                {segments.map((seg, si) => (
+                  <polyline key={si} points={seg.map(p => p.join(',')).join(' ')} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
+                ))}
+                {pts.map((v, i) => v == null ? null : (
+                  <circle key={i} cx={xFor(i)} cy={yFor(v)} r="3.2" fill="#FFFFFF" stroke={color} strokeWidth="1.6"/>
+                ))}
+              </g>
+            );
+          })}
+        </svg>
+      );
+    }
+
+    function Footer() {
+      return (
+        <footer className="footer-bar">
+          <span>© 2026 KarbonLens · Lombok, Indonesia</span>
+          <span>Data from public registries · Built independent of IDX</span>
+        </footer>
+      );
+    }
+
+    // ============== Satellite map viewer ==============
+    const SAT_W = 800, SAT_H = 460;
+
+    function mulberry32(seed) {
+      return function () {
+        seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+        let t = seed;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+
+    const BOUNDARY = "M 110,70 Q 180,40 290,50 Q 410,55 500,80 Q 600,115 620,200 Q 615,290 540,360 Q 440,410 320,395 Q 200,380 140,330 Q 70,260 80,170 Q 90,105 110,70 Z";
+
+    function pointInBounds(x, y) {
+      const cx = 350, cy = 220;
+      const rx = 280, ry = 180;
+      return ((x - cx) * (x - cx)) / (rx * rx) + ((y - cy) * (y - cy)) / (ry * ry) < 1;
+    }
+
+    function buildNdviCells(seed) {
+      const rand = mulberry32(seed);
+      const cols = 64, rows = 36;
+      const cw = SAT_W / cols, ch = SAT_H / rows;
+      const cells = [];
+      const degraded = [
+        { x: 240, y: 140, r: 55 },
+        { x: 410, y: 110, r: 40 },
+        { x: 510, y: 250, r: 65 },
+        { x: 200, y: 300, r: 45 }
+      ];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x = c * cw + cw / 2;
+          const y = r * ch + ch / 2;
+          let n = 0.62 + 0.20 * Math.sin(c * 0.31 + r * 0.22) + 0.10 * Math.cos(c * 0.55 - r * 0.41);
+          n += (rand() - 0.5) * 0.10;
+          degraded.forEach(d => {
+            const dx = x - d.x, dy = y - d.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < d.r) n -= (1 - dist / d.r) * 0.55;
+          });
+          n = Math.max(-0.1, Math.min(0.92, n));
+          cells.push({ x: c * cw, y: r * ch, w: cw + 0.5, h: ch + 0.5, n, inside: pointInBounds(x, y) });
+        }
+      }
+      return cells;
+    }
+
+    function buildCanopyCells(seed) {
+      const rand = mulberry32(seed + 11);
+      const cols = 64, rows = 36;
+      const cw = SAT_W / cols, ch = SAT_H / rows;
+      const cells = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x = c * cw + cw / 2;
+          const y = r * ch + ch / 2;
+          let h = 18 + 10 * Math.sin(c * 0.18 + r * 0.31) + 6 * Math.cos(c * 0.4 - r * 0.2);
+          h += (rand() - 0.5) * 4;
+          const cx = 350, cy = 220;
+          const d = Math.sqrt(((x - cx) ** 2) / (260 * 260) + ((y - cy) ** 2) / (170 * 170));
+          h -= d * 8;
+          h = Math.max(0, Math.min(35, h));
+          cells.push({ x: c * cw, y: r * ch, w: cw + 0.5, h: ch + 0.5, height: h, inside: pointInBounds(x, y) });
+        }
+      }
+      return cells;
+    }
+
+    function buildTrueColorCells(seed) {
+      const rand = mulberry32(seed + 23);
+      const cols = 96, rows = 54;
+      const cw = SAT_W / cols, ch = SAT_H / rows;
+      const cells = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x = c * cw + cw / 2;
+          const y = r * ch + ch / 2;
+          const inside = pointInBounds(x, y);
+          let R, G, B;
+          const noise = (rand() - 0.5) * 18;
+          if (inside) {
+            R = 38 + noise; G = 64 + noise; B = 36 + noise;
+            const v = Math.sin(c * 0.3) * Math.cos(r * 0.25);
+            R += v * 6; G += v * 10; B += v * 4;
+          } else {
+            const t = Math.sin(c * 0.12 + r * 0.18);
+            if (t > 0.5) { R = 78 + noise; G = 92 + noise; B = 60 + noise; }
+            else if (t < -0.4) { R = 52 + noise; G = 82 + noise; B = 110 + noise; }
+            else { R = 110 + noise; G = 96 + noise; B = 72 + noise; }
+          }
+          cells.push({ x: c * cw, y: r * ch, w: cw + 0.5, h: ch + 0.5, fill: `rgb(${R|0},${G|0},${B|0})` });
+        }
+      }
+      return cells;
+    }
+
+    function ndviColor(n) {
+      const stops = [
+        { v: -0.1, c: [180, 120, 70] },
+        { v:  0.15, c: [220, 200, 95] },
+        { v:  0.35, c: [180, 200, 70] },
+        { v:  0.55, c: [70, 145, 60] },
+        { v:  0.92, c: [12, 78, 36] }
+      ];
+      for (let i = 0; i < stops.length - 1; i++) {
+        const a = stops[i], b = stops[i + 1];
+        if (n <= b.v) {
+          const t = (n - a.v) / (b.v - a.v);
+          const r = a.c[0] + (b.c[0] - a.c[0]) * t;
+          const g = a.c[1] + (b.c[1] - a.c[1]) * t;
+          const bl = a.c[2] + (b.c[2] - a.c[2]) * t;
+          return `rgb(${r|0},${g|0},${bl|0})`;
+        }
+      }
+      return `rgb(12,78,36)`;
+    }
+
+    function canopyColor(h) {
+      const t = Math.min(1, h / 35);
+      const stops = [
+        { v: 0,    c: [240, 232, 210] },
+        { v: 0.4,  c: [120, 195, 170] },
+        { v: 0.75, c: [40,  138, 130] },
+        { v: 1,    c: [12,  62,  78] }
+      ];
+      for (let i = 0; i < stops.length - 1; i++) {
+        const a = stops[i], b = stops[i + 1];
+        if (t <= b.v) {
+          const tt = (t - a.v) / (b.v - a.v);
+          const r = a.c[0] + (b.c[0] - a.c[0]) * tt;
+          const g = a.c[1] + (b.c[1] - a.c[1]) * tt;
+          const bl = a.c[2] + (b.c[2] - a.c[2]) * tt;
+          return `rgb(${r|0},${g|0},${bl|0})`;
+        }
+      }
+      return `rgb(12,62,78)`;
+    }
+
+    const RADD_ALERTS = [
+      { x: 245, y: 145, ha: 1.8, conf: 'high', date: '14 Apr 2026' },
+      { x: 305, y: 130, ha: 0.9, conf: 'high', date: '11 Apr 2026' },
+      { x: 405, y: 115, ha: 2.4, conf: 'high', date: '08 Apr 2026' },
+      { x: 510, y: 250, ha: 1.2, conf: 'nominal', date: '02 Apr 2026' },
+      { x: 200, y: 300, ha: 0.6, conf: 'nominal', date: '28 Mar 2026' },
+      { x: 460, y: 320, ha: 0.8, conf: 'nominal', date: '21 Mar 2026' },
+      { x: 350, y: 270, ha: 0.4, conf: 'nominal', date: '15 Mar 2026' }
+    ];
+
+    const VIIRS_HOTSPOTS = [
+      { x: 285, y: 165, brightness: 332, frp: 12.4 },
+      { x: 295, y: 175, brightness: 318, frp: 8.1 },
+      { x: 425, y: 200, brightness: 305, frp: 5.2 },
+      { x: 480, y: 280, brightness: 298, frp: 3.8 },
+      { x: 175, y: 210, brightness: 312, frp: 6.7 }
+    ];
+
+    const _ndviCells   = buildNdviCells(42);
+    const _canopyCells = buildCanopyCells(42);
+    const _trueCells   = buildTrueColorCells(42);
+
+    function LayerToggle({ active, onClick, swatch, label, count }) {
+      return (
+        <button
+          type="button"
+          className={'sat-layer-toggle' + (active ? ' active' : '')}
+          onClick={onClick}
+        >
+          <span className="sat-layer-swatch">{swatch}</span>
+          <span className="sat-layer-label">{label}</span>
+          {count != null && <span className="sat-layer-count">{count}</span>}
+          <span className="sat-layer-check">{active ? '●' : '○'}</span>
+        </button>
+      );
+    }
+
+    function SatelliteMap() {
+      const [layers, setLayers] = React.useState({
+        true_color: true,
+        ndvi: false,
+        canopy: false,
+        radd: true,
+        viirs: false,
+        boundary: true,
+        grid: true
+      });
+      const [opacity, setOpacity] = React.useState(0.78);
+      const [basemap, setBasemap] = React.useState('sentinel2');
+      const [hover, setHover] = React.useState(null);
+      const [selected, setSelected] = React.useState(null);
+
+      const toggle = (k) => setLayers(s => ({ ...s, [k]: !s[k] }));
+
+      const grids = [];
+      for (let i = 1; i < 6; i++) grids.push({ x: (SAT_W / 6) * i });
+      const gridY = [];
+      for (let i = 1; i < 4; i++) gridY.push({ y: (SAT_H / 4) * i });
+
+      return (
+        <div className="sat-viewer">
+          <div className="sat-toolbar">
+            <div className="sat-toolbar-group">
+              <span className="sat-toolbar-label">Basemap</span>
+              <div className="sat-segmented">
+                {[
+                  { k: 'sentinel2', l: 'Sentinel-2' },
+                  { k: 'planet',    l: 'Planet' },
+                  { k: 'landsat',   l: 'Landsat 9' }
+                ].map(b => (
+                  <button
+                    key={b.k}
+                    className={'sat-seg-btn' + (basemap === b.k ? ' active' : '')}
+                    onClick={() => setBasemap(b.k)}
+                  >{b.l}</button>
+                ))}
+              </div>
+            </div>
+            <div className="sat-toolbar-group">
+              <span className="sat-toolbar-label">Date</span>
+              <span className="sat-pill-mono">2026-04-15 · 03:42 UTC</span>
+            </div>
+            <div className="sat-toolbar-group">
+              <span className="sat-toolbar-label">Cloud cover</span>
+              <span className="sat-pill-mono">3.1%</span>
+            </div>
+            <div className="sat-toolbar-group" style={{ marginLeft: 'auto' }}>
+              <span className="sat-toolbar-label">Opacity</span>
+              <input
+                type="range" min="0" max="1" step="0.05"
+                value={opacity}
+                onChange={e => setOpacity(parseFloat(e.target.value))}
+                className="sat-opacity"
+              />
+              <span className="sat-pill-mono" style={{ minWidth: 36, textAlign: 'right' }}>{Math.round(opacity * 100)}%</span>
+            </div>
+          </div>
+
+          <div className="sat-stage">
+            <div className="sat-layers">
+              <div className="sat-section-label">Imagery</div>
+              <LayerToggle
+                active={layers.true_color}
+                onClick={() => toggle('true_color')}
+                label="True color"
+                swatch={<span style={{display:'block',width:'100%',height:'100%',background:'linear-gradient(135deg,#3a5a3a,#5a7a4a)'}} />}
+              />
+              <LayerToggle
+                active={layers.ndvi}
+                onClick={() => toggle('ndvi')}
+                label="NDVI · vegetation"
+                swatch={<span style={{display:'block',width:'100%',height:'100%',background:'linear-gradient(90deg,#b47846,#dcc85f,#0c4e24)'}} />}
+              />
+              <LayerToggle
+                active={layers.canopy}
+                onClick={() => toggle('canopy')}
+                label="Canopy height"
+                swatch={<span style={{display:'block',width:'100%',height:'100%',background:'linear-gradient(90deg,#f0e8d2,#288a82,#0c3e4e)'}} />}
+              />
+
+              <div className="sat-section-label" style={{ marginTop: 14 }}>Alerts</div>
+              <LayerToggle
+                active={layers.radd}
+                onClick={() => toggle('radd')}
+                label="RADD deforestation"
+                count={RADD_ALERTS.length}
+                swatch={<span style={{display:'block',width:'100%',height:'100%',background:'#E24B4A'}} />}
+              />
+              <LayerToggle
+                active={layers.viirs}
+                onClick={() => toggle('viirs')}
+                label="VIIRS thermal"
+                count={VIIRS_HOTSPOTS.length}
+                swatch={<span style={{display:'block',width:'100%',height:'100%',background:'#D85A30'}} />}
+              />
+
+              <div className="sat-section-label" style={{ marginTop: 14 }}>Reference</div>
+              <LayerToggle
+                active={layers.boundary}
+                onClick={() => toggle('boundary')}
+                label="Project polygon"
+                swatch={<span style={{display:'block',width:'100%',height:'100%',background:'transparent',border:'1.5px solid #1A1A1A'}} />}
+              />
+              <LayerToggle
+                active={layers.grid}
+                onClick={() => toggle('grid')}
+                label="Graticule"
+                swatch={<span style={{display:'block',width:'100%',height:'100%',background:'repeating-linear-gradient(0deg,#1A1A1A 0 1px,transparent 1px 4px),repeating-linear-gradient(90deg,#1A1A1A 0 1px,transparent 1px 4px)'}} />}
+              />
+
+              <div className="sat-meta">
+                <div className="sat-meta-row"><span>Provider</span><span>Sentinel Hub</span></div>
+                <div className="sat-meta-row"><span>Resolution</span><span>10 m / px</span></div>
+                <div className="sat-meta-row"><span>Tile</span><span>49M.BC.21</span></div>
+                <div className="sat-meta-row"><span>Last refresh</span><span>14 min ago</span></div>
+              </div>
+            </div>
+
+            <div className="sat-map-wrap">
+              <svg viewBox={`0 0 ${SAT_W} ${SAT_H}`} className="sat-svg" preserveAspectRatio="xMidYMid slice">
+                <rect width={SAT_W} height={SAT_H} fill="#0a0d0c" />
+
+                {layers.true_color && (
+                  <g>
+                    {_trueCells.map((c, i) => (
+                      <rect key={i} x={c.x} y={c.y} width={c.w} height={c.h} fill={c.fill} />
+                    ))}
+                    <ellipse cx="640" cy="80" rx="120" ry="22" fill="#FFFFFF" opacity="0.12" />
+                    <ellipse cx="120" cy="380" rx="80" ry="18" fill="#FFFFFF" opacity="0.08" />
+                  </g>
+                )}
+
+                {layers.ndvi && (
+                  <g opacity={opacity}>
+                    {_ndviCells.map((c, i) => (
+                      <rect key={i} x={c.x} y={c.y} width={c.w} height={c.h} fill={ndviColor(c.n)} />
+                    ))}
+                  </g>
+                )}
+
+                {layers.canopy && (
+                  <g opacity={opacity}>
+                    {_canopyCells.map((c, i) => (
+                      <rect key={i} x={c.x} y={c.y} width={c.w} height={c.h} fill={canopyColor(c.height)} />
+                    ))}
+                  </g>
+                )}
+
+                {layers.grid && (
+                  <g opacity="0.35">
+                    {grids.map((g, i) => (
+                      <line key={'gx' + i} x1={g.x} y1={0} x2={g.x} y2={SAT_H} stroke="#FFFFFF" strokeWidth="0.4" strokeDasharray="2,4" />
+                    ))}
+                    {gridY.map((g, i) => (
+                      <line key={'gy' + i} x1={0} y1={g.y} x2={SAT_W} y2={g.y} stroke="#FFFFFF" strokeWidth="0.4" strokeDasharray="2,4" />
+                    ))}
+                    {grids.map((g, i) => (
+                      <text key={'gxl' + i} x={g.x + 3} y={12} fontSize="9" fill="#FFFFFF" opacity="0.7" fontFamily="ui-monospace, monospace">
+                        {(113.0 + i * 0.08).toFixed(2)}°E
+                      </text>
+                    ))}
+                    {gridY.map((g, i) => (
+                      <text key={'gyl' + i} x={4} y={g.y - 3} fontSize="9" fill="#FFFFFF" opacity="0.7" fontFamily="ui-monospace, monospace">
+                        {(-1.5 - i * 0.10).toFixed(2)}°S
+                      </text>
+                    ))}
+                  </g>
+                )}
+
+                {layers.boundary && (
+                  <g>
+                    <path d={BOUNDARY} fill="none" stroke="#FFFFFF" strokeWidth="2.4" strokeOpacity="0.95" />
+                    <path d={BOUNDARY} fill="none" stroke="#1A1A1A" strokeWidth="1" strokeDasharray="4,3" />
+                  </g>
+                )}
+
+                {layers.radd && RADD_ALERTS.map((a, i) => {
+                  const isHigh = a.conf === 'high';
+                  const color = isHigh ? '#E24B4A' : '#BA7517';
+                  const isHover = hover && hover.type === 'radd' && hover.i === i;
+                  const isSel = selected && selected.type === 'radd' && selected.i === i;
+                  return (
+                    <g key={i}
+                       onMouseEnter={() => setHover({ type: 'radd', i })}
+                       onMouseLeave={() => setHover(null)}
+                       onClick={() => setSelected({ type: 'radd', i })}
+                       style={{ cursor: 'pointer' }}>
+                      <circle cx={a.x} cy={a.y} r="14" fill={color} opacity="0.18" />
+                      <circle cx={a.x} cy={a.y} r="7"  fill={color} opacity="0.35" />
+                      <circle cx={a.x} cy={a.y} r="3.2" fill={color} stroke="#FFFFFF" strokeWidth="1" />
+                      {(isHover || isSel) && (
+                        <circle cx={a.x} cy={a.y} r="11" fill="none" stroke="#FFFFFF" strokeWidth="1.2" />
+                      )}
+                    </g>
+                  );
+                })}
+
+                {layers.viirs && VIIRS_HOTSPOTS.map((h, i) => (
+                  <g key={'v' + i}
+                     onMouseEnter={() => setHover({ type: 'viirs', i })}
+                     onMouseLeave={() => setHover(null)}
+                     onClick={() => setSelected({ type: 'viirs', i })}
+                     style={{ cursor: 'pointer' }}>
+                    <rect x={h.x - 6} y={h.y - 6} width="12" height="12" fill="#D85A30" opacity="0.25" />
+                    <rect x={h.x - 3} y={h.y - 3} width="6" height="6" fill="#D85A30" stroke="#FFFFFF" strokeWidth="1" />
+                  </g>
+                ))}
+
+                <g transform={`translate(${SAT_W - 110}, ${SAT_H - 56})`}>
+                  <rect x="0" y="0" width="100" height="40" fill="#0a0d0c" opacity="0.65" rx="4" />
+                  <line x1="10" y1="14" x2="90" y2="14" stroke="#FFFFFF" strokeWidth="1.2" />
+                  <line x1="10" y1="11" x2="10" y2="17" stroke="#FFFFFF" strokeWidth="1.2" />
+                  <line x1="50" y1="11" x2="50" y2="17" stroke="#FFFFFF" strokeWidth="1.2" />
+                  <line x1="90" y1="11" x2="90" y2="17" stroke="#FFFFFF" strokeWidth="1.2" />
+                  <text x="10" y="27" fill="#FFFFFF" fontSize="8" fontFamily="ui-monospace, monospace">0</text>
+                  <text x="50" y="27" fill="#FFFFFF" fontSize="8" fontFamily="ui-monospace, monospace" textAnchor="middle">5</text>
+                  <text x="90" y="27" fill="#FFFFFF" fontSize="8" fontFamily="ui-monospace, monospace" textAnchor="end">10 km</text>
+                  <text x="50" y="36" fill="#FFFFFF" fontSize="8" fontFamily="ui-monospace, monospace" textAnchor="middle" opacity="0.7">EPSG:4326</text>
+                </g>
+              </svg>
+
+              {selected && selected.type === 'radd' && (() => {
+                const a = RADD_ALERTS[selected.i];
+                return (
+                  <div className="sat-callout" style={{ top: 12, left: 12 }}>
+                    <div className="sat-callout-head">
+                      <span className={'pill ' + (a.conf === 'high' ? 'pill-danger' : 'pill-warning')}>RADD · {a.conf}</span>
+                      <button className="sat-callout-close" onClick={() => setSelected(null)}>×</button>
+                    </div>
+                    <div className="sat-callout-title">Canopy disturbance · {a.ha} ha</div>
+                    <div className="sat-callout-meta">
+                      <div><span>Detected</span><span className="tnum">{a.date}</span></div>
+                      <div><span>Source</span><span>RADD · Wageningen</span></div>
+                      <div><span>Coords</span><span className="tnum">-1.83°S, 113.24°E</span></div>
+                      <div><span>Sensor</span><span>Sentinel-1 SAR</span></div>
+                    </div>
+                  </div>
+                );
+              })()}
+              {selected && selected.type === 'viirs' && (() => {
+                const h = VIIRS_HOTSPOTS[selected.i];
+                return (
+                  <div className="sat-callout" style={{ top: 12, left: 12 }}>
+                    <div className="sat-callout-head">
+                      <span className="pill pill-warning">VIIRS · thermal anomaly</span>
+                      <button className="sat-callout-close" onClick={() => setSelected(null)}>×</button>
+                    </div>
+                    <div className="sat-callout-title">Active fire detection</div>
+                    <div className="sat-callout-meta">
+                      <div><span>Brightness</span><span className="tnum">{h.brightness} K</span></div>
+                      <div><span>FRP</span><span className="tnum">{h.frp} MW</span></div>
+                      <div><span>Source</span><span>NASA FIRMS · VIIRS</span></div>
+                      <div><span>Confidence</span><span>nominal</span></div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="sat-legend">
+                {layers.ndvi && (
+                  <div className="sat-legend-item">
+                    <span className="sat-legend-label">NDVI</span>
+                    <div className="sat-legend-bar" style={{background:'linear-gradient(90deg,#b47846,#dcc85f,#b4c846,#469038,#0c4e24)'}} />
+                    <div className="sat-legend-scale tnum"><span>-0.1</span><span>0.4</span><span>0.9</span></div>
+                  </div>
+                )}
+                {layers.canopy && (
+                  <div className="sat-legend-item">
+                    <span className="sat-legend-label">Canopy m</span>
+                    <div className="sat-legend-bar" style={{background:'linear-gradient(90deg,#f0e8d2,#78c3aa,#288a82,#0c3e4e)'}} />
+                    <div className="sat-legend-scale tnum"><span>0</span><span>15</span><span>35</span></div>
+                  </div>
+                )}
+                {layers.radd && (
+                  <div className="sat-legend-item">
+                    <span className="sat-legend-dot" style={{background:'#E24B4A'}} />
+                    <span>High confidence (3)</span>
+                    <span className="sat-legend-dot" style={{background:'#BA7517', marginLeft: 12}} />
+                    <span>Nominal (4)</span>
+                  </div>
+                )}
+                {layers.viirs && (
+                  <div className="sat-legend-item">
+                    <span className="sat-legend-square" style={{background:'#D85A30'}} />
+                    <span>Active fire · 5 hotspots · last 7d</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="sat-footer">
+            <span>Tile centroid: 1.83°S, 113.24°E · 149,800 ha</span>
+            <span>Sources: Sentinel Hub, NASA FIRMS, Wageningen RADD, GFW · KarbonLens pipeline v2.4</span>
+          </div>
+        </div>
+      );
+    }
+
+    // ============== Screen: Landing ==============
+    function Landing() {
+      const D = window.KL_DATA;
+      const featured = ['katingan-peatland', 'sumatra-merang', 'rimba-raya'].map(id => D.projects.find(p => p.id === id));
+
+      return (
+        <div data-screen-label="01 Landing">
+          <TopNav active={null} isPublic={true} />
+          <div className="page" style={{ paddingTop: 0 }}>
+            <section className="landing-hero">
+              <span className="pill pill-info kicker"><span className="pill-dot" />Baru · Permenhut 6/2026 tracker live</span>
+              <h1 className="hero-h1">{`Indonesia's carbon market,\nin one terminal.`}</h1>
+              <p className="hero-tag-en">Project registry, prices, reversal alerts, and regulatory tracking — unified across Verra, SRN-PPI, Gold Standard, and IDXCarbon.</p>
+              <p className="hero-tag-id">Pasar karbon Indonesia dalam satu layar. Registry proyek, harga, alert reversal, dan pelacak regulasi.</p>
+              <div className="hero-cta">
+                <button className="btn btn-primary" onClick={() => navigate('#/projects')}>Start free</button>
+                <button className="btn" onClick={() => navigate('#/projects')}>See live demo</button>
+              </div>
+            </section>
+
+            <section className="section-block">
+              <div className="section-block-head">
+                <div className="section-label" style={{ marginBottom: 0 }}>Live market · January 2026</div>
+              </div>
+              <div className="stat-grid" style={{ marginBottom: 0 }}>
+                <div className="stat-card">
+                  <div className="stat-label">Projects tracked</div>
+                  <div className="stat-value">127</div>
+                  <div className="stat-delta neutral">across 4 registries</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">IDXCarbon Jan volume</div>
+                  <div className="stat-value">117k <span style={{fontSize:14,color:'var(--text-3)'}}>tCO₂e</span></div>
+                  <div className="stat-delta down">↓ 38% vs Dec</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Average price</div>
+                  <div className="stat-value">Rp 40k<span style={{fontSize:14,color:'var(--text-3)',fontWeight:400}}>/ton</span></div>
+                  <div className="stat-delta neutral">≈ US$2.50</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Reversal alerts 7d</div>
+                  <div className="stat-value warning">23</div>
+                  <div className="stat-delta neutral">across 14 projects</div>
+                </div>
+              </div>
+            </section>
+
+            <section className="section-block">
+              <div className="section-block-head">
+                <h2 className="section-h2">Featured projects</h2>
+                <a className="section-link" onClick={() => navigate('#/projects')}>View all 127 →</a>
+              </div>
+              <div className="project-card-grid">
+                {featured.map(p => (
+                  <div key={p.id} className="proj-preview" onClick={() => navigate('#/projects/' + p.id)}>
+                    <div className="proj-preview-head">
+                      {statusPill(p.status)}
+                      <span className={'score-badge ' + scoreClass(p.score)}>{p.score}</span>
+                    </div>
+                    <h3 className="proj-preview-name">{p.shortName}</h3>
+                    <div className="proj-preview-meta">
+                      {p.type} · {p.provinceShort} · {p.hectares ? p.hectares.toLocaleString() + ' ha' : '—'}
+                    </div>
+                    <div className="proj-preview-tags">
+                      {p.registries.map(r => <span key={r} className="tag">{r}</span>)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="section-block">
+              <div className="section-block-head" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+                <h2 className="section-h2">Pricing</h2>
+                <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Start free. Upgrade anytime.</div>
+              </div>
+              <div className="pricing-grid" style={{ marginTop: 18 }}>
+                <div className="price-card">
+                  <div className="price-tier">Free</div>
+                  <div className="price-amount">$0</div>
+                  <ul className="price-features">
+                    <li>3 projects full detail</li>
+                    <li>Weekly market digest</li>
+                    <li>Basic search</li>
+                    <li>Public data only</li>
+                  </ul>
+                  <button className="btn" style={{ width: '100%' }} onClick={() => navigate('#/projects')}>Start free</button>
+                </div>
+                <div className="price-card featured">
+                  <span className="price-card-badge">Most popular</span>
+                  <div className="price-tier">Pro</div>
+                  <div className="price-amount">$99<span className="per">/mo</span></div>
+                  <ul className="price-features">
+                    <li>All 127 projects</li>
+                    <li>Real-time reversal alerts</li>
+                    <li>API access (1k req/hr)</li>
+                    <li>CSV export</li>
+                    <li>Regulatory tracker</li>
+                    <li>Telegram notifications</li>
+                  </ul>
+                  <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => navigate('#/projects')}>Start Pro trial</button>
+                </div>
+                <div className="price-card">
+                  <div className="price-tier">Enterprise</div>
+                  <div className="price-amount">$10k+<span className="per">/yr</span></div>
+                  <ul className="price-features">
+                    <li>Team seats (unlimited)</li>
+                    <li>White-label exports</li>
+                    <li>Priority support</li>
+                    <li>Custom reports</li>
+                    <li>Webhook integration</li>
+                  </ul>
+                  <button className="btn" style={{ width: '100%' }} onClick={() => navigate('#/projects')}>Contact sales</button>
+                </div>
+              </div>
+            </section>
+          </div>
+          <Footer />
+        </div>
+      );
+    }
+
+    // ============== Screen: Projects ==============
+    function Projects() {
+      const D = window.KL_DATA;
+      const [search, setSearch] = React.useState('');
+      const [type, setType] = React.useState('All types');
+      const [province, setProvince] = React.useState('All provinces');
+      const [scoreMin, setScoreMin] = React.useState('All scores');
+
+      const filtered = React.useMemo(() => {
+        return D.projects.filter(p => {
+          const q = search.trim().toLowerCase();
+          if (q && !(p.name.toLowerCase().includes(q) || p.developer.toLowerCase().includes(q) || p.province.toLowerCase().includes(q))) return false;
+          if (type !== 'All types' && p.type !== type) return false;
+          if (province !== 'All provinces' && p.province !== province) return false;
+          if (scoreMin === 'Score ≥ 50' && p.score < 50) return false;
+          if (scoreMin === 'Score ≥ 70' && p.score < 70) return false;
+          return true;
+        });
+      }, [search, type, province, scoreMin]);
+
+      return (
+        <div data-screen-label="02 Projects">
+          <TopNav active="projects" />
+          <div className="page">
+            <div className="page-header">
+              <div>
+                <h1 className="page-title">Projects</h1>
+                <p className="page-subtitle">127 Indonesian carbon projects across Verra, SRN-PPI, Gold Standard</p>
+              </div>
+              <div className="page-actions">
+                <button className="btn">Export CSV</button>
+              </div>
+            </div>
+
+            <div className="filter-bar">
+              <input className="input" placeholder="Search projects, developers, regions..." value={search} onChange={e => setSearch(e.target.value)} />
+              <select className="select" value={type} onChange={e => setType(e.target.value)}>
+                {['All types','REDD+','ARR / Reforestation','Blue Carbon','Peatland','Geothermal','Hydro','Gas power'].map(x => <option key={x}>{x}</option>)}
+              </select>
+              <select className="select" value={province} onChange={e => setProvince(e.target.value)}>
+                {['All provinces','Central Kalimantan','South Sumatra','Papua','West Kalimantan','North Sulawesi','Jakarta','Central Java','Maluku','Riau / Jambi','Multiple'].map(x => <option key={x}>{x}</option>)}
+              </select>
+              <select className="select" value={scoreMin} onChange={e => setScoreMin(e.target.value)}>
+                {['All scores','Score ≥ 50','Score ≥ 70'].map(x => <option key={x}>{x}</option>)}
+              </select>
+            </div>
+
+            <div className="card" style={{ padding: '4px 18px' }}>
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>Project</th>
+                    <th>Type</th>
+                    <th>Province</th>
+                    <th className="right">Score</th>
+                    <th className="right">Available</th>
+                    <th>Registries</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(p => (
+                    <tr key={p.id} onClick={() => navigate('#/projects/' + p.id)}>
+                      <td>
+                        <div className="row-name">{p.shortName}</div>
+                        <div className="row-sub">{p.developer}</div>
+                      </td>
+                      <td style={{color:'var(--text-2)'}}>{p.type}</td>
+                      <td style={{color:'var(--text-2)'}}>{p.provinceShort}</td>
+                      <td className="right"><span className={'score-badge ' + scoreClass(p.score)}>{p.score}</span></td>
+                      <td className="right tnum" style={{color: p.available === 'Suspended' ? 'var(--danger-fg)' : p.available === 'Pipeline' ? 'var(--text-3)' : 'var(--text)'}}>{p.available}</td>
+                      <td style={{color:'var(--text-3)', fontSize:12}}>{p.registriesShort}</td>
+                    </tr>
+                  ))}
+                  {filtered.length === 0 && (
+                    <tr style={{cursor:'default'}} onClick={e => e.stopPropagation()}>
+                      <td colSpan="6" style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-3)' }}>
+                        No projects match your filters.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="page-footer">
+              <span>Showing {filtered.length} of 127 · Data refreshed 18 minutes ago</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button className="btn btn-sm">← Prev</button>
+                <button className="btn btn-sm">Next →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ============== Screen: Project Detail ==============
+    function ProjectDetail({ id }) {
+      const D = window.KL_DATA;
+      const p = D.projects.find(x => x.id === id) || D.projects.find(x => x.id === 'katingan-peatland');
+      const k = D.projects.find(x => x.id === 'katingan-peatland');
+      const breakdown = p.breakdown || k.breakdown;
+      const issuances = p.issuances || k.issuances;
+      const news = p.news || k.news;
+      const alerts = p.alerts || k.alerts;
+      const issued = p.issued || '—';
+      const retired = p.retired || '—';
+      const lastVintage = p.lastVintage || 2024;
+      const subtitle = `${p.type}${p.subtype ? ' · ' + p.subtype : ''}${p.hectares ? ' · ' + p.hectares.toLocaleString() + ' ha' : ''} · ${p.province} · ${p.developer}`;
+
+      const fillCls = (v) => v >= 70 ? 'success' : (v >= 50 ? 'info' : 'warning');
+
+      return (
+        <div data-screen-label="03 Project Detail">
+          <TopNav active="projects" />
+          <div className="page">
+            <div className="breadcrumb">
+              <a onClick={() => navigate('#/projects')}>Projects</a> <span style={{color:'var(--text-3)'}}>/</span> {p.shortName}
+            </div>
+            <div className="page-header">
+              <div>
+                <h1 className="page-title">{p.name}</h1>
+                <p className="page-subtitle">{subtitle}</p>
+              </div>
+              <div className="page-actions">
+                <button className="btn btn-sm">+ Watch</button>
+                <button className="btn btn-sm">Set alert</button>
+              </div>
+            </div>
+
+            <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+              <div className="stat-card">
+                <div className="stat-label">Integrity score</div>
+                <div className="stat-value success">{p.score}</div>
+                <div className="stat-delta neutral">composite</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">VCUs issued</div>
+                <div className="stat-value">{issued}</div>
+                <div className="stat-delta neutral">cumulative</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Retired</div>
+                <div className="stat-value">{retired}</div>
+                <div className="stat-delta neutral">cumulative</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Available</div>
+                <div className="stat-value">{p.available}</div>
+                <div className="stat-delta neutral">tradable</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Last vintage</div>
+                <div className="stat-value">{lastVintage}</div>
+                <div className="stat-delta neutral">verified</div>
+              </div>
+            </div>
+
+            <div className="card" style={{ marginBottom: 24, padding: 0, overflow: 'hidden' }}>
+              <div style={{ padding: '14px 18px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="section-label" style={{ marginBottom: 0 }}>Satellite imagery · data layers</div>
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Sentinel-2 · 10m · April 2026</span>
+              </div>
+              <SatelliteMap />
+            </div>
+
+            <div className="detail-two-col">
+              <div className="card">
+                <div className="section-label">Project area · reversal alerts 90 days</div>
+                <ProjectMap alerts={alerts} />
+                <div className="legend">
+                  <span className="legend-item"><span className="legend-swatch" style={{background:'#E24B4A'}} /> High confidence (3)</span>
+                  <span className="legend-item"><span className="legend-swatch" style={{background:'#BA7517'}} /> Nominal (2)</span>
+                  <span className="legend-item" style={{marginLeft:'auto', color:'var(--text-3)'}}>Source: GFW · RADD</span>
+                </div>
+              </div>
+              <div className="card">
+                <div className="section-label">Score breakdown</div>
+                {[
+                  { label: 'Validation recency', value: breakdown.validation },
+                  { label: 'Reversal risk (inverted)', value: breakdown.reversal },
+                  { label: 'Community flags (inv.)', value: breakdown.community },
+                  { label: 'Transparency', value: breakdown.transparency }
+                ].map(b => (
+                  <div key={b.label}>
+                    <div className="score-row">
+                      <span className="score-row-label">{b.label}</span>
+                      <span className="score-row-value">{b.value}</span>
+                    </div>
+                    <div className="score-track">
+                      <div className={'score-fill ' + fillCls(b.value)} style={{ width: b.value + '%' }} />
+                    </div>
+                  </div>
+                ))}
+                <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6, marginTop: 6 }}>
+                  Methodology: weighted composite. Reversal risk penalized by 90-day GFW alert count and alert area. Community score derived from NGO/news mentions tagged with relevant flags.
+                </div>
+              </div>
+            </div>
+
+            <div className="card" style={{ marginBottom: 24 }}>
+              <div className="section-label">VCU issuances · 2017–2020</div>
+              <BarChart data={issuances} />
+            </div>
+
+            <div className="card">
+              <div className="section-label">Recent news & flags</div>
+              {news.map((n, i) => (
+                <div key={i} className={'news-item ' + n.sentiment}>
+                  <div className="news-item-title">{n.title}</div>
+                  <div className="news-item-meta">{n.source} · {n.daysAgo}d</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ============== Screen: Prices ==============
+    function Prices() {
+      const D = window.KL_DATA;
+      const [range, setRange] = React.useState('6M');
+      const s = D.priceStats;
+
+      return (
+        <div data-screen-label="04 Prices">
+          <TopNav active="prices" />
+          <div className="page">
+            <div className="page-header">
+              <div>
+                <h1 className="page-title">Price intelligence</h1>
+                <p className="page-subtitle">IDXCarbon historical prices, volumes, and transactions — all credit types</p>
+              </div>
+              <div className="page-actions">
+                <div className="range-pills">
+                  {['1M','6M','1Y','All'].map(r => (
+                    <button key={r} className={'range-pill ' + (range === r ? 'active' : '')} onClick={() => setRange(r)}>{r}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="stat-grid">
+              <div className="stat-card">
+                <div className="stat-label">Jan 2026 value</div>
+                <div className="stat-value">{s.janValue}</div>
+                <div className="stat-delta down">{s.janValueDelta}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Volume</div>
+                <div className="stat-value">{s.volume}</div>
+                <div className="stat-delta down">{s.volumeDelta}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Avg price</div>
+                <div className="stat-value">{s.avgPrice}</div>
+                <div className="stat-delta neutral">{s.avgPriceDelta}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Participants</div>
+                <div className="stat-value">{s.participants}</div>
+                <div className="stat-delta up">{s.participantsDelta}</div>
+              </div>
+            </div>
+
+            <div className="card" style={{ marginBottom: 24 }}>
+              <div className="section-label">Average price by credit type · Aug 2025 – Jan 2026</div>
+              <PriceChart series={D.priceSeries} months={D.priceSeries.months} />
+              <div className="legend">
+                <span className="legend-item"><span className="legend-line" style={{background:'#378ADD'}} /> IDTBS-RE · Rp 55k–64k</span>
+                <span className="legend-item"><span className="legend-line" style={{background:'#1D9E75'}} /> IDTBS · Rp 38k–42k</span>
+                <span className="legend-item"><span className="legend-line" style={{background:'#D85A30'}} /> IDNBS · Rp 37k–39k (sparse)</span>
+              </div>
+            </div>
+
+            <div className="card" style={{ padding: '4px 18px' }}>
+              <div className="section-label" style={{ marginTop: 14 }}>Recent transactions · January 2026</div>
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Market</th>
+                    <th>Credit type</th>
+                    <th>Project</th>
+                    <th className="right">Volume</th>
+                    <th className="right">Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {D.transactions.map((t, i) => (
+                    <tr key={i} onClick={() => navigate('#/projects')}>
+                      <td className="tnum" style={{color:'var(--text-2)'}}>{t.date}</td>
+                      <td>
+                        <span className={'pill ' + (t.market === 'Marketplace' ? 'pill-info' : 'pill-neutral')} style={{fontSize:10}}>{t.market}</span>
+                      </td>
+                      <td style={{fontWeight:500}}>{t.creditType}</td>
+                      <td style={{color:'var(--text-2)'}}>{t.project}</td>
+                      <td className="right tnum">{t.volume}</td>
+                      <td className="right tnum" style={{fontWeight:500}}>{t.price}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="page-footer">
+              <span>Source: IDXCarbon · Last sync 4 minutes ago</span>
+              <span>4 transactions in window</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ============== Screen: Regulatory ==============
+    function Regulatory() {
+      const D = window.KL_DATA;
+      const [ministry, setMinistry] = React.useState('All ministries');
+
+      const filtered = D.regulatory.filter(r => {
+        if (ministry === 'All ministries') return true;
+        return r.tags.includes(ministry);
+      });
+
+      const impPill = (imp, label) => {
+        const cls = imp === 'critical' ? 'pill-danger' : imp === 'high' ? 'pill-warning' : imp === 'medium' ? 'pill-info' : 'pill-neutral';
+        return <span className={'pill ' + cls}>{label}</span>;
+      };
+
+      return (
+        <div data-screen-label="05 Regulatory">
+          <TopNav active="regulatory" />
+          <div className="page">
+            <div className="page-header">
+              <div>
+                <h1 className="page-title">Regulatory timeline</h1>
+                <p className="page-subtitle">Perpres, Permen, POJK, and Kepmen affecting the Indonesian carbon market</p>
+              </div>
+              <div className="page-actions">
+                <select className="select" value={ministry} onChange={e => setMinistry(e.target.value)}>
+                  {['All ministries','Kemenhut','KLH','OJK','Presidential','Multi-ministry'].map(x => <option key={x}>{x}</option>)}
+                </select>
+                <button className="btn">+ Subscribe</button>
+              </div>
+            </div>
+
+            <div className="card card-pad-lg">
+              {filtered.map((r, i) => (
+                <div key={i} className="timeline-item">
+                  <div>
+                    <div className="timeline-date tnum">{r.date}</div>
+                    <div className="timeline-date-status">{r.status}</div>
+                  </div>
+                  <div>
+                    <h3 className="timeline-title">{r.title}</h3>
+                    <p className="timeline-desc">"{r.desc}"</p>
+                    <div className="timeline-meta">
+                      {impPill(r.importance, r.importanceLabel)}
+                      {r.tags.map(t => <span key={t} className="tag">{t}</span>)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="page-footer">
+              <span>Source: JDIH Kemenhut, KLH, Setneg, OJK · Updated 2 hours ago</span>
+              <span>{filtered.length} of {D.regulatory.length} events</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ============== Screen: Alerts ==============
+    function Alerts() {
+      const D = window.KL_DATA;
+      const [filter, setFilter] = React.useState('All types');
+      const [alerts, setAlerts] = React.useState(D.alerts);
+
+      const filtered = alerts.filter(a => {
+        if (filter === 'All types') return true;
+        return a.type === filter.toLowerCase();
+      });
+
+      const sevPill = (sev, label) => {
+        const cls = 'pill-' + sev;
+        return <span className={'pill ' + cls}>{label}</span>;
+      };
+
+      const markRead = (id) => {
+        setAlerts(alerts.map(a => a.id === id ? { ...a, read: true } : a));
+      };
+
+      const unread = alerts.filter(a => !a.read).length;
+
+      return (
+        <div data-screen-label="06 Alerts">
+          <TopNav active="alerts" />
+          <div className="page">
+            <div className="page-header">
+              <div>
+                <h1 className="page-title">Alerts</h1>
+                <p className="page-subtitle">Real-time signals across projects you watch · {unread} unread</p>
+              </div>
+              <div className="page-actions">
+                <select className="select" value={filter} onChange={e => setFilter(e.target.value)}>
+                  {['All types','Reversal','Price','Regulatory','News','Retirement','Issuance'].map(x => <option key={x}>{x}</option>)}
+                </select>
+                <button className="btn">Settings</button>
+              </div>
+            </div>
+
+            <div className="card card-pad-lg">
+              {filtered.map(a => (
+                <div key={a.id} className="alert-row" onClick={() => markRead(a.id)}>
+                  <div className={'alert-status-dot ' + (a.read ? '' : 'unread')} />
+                  <div>
+                    <div className="alert-top-row">
+                      {sevPill(a.severity, a.typeLabel)}
+                      <span className="alert-project">{a.project}</span>
+                    </div>
+                    <div className="alert-title">{a.title}</div>
+                    <div className="alert-desc">{a.desc}</div>
+                  </div>
+                  <div className="alert-time tnum">{a.time}</div>
+                </div>
+              ))}
+              {filtered.length === 0 && (
+                <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-3)' }}>
+                  No alerts of this type.
+                </div>
+              )}
+            </div>
+
+            <div className="page-footer">
+              <span>Pipeline status: nominal · Last sync 23 seconds ago</span>
+              <span>{filtered.length} of {alerts.length} alerts</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ============== Router / App ==============
+    function App() {
+      const [route, setRoute] = React.useState(window.location.hash || '#/');
+
+      React.useEffect(() => {
+        const onChange = () => {
+          setRoute(window.location.hash || '#/');
+          window.scrollTo(0, 0);
+          try { localStorage.setItem('kl_last_route', window.location.hash || '#/'); } catch (e) {}
+        };
+        window.addEventListener('hashchange', onChange);
+        if (!window.location.hash || window.location.hash === '#' || window.location.hash === '#/') {
+          try {
+            const last = localStorage.getItem('kl_last_route');
+            if (last && last !== '#/') {
+              window.location.hash = last;
+              return;
+            }
+          } catch (e) {}
+        }
+        return () => window.removeEventListener('hashchange', onChange);
+      }, []);
+
+      const path = route.replace(/^#/, '');
+
+      if (path === '/' || path === '') return <Landing />;
+      if (path === '/projects') return <Projects />;
+      if (path.startsWith('/projects/')) {
+        const id = path.split('/')[2];
+        return <ProjectDetail id={id} />;
+      }
+      if (path === '/prices') return <Prices />;
+      if (path === '/regulatory') return <Regulatory />;
+      if (path === '/alerts') return <Alerts />;
+
+      return <Landing />;
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
