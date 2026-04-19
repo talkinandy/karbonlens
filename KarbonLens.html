@@ -1078,6 +1078,127 @@
       .sat-legend { position: static; max-width: 100%; margin: 8px; }
     }
 
+    /* ===== Landing satellite preview ===== */
+    .sat-preview {
+      position: relative;
+      background: #0a0d0c;
+      border: 0.5px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      cursor: pointer;
+      margin-bottom: 32px;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .sat-preview:hover {
+      border-color: var(--info-fg);
+      transform: translateY(-1px);
+    }
+    .sat-preview-map {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 6;
+      min-height: 260px;
+      overflow: hidden;
+    }
+    .sat-preview-map svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .sat-preview-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(15, 20, 17, 0.78);
+      border: 0.5px solid rgba(255,255,255,0.14);
+      border-radius: 6px;
+      padding: 6px 10px;
+      color: rgba(255,255,255,0.9);
+      font-size: 11px;
+      font-family: ui-monospace, Menlo, monospace;
+      font-variant-numeric: tabular-nums;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+    .sat-preview-live {
+      color: #E24B4A;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+    }
+    .sat-preview-legend {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 16px;
+      background: rgba(15, 20, 17, 0.78);
+      border: 0.5px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.85);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      flex-wrap: wrap;
+      max-width: calc(100% - 140px);
+    }
+    .sat-preview-caption {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 18px;
+      background: #161b18;
+      border-top: 0.5px solid rgba(255,255,255,0.08);
+      color: #E8E8E5;
+      flex-wrap: wrap;
+    }
+    .sat-preview-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: #FFFFFF;
+      margin-bottom: 2px;
+    }
+    .sat-preview-subtitle {
+      font-size: 12px;
+      color: rgba(255,255,255,0.6);
+      font-variant-numeric: tabular-nums;
+    }
+    .sat-preview-cta {
+      background: transparent;
+      color: #FFFFFF;
+      border: 0.5px solid rgba(255,255,255,0.3);
+      border-radius: var(--radius-md);
+      padding: 7px 14px;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .sat-preview-cta:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.5);
+    }
+
+    @keyframes sat-pulse {
+      0%, 100% { opacity: 0.18; r: 14; }
+      50%      { opacity: 0.45; r: 20; }
+    }
+    .sat-preview-pulse {
+      animation: sat-pulse 2.4s ease-in-out infinite;
+    }
+
+    @media (max-width: 768px) {
+      .sat-preview-map { aspect-ratio: 16/10; min-height: 240px; }
+      .sat-preview-caption { flex-direction: column; align-items: flex-start; gap: 10px; }
+      .sat-preview-legend { gap: 10px; max-width: calc(100% - 24px); }
+    }
+
     /* ===== Responsive ===== */
     @media (max-width: 768px) {
       .topnav { padding: 0 16px; }
@@ -1926,6 +2047,89 @@
       );
     }
 
+    // ============== Landing satellite preview ==============
+    function SatellitePreview() {
+      const grids = [1, 2, 3, 4, 5].map(i => (SAT_W / 6) * i);
+      const gridY = [1, 2, 3].map(i => (SAT_H / 4) * i);
+      return (
+        <div className="sat-preview" onClick={() => navigate('#/projects/katingan-peatland')}>
+          <div className="sat-preview-map">
+            <svg viewBox={`0 0 ${SAT_W} ${SAT_H}`} preserveAspectRatio="xMidYMid slice">
+              <rect width={SAT_W} height={SAT_H} fill="#0a0d0c" />
+              {_trueCells.map((c, i) => (
+                <rect key={i} x={c.x} y={c.y} width={c.w} height={c.h} fill={c.fill} />
+              ))}
+              <ellipse cx="640" cy="80" rx="120" ry="22" fill="#FFFFFF" opacity="0.12" />
+              <ellipse cx="120" cy="380" rx="80" ry="18" fill="#FFFFFF" opacity="0.08" />
+
+              <g opacity="0.22">
+                {grids.map((gx, i) => (
+                  <line key={'gx' + i} x1={gx} y1={0} x2={gx} y2={SAT_H} stroke="#FFFFFF" strokeWidth="0.4" strokeDasharray="2,4" />
+                ))}
+                {gridY.map((gy, i) => (
+                  <line key={'gy' + i} x1={0} y1={gy} x2={SAT_W} y2={gy} stroke="#FFFFFF" strokeWidth="0.4" strokeDasharray="2,4" />
+                ))}
+              </g>
+
+              <path d={BOUNDARY} fill="none" stroke="#FFFFFF" strokeWidth="2.4" strokeOpacity="0.95" />
+              <path d={BOUNDARY} fill="none" stroke="#1A1A1A" strokeWidth="1" strokeDasharray="4,3" />
+
+              {RADD_ALERTS.map((a, i) => {
+                const color = a.conf === 'high' ? '#E24B4A' : '#BA7517';
+                return (
+                  <g key={i}>
+                    <circle
+                      cx={a.x} cy={a.y} r="14" fill={color}
+                      className="sat-preview-pulse"
+                      style={{ animationDelay: (i * 0.3) + 's' }}
+                    />
+                    <circle cx={a.x} cy={a.y} r="7" fill={color} opacity="0.35" />
+                    <circle cx={a.x} cy={a.y} r="3.2" fill={color} stroke="#FFFFFF" strokeWidth="1" />
+                  </g>
+                );
+              })}
+
+              <g transform={`translate(${SAT_W - 110}, ${SAT_H - 56})`}>
+                <rect x="0" y="0" width="100" height="40" fill="#0a0d0c" opacity="0.65" rx="4" />
+                <line x1="10" y1="14" x2="90" y2="14" stroke="#FFFFFF" strokeWidth="1.2" />
+                <line x1="10" y1="11" x2="10" y2="17" stroke="#FFFFFF" strokeWidth="1.2" />
+                <line x1="50" y1="11" x2="50" y2="17" stroke="#FFFFFF" strokeWidth="1.2" />
+                <line x1="90" y1="11" x2="90" y2="17" stroke="#FFFFFF" strokeWidth="1.2" />
+                <text x="10" y="27" fill="#FFFFFF" fontSize="8" fontFamily="ui-monospace, monospace">0</text>
+                <text x="50" y="27" fill="#FFFFFF" fontSize="8" fontFamily="ui-monospace, monospace" textAnchor="middle">5</text>
+                <text x="90" y="27" fill="#FFFFFF" fontSize="8" fontFamily="ui-monospace, monospace" textAnchor="end">10 km</text>
+                <text x="50" y="36" fill="#FFFFFF" fontSize="8" fontFamily="ui-monospace, monospace" textAnchor="middle" opacity="0.7">EPSG:4326</text>
+              </g>
+            </svg>
+
+            <div className="sat-preview-badge">
+              <span className="sat-preview-live">● LIVE</span>
+              <span>Sentinel-2 · 2026-04-15 03:42 UTC · cloud 3.1%</span>
+            </div>
+
+            <div className="sat-preview-legend">
+              <span style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                <span style={{width:8,height:8,borderRadius:'50%',background:'#E24B4A',display:'inline-block'}} />
+                High confidence (3)
+              </span>
+              <span style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                <span style={{width:8,height:8,borderRadius:'50%',background:'#BA7517',display:'inline-block'}} />
+                Nominal (4)
+              </span>
+              <span style={{opacity:0.55,fontSize:10,textTransform:'uppercase',letterSpacing:0.5}}>RADD · last 90d</span>
+            </div>
+          </div>
+          <div className="sat-preview-caption">
+            <div>
+              <div className="sat-preview-title">Katingan peatland · live satellite monitoring</div>
+              <div className="sat-preview-subtitle">149,800 ha · 7 RADD alerts · Sentinel-2 10m · VIIRS thermal · NDVI</div>
+            </div>
+            <button className="sat-preview-cta" onClick={(e) => { e.stopPropagation(); navigate('#/projects/katingan-peatland'); }}>Explore project →</button>
+          </div>
+        </div>
+      );
+    }
+
     // ============== Screen: Landing ==============
     function Landing() {
       const D = window.KL_DATA;
@@ -1945,6 +2149,8 @@
                 <button className="btn" onClick={() => navigate('#/projects')}>See live demo</button>
               </div>
             </section>
+
+            <SatellitePreview />
 
             <section className="section-block">
               <div className="section-block-head">
@@ -1998,51 +2204,6 @@
               </div>
             </section>
 
-            <section className="section-block">
-              <div className="section-block-head" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
-                <h2 className="section-h2">Pricing</h2>
-                <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Start free. Upgrade anytime.</div>
-              </div>
-              <div className="pricing-grid" style={{ marginTop: 18 }}>
-                <div className="price-card">
-                  <div className="price-tier">Free</div>
-                  <div className="price-amount">$0</div>
-                  <ul className="price-features">
-                    <li>3 projects full detail</li>
-                    <li>Weekly market digest</li>
-                    <li>Basic search</li>
-                    <li>Public data only</li>
-                  </ul>
-                  <button className="btn" style={{ width: '100%' }} onClick={() => navigate('#/projects')}>Start free</button>
-                </div>
-                <div className="price-card featured">
-                  <span className="price-card-badge">Most popular</span>
-                  <div className="price-tier">Pro</div>
-                  <div className="price-amount">$99<span className="per">/mo</span></div>
-                  <ul className="price-features">
-                    <li>All 127 projects</li>
-                    <li>Real-time reversal alerts</li>
-                    <li>API access (1k req/hr)</li>
-                    <li>CSV export</li>
-                    <li>Regulatory tracker</li>
-                    <li>Telegram notifications</li>
-                  </ul>
-                  <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => navigate('#/projects')}>Start Pro trial</button>
-                </div>
-                <div className="price-card">
-                  <div className="price-tier">Enterprise</div>
-                  <div className="price-amount">$10k+<span className="per">/yr</span></div>
-                  <ul className="price-features">
-                    <li>Team seats (unlimited)</li>
-                    <li>White-label exports</li>
-                    <li>Priority support</li>
-                    <li>Custom reports</li>
-                    <li>Webhook integration</li>
-                  </ul>
-                  <button className="btn" style={{ width: '100%' }} onClick={() => navigate('#/projects')}>Contact sales</button>
-                </div>
-              </div>
-            </section>
           </div>
           <Footer />
         </div>
