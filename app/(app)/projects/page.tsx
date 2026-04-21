@@ -1,8 +1,155 @@
-import Link from "next/link";
-// TODO T11+: replace with db query
-import { mockProjects } from "@/lib/mock-data";
+/**
+ * app/(app)/projects/page.tsx — T11 Projects explorer (server component).
+ *
+ * Ownership: T11. Replaces the T03 mock-data scaffold. Reads `searchParams`,
+ * invokes the Drizzle helper (`lib/queries/projects-list`), and composes the
+ * page from the T11-owned presentational components:
+ *
+ *   - <StatsStrip>      (server, presentational)
+ *   - <FilterChips>     (server, server-rendered <Link> hrefs)
+ *   - <SortControl>     (client leaf — uses `useRouter` — per OQ-4)
+ *   - <ProjectsTable>   (server, presentational)
+ *   - <Pagination>      (server, server-rendered <Link> hrefs)
+ *   - <EmptyState>      (server, presentational)
+ *   - loading.tsx       (co-located, picked up by Next.js App Router streaming)
+ *
+ * URL contract (§3.3):
+ *   - `province` / `type` / `status` — repeated-key multi-value. `type`
+ *     maps internally to `projectType` in the query helper.
+ *   - `sort` — single value; fallback to `score_desc` on unknown input.
+ *   - `page` — positive integer; fallback to 1.
+ *   - `limit` — positive integer capped at 100; default 20.
+ *   - `tab` — 'table' | 'map'; fallback to 'table'. T13 fills the map branch.
+ *
+ * Tab preservation (§3.3, critical for T13 compat): every `<Link>` href on
+ * this page is built via `buildFilterUrl`, which carries forward the current
+ * `?tab=...` value so filter/sort/pagination interactions never drop the map
+ * tab. T13 fills the `{tab === 'map'}` branch below with a narrow change —
+ * the stub div is sized to prevent a layout shift on switch.
+ *
+ * Middleware-level auth (T05) already blocks unauthenticated requests to
+ * `/projects`. This page assumes a signed-in session and does not re-gate.
+ */
 
-export default function ProjectsPage() {
+import Link from 'next/link';
+import {
+  getProjectsList,
+  getProvinceOptions,
+  getProjectTypeOptions,
+  getStatusOptions,
+  type ProjectsListSort,
+} from '@/lib/queries/projects-list';
+import { ProjectsTable } from '@/components/projects/ProjectsTable';
+import { FilterChips } from '@/components/projects/FilterChips';
+import { SortControl } from '@/components/projects/SortControl';
+import { StatsStrip } from '@/components/projects/StatsStrip';
+import { Pagination } from '@/components/projects/Pagination';
+import { EmptyState } from '@/components/projects/EmptyState';
+import { buildFilterUrl } from '@/lib/url/build-filter-url';
+
+const PATHNAME = '/projects';
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 100;
+const VALID_SORTS: ProjectsListSort[] = [
+  'score_desc',
+  'score_asc',
+  'hectares_desc',
+  'name_asc',
+];
+
+function toArray(v: string | string[] | undefined): string[] {
+  if (v === undefined) return [];
+  if (Array.isArray(v)) return v.filter((x) => typeof x === 'string' && x !== '');
+  return v === '' ? [] : [v];
+}
+
+function parseSort(raw: string | string[] | undefined): ProjectsListSort {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  if (v && (VALID_SORTS as string[]).includes(v)) return v as ProjectsListSort;
+  return 'score_desc';
+}
+
+function parseInt1(
+  raw: string | string[] | undefined,
+  fallback: number,
+  cap?: number,
+): number {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  if (!v) return fallback;
+  const n = Number.parseInt(v, 10);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return cap ? Math.min(n, cap) : n;
+}
+
+function parseTab(raw: string | string[] | undefined): 'table' | 'map' {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  return v === 'map' ? 'map' : 'table';
+}
+
+export default async function ProjectsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+
+  // ── Parse search params (all malformed values silently fall back) ────────
+  // URL param `type` maps to internal `projectType` on the query helper.
+  const province = toArray(sp.province);
+  const projectType = toArray(sp.type);
+  const status = toArray(sp.status);
+  const sort = parseSort(sp.sort);
+  const page = parseInt1(sp.page, 1);
+  const limit = parseInt1(sp.limit, DEFAULT_LIMIT, MAX_LIMIT);
+  const tab = parseTab(sp.tab);
+
+  // Kick the three option queries off in parallel with the list query.
+  const [result, provinceOptions, typeOptions, statusOptions] = await Promise.all([
+    getProjectsList({
+      province,
+      projectType,
+      status,
+      sort,
+      page,
+      limit,
+    }),
+    getProvinceOptions(),
+    getProjectTypeOptions(),
+    getStatusOptions(),
+  ]);
+
+  const { rows, stats } = result;
+  const totalPages = Math.max(1, Math.ceil(stats.totalMatching / limit));
+  const showPagination = stats.totalMatching > limit;
+
+  // Tab toggle hrefs. Switching tabs clears `page` (a T13 map doesn't need
+  // to preserve the table's cursor) but retains filters and sort.
+  const tabTableHref = buildFilterUrl(PATHNAME, sp, {
+    set: { tab: 'table' },
+    remove: ['page'],
+  });
+  const tabMapHref = buildFilterUrl(PATHNAME, sp, {
+    set: { tab: 'map' },
+    remove: ['page'],
+  });
+
+  // "Clear all filters" — wipes every filter but preserves tab (map users
+  // should stay on the map after clearing).
+  const clearFiltersHref = buildFilterUrl(
+    PATHNAME,
+    {},
+    tab === 'map' ? { set: { tab: 'map' } } : {},
+  );
+
+  const prevHref =
+    page > 1
+      ? buildFilterUrl(PATHNAME, sp, { set: { page: String(page - 1) } })
+      : null;
+  const nextHref =
+    page < totalPages
+      ? buildFilterUrl(PATHNAME, sp, { set: { page: String(page + 1) } })
+      : null;
+
   return (
     <main className="kl-page">
       <header className="kl-page-header">
@@ -10,66 +157,85 @@ export default function ProjectsPage() {
           <p className="kl-section-label">Registry · v0.1</p>
           <h1 className="kl-page-title">Projects explorer</h1>
           <p className="kl-page-subtitle">
-            Indonesian carbon projects across Verra, SRN-PPI, Gold Standard, and
-            IDXCarbon. Click any row for the full dossier.
+            Indonesian carbon projects across Verra, SRN-PPI, Gold Standard,
+            and IDXCarbon. Click any row for the full dossier.
           </p>
-        </div>
-        <div className="kl-page-actions">
-          <span className="kl-pill kl-pill--neutral">Filters — coming soon</span>
         </div>
       </header>
 
-      <div className="kl-card" style={{ padding: 0, overflow: "hidden" }}>
-        <table className="kl-table">
-          <thead>
-            <tr>
-              <th>Project</th>
-              <th>Type</th>
-              <th>Province</th>
-              <th>Registries</th>
-              <th>Status</th>
-              <th style={{ textAlign: "right" }}>Score</th>
-              <th style={{ textAlign: "right" }}>Available</th>
-            </tr>
-          </thead>
-          <tbody>
-            {mockProjects.map((p) => (
-              <tr key={p.slug}>
-                <td>
-                  <Link href={`/projects/${p.slug}`} style={{ fontWeight: 500 }}>
-                    {p.shortName}
-                  </Link>
-                  <div className="kl-page-subtitle">{p.developer}</div>
-                </td>
-                <td>{p.type}</td>
-                <td>{p.provinceShort}</td>
-                <td>
-                  <span className="kl-pill kl-pill--neutral">
-                    {p.registriesShort}
-                  </span>
-                </td>
-                <td>
-                  <span
-                    className={`kl-pill kl-pill--${
-                      p.status === "flagged"
-                        ? "danger"
-                        : p.status === "pipeline"
-                          ? "warning"
-                          : p.status === "suspended"
-                            ? "danger"
-                            : "success"
-                    }`}
-                  >
-                    {p.status}
-                  </span>
-                </td>
-                <td style={{ textAlign: "right", fontWeight: 500 }}>{p.score}</td>
-                <td style={{ textAlign: "right" }}>{p.available}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <StatsStrip stats={stats} />
+
+      {/* Tab row — Table (T11) vs Map (T13 will fill). */}
+      <div className="kl-tab-row" role="tablist">
+        <Link
+          href={tabTableHref}
+          className={`kl-tab${tab === 'table' ? ' is-active' : ''}`}
+          role="tab"
+          aria-selected={tab === 'table'}
+        >
+          Table
+        </Link>
+        <Link
+          href={tabMapHref}
+          className={`kl-tab${tab === 'map' ? ' is-active' : ''}`}
+          role="tab"
+          aria-selected={tab === 'map'}
+        >
+          Map
+        </Link>
       </div>
+
+      {/* Toolbar: filters on the left, sort on the right. */}
+      <div className="kl-toolbar">
+        <div style={{ flex: 1, minWidth: 280 }}>
+          <FilterChips
+            options={{
+              province: provinceOptions,
+              type: typeOptions,
+              status: statusOptions,
+            }}
+            active={{ province, type: projectType, status }}
+            searchParams={sp}
+            pathname={PATHNAME}
+          />
+        </div>
+        <SortControl
+          currentSort={sort}
+          searchParams={sp}
+          pathname={PATHNAME}
+        />
+      </div>
+
+      {/* Body — map placeholder (T13) or table (T11 default). */}
+      {tab === 'map' ? (
+        <div
+          className="kl-card"
+          style={{
+            minHeight: 480,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--text-3)',
+          }}
+        >
+          {/* T13 map placeholder — filled by T13 without re-shaping this file. */}
+          <p>Map view coming in T13.</p>
+        </div>
+      ) : rows.length === 0 ? (
+        <EmptyState clearFiltersHref={clearFiltersHref} />
+      ) : (
+        <>
+          <ProjectsTable rows={rows} />
+          {showPagination ? (
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              prevHref={prevHref}
+              nextHref={nextHref}
+            />
+          ) : null}
+        </>
+      )}
     </main>
   );
 }
