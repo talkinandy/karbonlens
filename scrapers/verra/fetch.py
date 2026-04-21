@@ -72,15 +72,31 @@ HTTP_HEADERS = {
 
 # Status mapping (spec section 4)
 STATUS_MAP: dict[str, str] = {
+    # Active — project is producing credits or has graduated from VCS
     "Registered": "active",
+    "Units Transferred from Approved GHG Program": "active",
+    # Pipeline — project is under review, validation, or verification
     "Under development": "pipeline",
     "Under Development": "pipeline",
     "Under validation": "pipeline",
-    "On Hold": "suspended",
+    "Registration requested": "pipeline",
+    "Registration and verification approval requested": "pipeline",
+    "Verification approval requested": "pipeline",
+    "Crediting Period Renewal Requested": "pipeline",
+    "Crediting Period Renewal and Verification Approval Requested": "pipeline",
+    # Late to verify: project was registered but missed its verification
+    # deadline. Still exists on Verra; not formally suspended. Classify as
+    # pipeline to reflect "in-process" rather than terminal state.
+    "Late to verify": "pipeline",
+    # Suspended — project is paused / inactive but not terminated
     "Inactive": "suspended",
+    "On Hold - see notification letter": "suspended",
+    # Flagged — project was denied, withdrawn, or rejected outright
     "Withdrawn": "flagged",
     "Rejected by Administrator": "flagged",
-    "Rejected": "flagged",
+    "Registration request denied": "flagged",
+    "Registration and verification approval request denied": "flagged",
+    "Verification approval request denied": "flagged",
 }
 
 # Fuzzy match thresholds (spec section 3.3)
@@ -263,12 +279,21 @@ def _extract_attr(attrs: list[dict], code: str) -> str | None:
 
 
 def _map_status(raw: str | None) -> str | None:
+    """Map a Verra resourceStatus to the canonical enum
+    (active/pipeline/suspended/flagged).
+
+    Unknown values return None rather than a wrong default. The DB CHECK
+    constraint (migration 003) then records NULL for the row, which is
+    visible in queries and surfaceable in the admin UI — much better than
+    silently mislabelling a project as 'suspended' (which was the behaviour
+    before T06.1).
+    """
     if not raw:
         return None
     mapped = STATUS_MAP.get(raw.strip())
     if mapped is None:
         log.warning("status_unmapped", raw=raw)
-        return "suspended"
+        return None  # NULL in DB — visible in admin queries, not wrongly 'suspended'
     return mapped
 
 
@@ -689,7 +714,7 @@ def upsert_registry_row(conn: psycopg.Connection, project_id: str, p: VerraProje
         (
             project_id,
             p.vcs_id,
-            p.status_raw,
+            p.status_db,  # T06.1: write canonical enum, not raw Verra string
             source_url,
             json.dumps(p.raw_metadata, default=str),
         ),
