@@ -2,7 +2,7 @@
 id: T13
 title: Map integration (MapLibre) — explorer tab + detail panel
 phase: 3
-status: draft
+status: audited
 blocked_by: [T11, T12]
 blocks: []
 owner: tbd
@@ -52,7 +52,7 @@ This story is narrowly scoped to two surfaces: an explorer tab at `/projects?tab
 
 4. **`components/map/ProjectCentroidLayer.tsx`** — client component. Props:
    - `features: GeoJSON.FeatureCollection` — centroids from `getProjectCentroidsFeatureCollection()`.
-   - Adds a GeoJSON source and a `circle` layer. On click, opens a MapLibre `Popup` showing the project name and a link to `/projects/[slug]`.
+   - Adds a GeoJSON source and a `circle` layer. On click, opens a MapLibre `Popup` showing the project name, `integrity_score` (from `properties.score`; rendered as `"Score: 74"` or `"Score: —"` if null), and a "View detail →" link to `/projects/[slug]`.
    - Markers are tab-focusable (keyboard accessibility: `tabIndex={0}`, Enter/Space opens popup, Escape closes popup).
    - Skips features whose geometry is null (projects with NULL centroid in DB).
 
@@ -61,6 +61,19 @@ This story is narrowly scoped to two surfaces: an explorer tab at `/projects?tab
    - Color-codes by `confidence` property: `high` → `#ef4444` (red), `nominal` → `#f97316` (orange), `low` → `#eab308` (yellow).
    - Enables MapLibre clustering (`cluster: true` on the GeoJSON source). At zoom < 8, clustered circles are shown. At zoom ≥ 8, individual points are shown.
    - Uses `cluster-count` symbol layer for cluster badge text.
+   - **Cluster click:** Wire `map.on('click', clusterLayerId, ...)` to call `map.easeTo({ center: clusterCoordinates, zoom: currentZoom + 2 })`. Without this explicit handler, cluster circles are non-interactive by default. Exact pattern:
+     ```ts
+     map.on('click', 'alerts-clusters', (e) => {
+       const features = map.queryRenderedFeatures(e.point, { layers: ['alerts-clusters'] });
+       const clusterId = features[0].properties?.cluster_id;
+       const source = map.getSource('alerts') as maplibregl.GeoJSONSource;
+       source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+         if (err) return;
+         map.easeTo({ center: (features[0].geometry as GeoJSON.Point).coordinates as [number, number], zoom: zoom + 2 });
+       });
+     });
+     ```
+   - **Individual alert click:** Clicking a non-clustered alert point opens a MapLibre `Popup` showing `alertDate`, `confidence` (badge colour-coded), and `areaHa`.
 
 6. **Explorer map tab** (`/projects?tab=map`):
    - Renders when `searchParams.tab === 'map'`; the existing table renders when `tab` is absent or `'table'`.
@@ -69,12 +82,18 @@ This story is narrowly scoped to two surfaces: an explorer tab at `/projects?tab
    - Initial bounds fit Indonesia: approximately longitude 95–141, latitude −11 to 6 (`map.fitBounds([[95, -11], [141, 6]])`).
    - Clicking a marker opens a popup with project name + "View detail →" link to `/projects/[slug]`.
 
-7. **Detail map panel** (`/projects/[slug]#map`):
-   - Rendered below the issuances table, at the `#map` anchor T12 left as a placeholder.
+7. **Detail map panel** (`/projects/[slug]` — `#alerts` section):
+   - Rendered inside the `<section id="alerts">` that T12 shipped. T13 replaces the `<div class="kl-map-placeholder">Map coming in T13</div>` element that T12 left inside that section. The `id="alerts"` anchor **must not be moved or removed** — T16 (notifications) deep-links to it.
+   - T13 modifies `app/(app)/projects/[slug]/page.tsx` only inside the `kl-map-placeholder` div within `<section id="alerts">`. No other markup in the file may be changed.
    - Center: project centroid. Initial zoom: fit ~30 km around centroid (approximately zoom 10).
-   - Layers: `EsriBaseLayer` + `SatelliteAlertsLayer` (last 90 days of alerts for this project) + a filled `circle` polygon representing the 10 km buffer (GeoJSON polygon from `getProjectBufferFeatureCollection()`).
-   - Buffer circle layer: fill colour `rgba(59, 130, 246, 0.15)`, stroke `#3b82f6`, stroke width 1.5px.
+   - Layers: `EsriBaseLayer` + `SatelliteAlertsLayer` (last 90 days of alerts for this project) + a filled polygon representing the 10 km buffer (GeoJSON polygon from `getProjectBufferFeatureCollection()`).
+   - Buffer polygon layer: fill colour `rgba(59, 130, 246, 0.15)`, stroke `#3b82f6`, stroke width 1.5px.
    - If the project centroid is NULL, render a `<div>` with text "No location data available for this project."
+   - **Alert cap UI:** When `alertsGeoJSON.properties?.truncated` is true, render a notice directly below the map container:
+     ```
+     Showing 5,000 of {total} alerts — <a href="/projects/[slug]/alerts">see all in alerts inbox</a>
+     ```
+     The `ALERTS_MAP_LIMIT` constant is imported from `lib/queries/map-geojson.ts` to format the "5,000" figure programmatically rather than hardcoding it.
 
 8. **Server-side GeoJSON helper** — `lib/queries/map-geojson.ts`. Three exported async functions (all run server-side only; must not be imported by client components directly):
 
@@ -88,7 +107,7 @@ This story is narrowly scoped to two surfaces: an explorer tab at `/projects?tab
      ```
      Score is joined from `project_scores` (latest row per project, ordered by `score_date DESC LIMIT 1`). If no score row exists, `score` is `null`.
 
-   - **`getProjectAlertsFeatureCollection(projectId: string, days = 90)`** — queries `satellite_alerts` where `project_id = projectId` and `alert_date >= NOW() - INTERVAL '${days} days'`. Uses `ST_AsGeoJSON(location::geometry)::jsonb`. Returns a `GeoJSON.FeatureCollection` where each feature has:
+   - **`getProjectAlertsFeatureCollection(projectId: string, days = 90)`** — queries `satellite_alerts` where `project_id = projectId` and `alert_date >= NOW() - INTERVAL '${days} days'`. Uses `ST_AsGeoJSON(location::geometry)::jsonb`. Applies `LIMIT ALERTS_MAP_LIMIT` (see constant below). Returns a `GeoJSON.FeatureCollection` where each feature has:
      ```ts
      {
        type: "Feature",
@@ -96,6 +115,21 @@ This story is narrowly scoped to two surfaces: an explorer tab at `/projects?tab
        properties: { alertDate: string, confidence: "high" | "nominal" | "low", areaHa: number }
      }
      ```
+     When the total matching rows exceeds `ALERTS_MAP_LIMIT`, include a top-level `properties` object on the FeatureCollection indicating the cap:
+     ```ts
+     {
+       type: "FeatureCollection",
+       properties: { truncated: true, total: N },  // N = COUNT(*) of uncapped result
+       features: [...]  // capped at ALERTS_MAP_LIMIT
+     }
+     ```
+     When the result is not capped, `properties` is `null` or omitted. The total count is obtained via a parallel `SELECT COUNT(*)` query in the same function (not a second round-trip — run both queries concurrently with `Promise.all`).
+
+     **`ALERTS_MAP_LIMIT` constant** — defined at the top of `lib/queries/map-geojson.ts`:
+     ```ts
+     export const ALERTS_MAP_LIMIT = 5000;
+     ```
+     This value is exported so the UI can reference it in the truncation message (see §3 item 7 and the detail map panel below).
 
    - **`getProjectBufferFeatureCollection(projectId: string)`** — queries the project's centroid and `buffer_km`. Uses `ST_AsGeoJSON(ST_Buffer(centroid::geometry, buffer_km * 1000 / 111320.0))::jsonb` (approximate degree-based buffer — sufficient for v0.1). Returns a single-feature `GeoJSON.FeatureCollection` whose geometry is a Polygon.
 
@@ -108,9 +142,10 @@ This story is narrowly scoped to two surfaces: an explorer tab at `/projects?tab
 11. **Loading skeleton:** The `MapLibreBase` component shows an `animate-pulse bg-neutral-800 rounded` placeholder div (same height as the map container) while MapLibre JS is loading. The skeleton disappears once the `map.on('load', ...)` event fires.
 
 12. **Keyboard accessibility:**
+    - The map container `div` must have `tabIndex={0}` so it can receive keyboard focus. MapLibre's built-in keyboard handler (enabled by default) then provides arrow-key pan and +/- zoom when the container is focused. Do **not** set `keyboard: false` in the MapLibre constructor options.
+    - The map container must have `role="application"` and `aria-label="Satellite map of Indonesian carbon projects"` (explorer) or `aria-label="Satellite map of [project name]"` (detail panel). Do not use `role="region"` — `application` is correct for interactive widget regions.
     - Marker popups are reachable via keyboard (tab focus on marker elements; Enter/Space opens popup).
     - Escape key closes any open popup (`map.on('keydown', ...)` or popup-level handler).
-    - The map container itself has `role="region"` and `aria-label="Project map"`.
 
 ### Out of scope (explicit non-goals)
 
@@ -148,11 +183,21 @@ Note: Full marker count verification requires a browser; HTTP-level check confir
 ```
 Given an authenticated session
 When GET /projects/katingan-peatland is requested
-Then the response HTML contains the #map anchor element
+Then the response HTML contains the id="alerts" section element
+And the kl-map-placeholder div is replaced by the MapLibre container
 And (in browser) MapLibre renders with Esri satellite tiles
-And the 10 km buffer circle is visible around Katingan's centroid
+And the 10 km buffer polygon is visible around Katingan's centroid
 And at least some alert points are visible (Katingan has 428 alerts in DB)
 Note: Visual verification required in browser; document as manual check in PR.
+```
+
+**AC-10: Alert cap indicator shown when truncated**
+```
+Given a project whose satellite alerts for the last 90 days exceed ALERTS_MAP_LIMIT (5000)
+When the detail map panel is rendered
+Then the FeatureCollection has properties.truncated === true and properties.total === N
+And the UI renders "Showing 5,000 of N alerts — see all in alerts inbox" below the map
+And the "see all in alerts inbox" text is an anchor link to /projects/[slug]/alerts
 ```
 
 **AC-4: Marker click opens popup with project name**
@@ -274,8 +319,23 @@ T13 is the **sole owner** of:
 - `lib/queries/map-geojson.ts`
 
 T13 makes **narrow, coordinated changes** to (T11 and T12 own these files; T13 implementer must not refactor logic outside the map-related sections):
-- `app/(app)/projects/page.tsx` — add tab bar and map branch only
-- `app/(app)/projects/[slug]/page.tsx` — replace map placeholder `<div>` only
+
+- **`app/(app)/projects/page.tsx`** — add tab bar and map branch only. Cross-story contract with T11:
+  - T11's spec (§3.3) declares the page as a Next.js server component with no `'use client'` directive. T13 must preserve this. Only the `MapLibreBase` wrapper (and descendants) use `next/dynamic` with `ssr: false`; the page component itself remains a server component.
+  - T11's `searchParams` shape includes `tab?: 'table' | 'map'` (deferred in T11 §4 "Out of scope: Map tab on `/projects` — T13"). T13 reads `searchParams.tab` and renders `<ProjectsTable>` when `tab` is absent or `'table'`, and the explorer map panel when `tab === 'map'`. Cross-reference T11 §3.3 for the full `searchParams` parsing rules.
+  - Concrete render slot (server component, GeoJSON fetched server-side):
+    ```tsx
+    {resolvedSearchParams.tab === 'map' ? (
+      <Suspense fallback={<div className="animate-pulse bg-neutral-800 rounded h-[60vh]" />}>
+        <MapExplorerTab features={centroidsGeoJSON} />
+      </Suspense>
+    ) : (
+      <ProjectsTable rows={rows} />
+    )}
+    ```
+    `centroidsGeoJSON` is fetched via `getProjectCentroidsFeatureCollection()` in the server component, passed as a prop. Only `MapExplorerTab` (and `MapLibreBase` inside it) is dynamically imported with `ssr: false`.
+
+- **`app/(app)/projects/[slug]/page.tsx`** — replace the `kl-map-placeholder` div inside `<section id="alerts">` only. T13 modifies only that specific `<div>` element. The `id="alerts"` attribute on the parent `<section>` must not be renamed or removed — T16 (notifications bell + inbox) deep-links to `#alerts`. Cross-reference T12 §3.2 for the exact placeholder HTML.
 
 T13 adds `maplibre-gl` to `package.json`. No other `package.json` changes.
 
@@ -305,12 +365,12 @@ T13 adds `maplibre-gl` to `package.json`. No other `package.json` changes.
 
 ## 8. Definition of done
 
-- [ ] All nine acceptance criteria pass (AC-2, AC-3, AC-4, AC-5, AC-8 documented as manual browser verification in PR description)
+- [ ] All ten acceptance criteria pass (AC-2, AC-3, AC-4, AC-5, AC-8, AC-10 documented as manual browser verification in PR description)
 - [ ] `npm run build` exits 0
 - [ ] `npx tsc --noEmit` exits 0
 - [ ] `grep -r "mapbox" . --include="*.ts" --include="*.tsx" --exclude-dir=node_modules -i` returns no matches
 - [ ] `components/map/` contains all four new files
-- [ ] `lib/queries/map-geojson.ts` exists with all three exported functions
+- [ ] `lib/queries/map-geojson.ts` exists with all three exported functions and the `ALERTS_MAP_LIMIT = 5000` exported constant
 - [ ] `package.json` lists `maplibre-gl` at v5+ in `dependencies`
 - [ ] T11 and T12 page files updated with map integration; no unrelated lines changed in those files
 - [ ] Story landed in `feature/v0.1-impl` after T11 and T12 are merged
@@ -332,7 +392,10 @@ Recommendation: tab state lives in the URL query param (`?tab=map`), making filt
 `ST_Buffer` with the default 32 segments produces a polygon with 32 vertices — visually a smooth circle at the scales used here. Sufficient for v0.1. No action needed.
 
 **OQ-4: GeoJSON API route vs server component props.**
-Current design passes GeoJSON as server component props (fetched in the page's `async` server component, then JSON-serialized into the component tree). This avoids an extra HTTP round-trip. The tradeoff is that the map data is bundled into the initial HTML payload (~64 features × ~100 bytes each ≈ 6 KB for explorer; ~500 alerts × ~80 bytes ≈ 40 KB for detail). Both are within acceptable limits for v0.1. If detail page alert counts grow significantly, move to a client-side fetch via `/api/projects/[id]/alerts` in v0.2.
+Current design passes GeoJSON as server component props (fetched in the page's `async` server component, then JSON-serialized into the component tree). This avoids an extra HTTP round-trip. The tradeoff is that the map data is bundled into the initial HTML payload (~64 features × ~100 bytes each ≈ 6 KB for explorer; capped at 5,000 alerts × ~80 bytes ≈ 400 KB for detail). Explorer payload is within acceptable limits for v0.1; the alert cap introduced by F-1 keeps the detail payload manageable. If detail page alert counts grow significantly post-T07, move to a client-side fetch via `/api/projects/[id]/alerts` in v0.2. Accepted for v0.1.
+
+**OQ-5: Definitive value for `ALERTS_MAP_LIMIT`.**
+The cap of 5,000 is based on an estimate of ~80 bytes per alert GeoJSON feature, yielding a ~400 KB embedded payload — acceptable for v0.1. Post T07 Phase B ingestion, Andy should verify whether high-density projects (Mangrove Aceh, South Kalimantan) exceed 5,000 alerts in a 90-day window. If so, consider reducing to 2,000 or switching to a v0.2 client-side API route. No action needed before implementation; constant is exported and easily changed.
 
 ---
 

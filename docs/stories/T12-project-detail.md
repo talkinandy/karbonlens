@@ -2,7 +2,7 @@
 id: T12
 title: Project detail screen with real data
 phase: 3
-status: draft
+status: audited
 blocked_by: [T04, T06, T07, T09]
 blocks: [T13]
 owner: unassigned
@@ -85,15 +85,22 @@ must complete first; the remaining five queries run in parallel.
 
 #### 3.2 Page sections (top to bottom)
 
-All sections appear for authenticated users. Public users (non-authenticated) may access only the
-three public slugs (§3.3); the middleware redirects all others before the page renders.
+All sections appear for authenticated users. Public users (non-authenticated) may access the
+three public slugs (§3.3) but see a **reduced view**: the hero, score card, and registry card
+only — the issuances detail, retirements card, alerts section, and methodology note are NOT
+rendered for unauthenticated requests. The middleware handles slug-level gating; the page
+component checks `session` (from NextAuth `getServerSession`) to conditionally render the
+restricted sections. For all other slugs, middleware redirects to `/?signin=1` before the page
+component runs.
 
 **Section: Hero** (no anchor needed — it is the top of the page)
 
 - Project name as `<h1 class="kl-page-title">`.
 - Breadcrumb: `← Projects` link to `/projects` then `· <registryTag>` pills (one per registry).
 - Subtitle: `developer · province · hectares ha`.
-- Right-aligned: status badge (`kl-pill kl-pill--success|warning|danger`).
+- Right-aligned: status badge (`kl-pill kl-pill--success|warning|danger`). Import and use
+  `displayStatus()` from `lib/display/status.ts` (created by T11; T12 consumes it) to derive the
+  badge variant and label from `project.status`.
 - Status mapping: `active → success`, `pipeline → warning`, anything else → `danger`.
 
 **Section: `#score` — Integrity score card**
@@ -114,9 +121,19 @@ Renders as a `kl-card` with:
   | `community_flags` | Community & benefit-sharing |
   | `transparency` | Transparency & disclosure |
 
-  Each row: label left, `{value}/100` right, then a `div.score-track` containing a
-  `div.score-fill` with `width: {value}%` and class `success` (≥ 75) / `info` (≥ 60) /
-  `warning` (< 60).
+  Each row: label left, `{value}/100` right (numeric text label is mandatory for accessibility),
+  then a `div.score-track` containing a `div.score-fill` with `width: {value}%` and class
+  `success` (≥ 75) / `info` (≥ 60) / `warning` (< 60). The `div.score-fill` must include
+  ARIA progressbar semantics:
+  ```html
+  <div class="score-fill ..."
+       role="progressbar"
+       aria-valuenow="{value}"
+       aria-valuemin="0"
+       aria-valuemax="100"
+       aria-label="{label}: {value} out of 100">
+  </div>
+  ```
 - Footer note (italic, 11 px, `--text-3`):
   `"v1 methodology, calibrating. Last computed {scoreDate}."` where `scoreDate` is
   `project_scores.score_date` formatted as `YYYY-MM-DD`.
@@ -134,7 +151,10 @@ Last synced.
   If `url` is null, render plain text. For Verra registries the URL follows the pattern
   `https://registry.verra.org/app/projectDetail/VCS/{numericId}` — the Verra scraper (T06)
   populates this in `registries.url`.
-- Last synced: `lastSyncedAt` formatted as `DD MMM YYYY` (e.g. `19 Apr 2026`) or `—` if null.
+- Last synced: `lastSyncedAt` formatted as `DD MMM YYYY` (e.g. `19 Apr 2026`) or `—` if null,
+  followed by a muted inline note: `"Synced N days ago"` where N is the number of whole days
+  between `lastSyncedAt` and today (e.g. `"19 Apr 2026 · Synced 3 days ago"`). If
+  `lastSyncedAt` is null, omit the note entirely.
 - Status: render as a `kl-pill` (`active → success`, `suspended → danger`, else neutral).
 - If the registries array is empty, render: `"No registry records found."`.
 
@@ -167,10 +187,19 @@ Anchor: `id="alerts"`.
 A `kl-card` with:
 - Stat row: `Total (last 90 days): {total90d}` | `High confidence: {highConf}` |
   `Nominal confidence: {nominalConf}`.
-- Map embed placeholder: `<div class="kl-map-placeholder">Map coming in T13</div>` — a styled
-  grey rectangle (min-height: 280 px) with that label centred in muted text.
-- Link: `<a href="/alerts?project={project.id}">View all alerts for this project →</a>`. This
-  pre-seeds the T16 alerts inbox filter (T16 must honour the `?project=` query param).
+- Map placeholder section — emitted immediately below the stat row, **outside** the alerts
+  `kl-card`, as its own element with a contractual anchor for T13:
+  ```html
+  <section id="map" aria-label="Project map">
+    <div class="kl-map-placeholder">Map coming in T13</div>
+  </section>
+  ```
+  The `<div class="kl-map-placeholder">` is a styled grey rectangle (min-height: 280 px) with
+  that label centred in muted text. T13 will replace the placeholder content; it must not rename
+  or remove the `<section id="map">` element.
+- Link: `<a href="/alerts?project={project.slug}">View all alerts for this project →</a>`. This
+  pre-seeds the T16 alerts inbox filter. T16 resolves the slug to UUID server-side; passing
+  `project.slug` (not `project.id`) is the correct RESTful convention and matches T16's spec.
 - If zero alerts in 90 days: show the stat row with all zeros; still render the map placeholder.
 
 **Section: Methodology note** (below alerts, no anchor)
@@ -201,8 +230,8 @@ T06 scraper slug-generation logic):
 | `rimba-raya-biodiversity-reserve-project` | VCS674 | Rimba Raya Biodiversity Reserve Project |
 | `sumatra-merang-peatland-project-smpp` | VCS1650 | Sumatra Merang Peatland Project (SMPP) |
 
-**Andy must confirm these three slugs before the implementer applies §3.4.** At spec-apply time,
-verify against the live DB:
+**Slugs verified 2026-04-19 against live DB** (OQ-1 closed). The query below was executed by
+the spec auditor and all three slugs matched exactly — no further confirmation needed:
 
 ```sql
 SELECT slug, name_canonical
@@ -211,9 +240,6 @@ WHERE name_canonical ILIKE '%katingan%'
    OR name_canonical ILIKE '%rimba raya%'
    OR name_canonical ILIKE '%merang%';
 ```
-
-Use the exact `slug` values returned by that query in `middleware.ts`. If any slug differs from
-the table above, update the spec and `middleware.ts` accordingly.
 
 #### 3.4 Middleware update (narrow edit)
 
@@ -240,12 +266,13 @@ logic, and auth check are T05-owned and must not be touched.
 
 The following `id` attributes are contractual — T13 and T16 will hard-code deep-links to them:
 
-| id | Section |
-|---|---|
-| `score` | Integrity score card |
-| `registries` | Registry cross-reference card |
-| `issuances` | Issuances table |
-| `alerts` | Satellite alerts |
+| id | Section | Consumer |
+|---|---|---|
+| `score` | Integrity score card | internal nav |
+| `registries` | Registry cross-reference card | internal nav |
+| `issuances` | Issuances table | internal nav |
+| `alerts` | Satellite alerts | internal nav, T16 |
+| `map` | Map placeholder `<section>` below issuances | T13 (replaces placeholder content) |
 
 Do not rename these after landing on `feature/v0.1-impl`.
 
@@ -380,6 +407,7 @@ Then  exit code is 0 (no build errors)
 - `retirements` table — `beneficiary_name`, `credits`, `retirement_date`.
 - `satellite_alerts` table — `confidence`, `alert_date` (last 90 days).
 - `lib/score.ts` — `ScoreComponents` type, `WEIGHTS`, `METHODOLOGY_VERSION`, `COMMUNITY_OVERRIDES`.
+- `lib/display/status.ts` — `displayStatus()` helper (created by T11; T12 imports read-only).
 
 **Outputs:**
 - `app/(app)/projects/[slug]/page.tsx` — modified (mock removed, real queries wired).
@@ -413,8 +441,10 @@ No new DB migrations. No new env vars.
 
 **Related stories (not blocking but coupled):**
 - T11 (Projects explorer) — clicking a row navigates to `/projects/[slug]`. T11 sets slugs in
-  `href` attributes; they must match real DB slugs.
-- T16 (Alerts inbox) — this story creates the `?project={id}` deep-link. T16 must honour it.
+  `href` attributes; they must match real DB slugs. T11 also creates `lib/display/status.ts`
+  which T12 imports for the hero status badge.
+- T16 (Alerts inbox) — this story creates the `?project={slug}` deep-link. T16 resolves slug →
+  UUID server-side and must honour the `?project=` param using slug values.
 - T05 (NextAuth middleware) — this story makes a narrow edit to `middleware.ts`. The middleware
   logic itself is T05-owned; T12 touches only `PUBLIC_PROJECT_SLUGS`.
 
@@ -435,6 +465,7 @@ No new DB migrations. No new env vars.
 - `lib/db.ts`
 - `lib/auth.ts`
 - `lib/score.ts` (read-only import of `ScoreComponents`, `WEIGHTS`, `METHODOLOGY_VERSION`)
+- `lib/display/status.ts` (read-only import of `displayStatus()`; owned by T11)
 - Any migration file.
 - Any file under `app/(app)/projects/` other than the `[slug]/` subdirectory.
 
@@ -491,7 +522,12 @@ render `—` in the bar label and a zero-width bar. Do not crash the page.
 - [ ] `middleware.ts` `PUBLIC_PROJECT_SLUGS` uses real DB slugs with the explanatory comment.
 - [ ] All five detail components exist under `components/projects/detail/`.
 - [ ] `lib/queries/project-detail.ts` is the only place DB queries for this page run.
-- [ ] Section anchors `#score`, `#registries`, `#issuances`, `#alerts` are present in the DOM.
+- [ ] Section anchors `#score`, `#registries`, `#issuances`, `#alerts`, and `#map` are present in the DOM.
+- [ ] `<section id="map" aria-label="Project map">` is emitted below the issuances table with the placeholder div inside.
+- [ ] Hero status badge uses `displayStatus()` imported from `lib/display/status.ts`.
+- [ ] Score sub-score bars have `role="progressbar"` + `aria-valuenow/min/max` + `aria-label`.
+- [ ] Registry rows show "Synced N days ago" inline note next to the formatted date.
+- [ ] Unauthenticated public-slug views render only hero + score + registry (not issuances, alerts, or methodology).
 - [ ] `/projects/[slug]/loading.tsx` and `/projects/[slug]/not-found.tsx` exist.
 - [ ] Story's files landed on `feature/v0.1-impl`.
 - [ ] CHANGELOG entry added under `[Unreleased]`.
@@ -502,13 +538,8 @@ render `—` in the bar label and a zero-width bar. Do not crash the page.
 
 ## 9. Open questions
 
-**OQ-1 (Andy — blocking for middleware edit):** Confirm the three public slugs are:
-- `katingan-peatland-restoration-and-conservation-project`
-- `rimba-raya-biodiversity-reserve-project`
-- `sumatra-merang-peatland-project-smpp`
-
-Verify via the SQL in §3.3 against the live DB before applying §3.4. If any slug differs, update
-both §3.3 and the `middleware.ts` diff.
+**OQ-1 — CLOSED (2026-04-19).** All three public slugs verified correct against live DB by spec
+auditor. The §3.4 diff is confirmed ready to apply without further review.
 
 **OQ-2 (Andy — design preference):** Score card sub-scores: horizontal bars (as in the legacy
 prototype and specified here) vs. a radial/spider chart. Recommendation is horizontal bars:

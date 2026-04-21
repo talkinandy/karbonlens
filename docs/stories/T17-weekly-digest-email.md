@@ -2,7 +2,7 @@
 id: T17
 title: Weekly digest email via Resend
 phase: 3
-status: draft
+status: audited
 blocked_by: [T16]
 blocks: []
 owner: spec-writer agent
@@ -21,7 +21,7 @@ T16 created the `notifications` table and the in-app bell/inbox. T17 consumes th
 
 Resend is the email delivery provider. Free tier: 3,000 emails/month, 100/day — more than sufficient for v0.1. The `notifications` table already has a `digested_at` column (set in T16's migration) which makes the digest naturally idempotent: any notification already included in a digest is excluded from the next run.
 
-`RESEND_API_KEY` is already documented in `.env.example` (T03 era). T17 introduces one new env var, `DIGEST_SECRET`, which was not known at T03 time. This spec declares it in §5 and calls for a one-line amendment to `.env.example` — a documented cross-story exception (see §6).
+`RESEND_API_KEY` is already documented in `.env.example` (T03 era). T17 introduces one new env var, `DIGEST_CRON_SECRET`, which was not known at T03 time. This spec declares it in §5 and calls for a one-line amendment to `.env.example` — a documented cross-story exception (see §6).
 
 The cron trigger is deliberately kept out of T17. T19 owns all cron installation on the VPS. T17 only exposes the endpoint and documents the two recommended trigger strategies.
 
@@ -33,9 +33,9 @@ The cron trigger is deliberately kept out of T17. T19 owns all cron installation
 
 1. **Package installation**
    ```bash
-   npm i resend @react-email/components @react-email/render
+   npm i resend "@react-email/components@^0.0.x" "@react-email/render@^1.x"
    ```
-   Add these three packages to `package.json`. Confirm `npx tsc --noEmit` still passes.
+   Pin `@react-email/components@^0.0.x` and `@react-email/render@^1.x`. Confirm exact latest patch via `npm info @react-email/components version` at implementation time before pinning. Add these three packages to `package.json`. Confirm `npx tsc --noEmit` still passes.
 
 2. **`lib/email/digest-template.tsx` — React Email template**
 
@@ -114,7 +114,7 @@ The cron trigger is deliberately kept out of T17. T19 owns all cron installation
 
    Supports `POST` (and `GET` for simpler curl triggers — implement both via `export { handler as GET, handler as POST }`).
 
-   **Auth:** reads `Authorization: Bearer <token>` header. Compare `token === process.env.DIGEST_SECRET` using a constant-time comparison (`crypto.timingSafeEqual`). Return `401` with `{ error: "Unauthorized" }` if missing or wrong.
+   **Auth:** reads `Authorization: Bearer <token>` header. Compare `token === process.env.DIGEST_CRON_SECRET` using a constant-time comparison (`crypto.timingSafeEqual`). Return `401` with `{ error: "Unauthorized" }` if missing or wrong.
 
    **Logic:**
    1. Query all users where `email_digest_opt_in = TRUE`.
@@ -166,11 +166,11 @@ The cron trigger is deliberately kept out of T17. T19 owns all cron installation
    **(a) VPS cron (recommended):** T19 adds this entry to `/etc/cron.d/karbonlens`:
    ```
    0  2  *  *  1  karbonlens  curl -s -X POST \
-     -H "Authorization: Bearer $DIGEST_SECRET" \
+     -H "Authorization: Bearer $DIGEST_CRON_SECRET" \
      https://karbonlens.netlify.app/api/digest \
      >> /var/log/karbonlens/digest.log 2>&1
    ```
-   Fires every Monday 02:00 UTC (= 09:00 Asia/Jakarta WIB). `$DIGEST_SECRET` is sourced from `/opt/karbonlens/.env`.
+   Fires every Monday 02:00 UTC (= 09:00 Asia/Jakarta WIB). `$DIGEST_CRON_SECRET` is sourced from `/opt/karbonlens/.env`.
 
    **(b) GitHub Actions scheduled workflow:** create `.github/workflows/weekly-digest.yml` with:
    ```yaml
@@ -178,7 +178,7 @@ The cron trigger is deliberately kept out of T17. T19 owns all cron installation
      schedule:
        - cron: '0 2 * * 1'
    ```
-   Calls the same endpoint with `DIGEST_SECRET` stored as a GitHub Actions secret. Use this if VPS cron is unavailable.
+   Calls the same endpoint with `DIGEST_CRON_SECRET` stored as a GitHub Actions secret. Use this if VPS cron is unavailable.
 
    Recommendation: use (a) because T19 already installs and manages cron entries on the VPS; consolidating there reduces the number of moving parts. Option (b) is the fallback.
 
@@ -203,7 +203,7 @@ The cron trigger is deliberately kept out of T17. T19 owns all cron installation
 
 **AC-1: Missing auth header → 401**
 ```
-Given DIGEST_SECRET is set in the environment
+Given DIGEST_CRON_SECRET is set in the environment
 When POST /api/digest is called with no Authorization header
 Then the response status is 401
 And the body is { "error": "Unauthorized" }
@@ -212,9 +212,9 @@ And the body is { "error": "Unauthorized" }
 **AC-2: Authorised trigger sends emails**
 ```
 Given RESEND_API_KEY is set and valid
-And DIGEST_SECRET is set
+And DIGEST_CRON_SECRET is set
 And at least one user with email_digest_opt_in=TRUE has undigested notifications from the last 7 days
-When POST /api/digest -H "Authorization: Bearer <DIGEST_SECRET>"
+When POST /api/digest -H "Authorization: Bearer <DIGEST_CRON_SECRET>"
 Then the response status is 200
 And the body contains { "emails_sent": N } where N >= 1
 And andy@fmg.co.id receives an email in their inbox (manual verification in Gmail)
@@ -224,7 +224,7 @@ And andy@fmg.co.id receives an email in their inbox (manual verification in Gmai
 ```
 Given the digest endpoint was successfully called in step AC-2
 And digested_at is now populated on all included notifications
-When POST /api/digest -H "Authorization: Bearer <DIGEST_SECRET>" is called again immediately
+When POST /api/digest -H "Authorization: Bearer <DIGEST_CRON_SECRET>" is called again immediately
 Then the response is 200
 And the body contains { "emails_sent": 0 }
 And no new email arrives in the inbox
@@ -292,7 +292,7 @@ And the plain-text body contains the user's name and at least one notification t
 | Input | Source |
 |---|---|
 | `RESEND_API_KEY` | Already in `.env.example` (T03-era placeholder); Andy pastes the real value per the runbook in §5 Outputs |
-| `DIGEST_SECRET` | **New env var introduced by T17.** Generate: `openssl rand -base64 32`. Add to Netlify env vars and VPS `.env`. See cross-story exception note below. |
+| `DIGEST_CRON_SECRET` | **New env var introduced by T17.** Generate: `openssl rand -base64 32`. Add to Netlify env vars and VPS `.env`. See cross-story exception note below. |
 | `NEXTAUTH_SECRET` | Set in T05. Reused here for unsubscribe token signing — no new secret. |
 | `notifications` table | Written by T07 (GFW alerts) and T16 (in-app notifications infrastructure). `digested_at` column was added in T16's migration. |
 | `users` table | `email`, `name`, `email_digest_opt_in` columns, all present since T02. |
@@ -310,11 +310,11 @@ And the plain-text body contains the user's name and at least one notification t
 | `package.json` additions | `resend`, `@react-email/components`, `@react-email/render` |
 
 **Cross-story exception — `.env.example` amendment:**
-T03 owns `.env.example` as the sole file editor. T17 introduces `DIGEST_SECRET`, a new env var that was not known at T03 time. As a rare exception, T17's implementer may append the following line to `.env.example`:
+T03 owns `.env.example` as the sole file editor. T17 introduces `DIGEST_CRON_SECRET`, a new env var that was not known at T03 time. As a rare exception, T17's implementer may append the following line to `.env.example`:
 ```
 # ── Digest cron ─────────────────────────────────────────────────────────────
 # Shared secret for POST /api/digest. Generate: openssl rand -base64 32
-DIGEST_SECRET=CHANGE_ME
+DIGEST_CRON_SECRET=CHANGE_ME
 ```
 This exception is allowed because: (a) the var did not exist at T03 time, (b) it is a pure append with no conflict risk, (c) the absence of this line would leave the env var undocumented for all future developers. The implementer must flag this in the PR description.
 
@@ -370,10 +370,10 @@ The cron fires at 02:00 UTC (= 09:00 Asia/Jakarta WIB). The "last 7 days" window
 **(v) Email truncation — more than 10 notifications**
 The template always receives at most 10 notifications. `send-digest.ts` slices the query result to 10 before rendering, and passes `totalCount` (the full untruncated count) separately so the template can render "+N more → view in app".
 
-**(vi) `DIGEST_SECRET` not set in environment**
-If `process.env.DIGEST_SECRET` is undefined, `crypto.timingSafeEqual` will throw. Guard with:
+**(vi) `DIGEST_CRON_SECRET` not set in environment**
+If `process.env.DIGEST_CRON_SECRET` is undefined, `crypto.timingSafeEqual` will throw. Guard with:
 ```typescript
-if (!process.env.DIGEST_SECRET) {
+if (!process.env.DIGEST_CRON_SECRET) {
   return Response.json({ error: 'Digest not configured' }, { status: 503 });
 }
 ```
@@ -381,6 +381,9 @@ This prevents a confusing 500 and makes the misconfiguration explicit.
 
 **(vii) Unsubscribe token expired (> 30 days)**
 `verifyUnsubscribeToken` returns `null`. The route returns `400` with a friendly HTML message: "This unsubscribe link has expired. Please log in to manage your email preferences."
+
+**(viii) Resend ACK success + DB UPDATE failure (crash window)**
+If the Resend API acknowledges the send but the process crashes (Netlify function timeout, OOM, network drop) before the `UPDATE notifications SET digested_at = NOW()` completes, the notifications retain `digested_at IS NULL`. On the next Monday's run, the same notifications will be included again and the user receives a duplicate digest. This is acceptable for v0.1: there is a single user, Resend reliability is high, and the window is narrow (milliseconds between Resend ACK and the DB UPDATE). v0.2 may add an outbox or ack-inbox pattern to close this gap if duplicate sends become observable.
 
 ---
 
@@ -402,15 +405,17 @@ This prevents a confusing 500 and makes the misconfiguration explicit.
 
 ## 9. Open questions
 
-1. **Sending domain:** v0.1 uses Resend's default `onboarding@resend.dev` as the `from` address. This bypasses domain verification entirely and works immediately. When Andy acquires a custom domain (e.g., `karbonlens.id`), set up a verified sending domain in Resend and update the `from` field in `send-digest.ts` to `noreply@karbonlens.id`. Action: defer to post-v0.1.
+1. **Sending domain — v0.1 uses `onboarding@resend.dev` (resolved):** v0.1 uses Resend's default `onboarding@resend.dev` as the `from` address. This bypasses domain verification entirely and works immediately. The runbook (`docs/runbooks/resend-api-key.md`) documents this. When Andy acquires a custom domain (e.g., `karbonlens.id`), set up a verified sending domain in Resend and update the `from` field in `send-digest.ts` to `noreply@karbonlens.id`. Action: defer to post-v0.1.
 
-2. **Cron installation:** T17 documents the `curl` command but T19 installs it. T17 must be deployed to Netlify before T19 can successfully test the cron entry. Ensure T17 merges before T19 begins.
+2. **Cron schedule — `0 2 * * 1` locked (resolved):** T17 uses `0 2 * * 1` (02:00 UTC = 09:00 Asia/Jakarta WIB, Monday work-start). This is authoritative. `architecture.md` §4 currently shows `0 5 * * 1` (noon WIB) — that entry is stale and will be corrected in the Phase-3 close retro. T19 must install T17's `0 2 * * 1` line, not the architecture doc's value.
 
-3. **Score-drop notifications in digest:** the current notification types include `reversal`, `regulatory`, `price`, `news`, `retirement`, `issuance`. Score-drop is not yet a notification type. When T09 is extended to emit score-drop notifications (v0.2), they will automatically appear in the digest with no T17 changes needed.
+3. **Cron installation:** T17 documents the `curl` command but T19 installs it. T17 must be deployed to Netlify before T19 can successfully test the cron entry. Ensure T17 merges before T19 begins.
 
-4. **`jose` availability:** `jose` is a dependency of `next-auth` and should already be in `node_modules`. If `npm install` does not hoist it, add it explicitly: `npm i jose`. Implementer to verify before finalising.
+4. **Score-drop notifications in digest:** the current notification types include `reversal`, `regulatory`, `price`, `news`, `retirement`, `issuance`. Score-drop is not yet a notification type. When T09 is extended to emit score-drop notifications (v0.2), they will automatically appear in the digest with no T17 changes needed.
 
-5. **GitHub Actions fallback (option b):** if Andy wants the Actions workflow as belt-and-suspenders alongside the VPS cron, this is a 20-minute addition. Not planned for v0.1 unless VPS cron proves unreliable.
+5. **`jose` availability:** `jose` is a dependency of `next-auth` and should already be in `node_modules`. If `npm install` does not hoist it, add it explicitly: `npm i jose`. Implementer to verify before finalising.
+
+6. **GitHub Actions fallback (option b):** if Andy wants the Actions workflow as belt-and-suspenders alongside the VPS cron, this is a 20-minute addition. Not planned for v0.1 unless VPS cron proves unreliable.
 
 ---
 
@@ -420,7 +425,7 @@ This prevents a confusing 500 and makes the misconfiguration explicit.
 - `docs/architecture.md` §3 — `users` table schema (`email_digest_opt_in`)
 - `docs/architecture.md` §6 — API route table (`/api/digest/cron`)
 - `docs/architecture.md` §7 — env vars (`RESEND_API_KEY`, `DIGEST_CRON_SECRET`)
-- `docs/architecture.md` §4 — cron schedule (Monday 05:00 entry for digest)
+- `docs/architecture.md` §4 — cron schedule (Monday 05:00 entry is stale; T17 owns `0 2 * * 1` = 09:00 WIB; architecture.md will be corrected in Phase-3 retro)
 - `docs/TASKS.md` T17 — task definition
 - `docs/TASKS.md` T19 — cron installation (T17's downstream)
 - `docs/stories/T16-notifications-bell-inbox.md` — upstream story that creates `notifications.digested_at`

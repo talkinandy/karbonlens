@@ -2,7 +2,7 @@
 id: T14
 title: Price intelligence screen with real data
 phase: 3
-status: draft
+status: audited
 blocked_by: [T04, T08]
 blocks: [T18]
 owner: ""
@@ -23,7 +23,7 @@ T03 scaffolded `app/(app)/prices/page.tsx` with inline mock data. T08 scraped 10
 
 **Design reference:** `legacy/prototype/index.html` + `styles.css` — the visual language for cards, tables, pills, and typography. Design brief for Screen 4 is the authoritative layout. Mock data in `lib/mock-data.ts` (`mockPriceStats`, `mockPriceSeries`, `mockTransactions`) is deleted from the page; `lib/mock-data.ts` itself is left intact for other screens.
 
-**Chart library:** No chart library is currently in `package.json`. This story recommends adding `recharts` (see §3 item 3 and §9). Custom SVG is a valid alternative — the implementer decides after reading §9.
+**Chart library:** `recharts ^2.13` is locked as the chart library for this story. Add `"recharts": "^2.13"` to `dependencies` in `package.json`. The ~130 kB gzip cost is accepted. Custom SVG is not an alternative for this story.
 
 ---
 
@@ -52,18 +52,19 @@ T03 scaffolded `app/(app)/prices/page.tsx` with inline mock data. T08 scraped 10
    - **Latest month** — `period_month` formatted as "Mar 2026" (always the most recent row after DESC sort).
    - **Volume** — `total_volume_tco2e` formatted as `117k tCO₂e` (divide by 1 000, round to 1 dp, append "k").
    - **Value** — `total_value_idr` formatted as `Rp 4.7B` (divide by 1 000 000 000, round to 1 dp, prepend "Rp ", append "B").
-   - **Avg price** — `avg_price_idr` formatted as `Rp 40,025` (integer Rupiah with thousands separator, prepend "Rp ").
+   - **Avg price** — `avg_price_idr` formatted as **`Rp 40k`** (abbreviated: divide by 1 000, round to nearest integer, append "k"). **Hero cards always use abbreviated form.** Full-precision format ("Rp 40,025") is reserved for the monthly detail table.
    - **Participants** — `registered_participants` as integer.
    - Each card shows a **month-over-month delta badge**: compare rows[0] vs rows[1]. Badge format: `↑ 12%` in green (`var(--color-positive)`) or `↓ 38%` in red (`var(--color-negative)`); `≈` (no color change) when |delta| < 1%. If only one row exists, omit the badge.
 
 3. **Dual-axis line chart (`components/prices/PriceChart.tsx`).**
-   - Y-axis left (Y1): `avg_price_idr` in Rp (integer scale, label "Avg price (Rp)").
-   - Y-axis right (Y2): `total_volume_tco2e` in tCO₂e (label "Volume (tCO₂e)").
+   - **Library: `recharts ^2.13` (locked).** Use `<ComposedChart>` with two `<YAxis>` and a `<Line>` for price + `<Bar>` for volume. Add `"recharts": "^2.13"` to `dependencies` in `package.json`.
+   - Y-axis left (Y1): `avg_price_idr` in Rp (integer scale, label **"IDR per tCO₂e"**). Zero-anchored: `domain={[0, 'auto']}`.
+   - Y-axis right (Y2): `total_volume_tco2e` in tCO₂e (label **"Volume tCO₂e"**). Zero-anchored: `domain={[0, 'auto']}`.
    - X-axis: months in chronological order (oldest left), labels formatted "Jun '25", "Jul '25", … "Mar '26".
    - Data points plotted for every row in the query result (up to 10).
-   - A single note below the chart: "Per-credit-type breakdown (IDTBS-RE / IDTBS / IDNBS) coming in v0.2."
-   - **Library choice:** `recharts` is the recommended implementation — add `"recharts": "^2.13"` to `dependencies` in `package.json`. Use `<ComposedChart>` with two `<YAxis>` and a `<Line>` for price + `<Bar>` for volume. Implementer may substitute a custom SVG component (≤ 100 lines) if recharts feels heavy — see §9.
-   - The Y-axis must **not** auto-zoom: both axes start at 0 (pass `domain={[0, 'auto']}` in recharts). Outlier high-price months must remain visible relative to other months, not dominate the scale.
+   - **Accessibility:** wrap the chart in a `<figure aria-label="Monthly IDXCarbon price and volume — [period range]">` element. Immediately after the closing `</figure>`, render a visually-hidden duplicate of the monthly detail table (same data, same columns) inside a `<div className="sr-only">`. Extract this visually-hidden table as a shared sub-component `components/prices/ChartA11yTable.tsx` so both `PriceChart.tsx` and `MonthlyTable.tsx` can render it without duplication.
+   - **Sparse-data warning:** below the chart (outside `<figure>`), render in small text: `"Historical coverage limited to IDXCarbon's 10-month archive."`
+   - The Y-axes must **not** auto-zoom: both axes start at 0 (pass `domain={[0, 'auto']}` in recharts). Outlier high-price months must remain visible relative to other months, not dominate the scale.
 
 4. **Monthly detail table (`components/prices/MonthlyTable.tsx`).**
    Sorted descending by `period_month` (same order as query). Columns:
@@ -140,8 +141,9 @@ And the hero row displays volume, value, avg price, and participants for the Mar
 ```
 Given the January 2026 row in idx_monthly_snapshots has avg_price_idr populated
 When the implementer inspects the rendered HTML for the Jan 2026 row in the monthly detail table
-Then it contains a value matching the format "Rp 40,025" (exact digits depend on scraped data;
-     verify against the January 2026 IDXCarbon PDF — expected ~Rp 40k range)
+Then it contains a reasonable Rp number matching the format "Rp NN,NNN" or "Rp N.N k"
+     (verify against the January 2026 IDXCarbon PDF — expected ~Rp 40k range;
+      do not assert a specific literal value in automated tests — match format regex instead)
 ```
 
 **AC-4: Chart renders**
@@ -201,11 +203,12 @@ Then both commands exit 0 with no type errors
 
 **Outputs:**
 - `lib/queries/prices.ts` — new file, `getPriceHistory()` export.
-- `app/(app)/prices/page.tsx` — rewritten; removes all mock imports.
+- `app/(app)/prices/page.tsx` — rewritten; removes all mock imports. Must include at the top: `// No ISR: auth-gated; server query is sub-ms on period_month index.`
 - `app/(app)/prices/loading.tsx` — new file.
 - `components/prices/PriceChart.tsx` — new file.
 - `components/prices/MonthlyTable.tsx` — new file.
-- `package.json` — add `"recharts": "^2.13"` to `dependencies` (if recharts chosen; omit if custom SVG).
+- `components/prices/ChartA11yTable.tsx` — new shared sub-component (visually-hidden a11y table).
+- `package.json` — add `"recharts": "^2.13"` to `dependencies` (locked; not optional).
 - No DB migrations. No new env vars.
 
 ---
@@ -220,8 +223,9 @@ Then both commands exit 0 with no type errors
   - `app/(app)/prices/loading.tsx`
   - `components/prices/PriceChart.tsx`
   - `components/prices/MonthlyTable.tsx`
+  - `components/prices/ChartA11yTable.tsx`
   - `lib/queries/prices.ts`
-  - `package.json` (only the recharts dep line, if chosen)
+  - `package.json` (only the `"recharts": "^2.13"` dep line)
 
 ---
 
@@ -245,19 +249,21 @@ Then both commands exit 0 with no type errors
 - [ ] Story's files landed on `feature/v0.1-impl`.
 - [ ] No mock-data imports remain in `app/(app)/prices/page.tsx`.
 - [ ] `lib/mock-data.ts` is not deleted (other screens still use it).
+- [ ] `PriceChart.tsx` is wrapped in `<figure aria-label="...">` and `ChartA11yTable.tsx` is rendered in an adjacent `sr-only` div.
+- [ ] `app/(app)/prices/page.tsx` includes the `// No ISR: auth-gated; server query is sub-ms on period_month index.` comment.
 - [ ] CHANGELOG entry added under `[Unreleased]`: `T14 — Price intelligence screen wired to real IDXCarbon data`.
 - [ ] `TASKS.md` status flipped `todo` → `done` for T14.
 - [ ] Story frontmatter `status` set to `done`.
 
 ---
 
-## 9. Open questions
+## 9. Decisions (formerly open questions — resolved)
 
-1. **Chart library: recharts vs custom SVG.**
-   `recharts` is not yet in the tree. Adding it costs ~130 kB gzipped but gives correct dual-axis layout without bespoke math. A custom SVG component is ~80–100 lines and zero new deps but requires manual min/max scaling and axis label placement. **Andy's call.** Recommendation: use `recharts` — the dual Y-axis case is non-trivial in hand-rolled SVG and recharts is battle-tested. If Andy wants zero new deps, a custom SVG spec is available on request.
+1. **Chart library: recharts (locked).**
+   Decision: `recharts ^2.13`. The ~130 kB gzip cost is accepted on this auth-gated, data-heavy screen. Custom SVG is not an alternative for T14. `package.json` must include `"recharts": "^2.13"` in `dependencies`.
 
-2. **Currency display convention.**
-   Mock data uses "Rp 40k" (thousands abbreviated). The monthly detail table needs full precision ("Rp 40,025"). Hero cards may abbreviate. Confirm: hero cards use abbreviated form ("Rp 40k"), table rows use full integer form with thousands separator ("Rp 40,025"). If Andy prefers full precision everywhere, hero cards should be updated accordingly.
+2. **Currency display convention (locked).**
+   Hero cards use abbreviated form (`Rp 40k`, `Rp 4.7B`). Monthly detail table rows use full-precision form with thousands separator (`Rp 40,025`). Implementer must not use the abbreviated helper for table cells.
 
 ---
 
