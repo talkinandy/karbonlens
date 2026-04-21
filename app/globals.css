@@ -317,3 +317,188 @@ button {
   background: var(--surface-2);
   color: var(--text-2);
 }
+
+/* ===== T11 projects explorer — filter chips, sort, tabs ===== */
+
+.kl-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 0.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.kl-filter-chip:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.kl-filter-chip.is-active {
+  background: var(--text);
+  color: var(--surface);
+  border-color: var(--text);
+}
+
+.kl-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kl-filter-group-label {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.kl-filter-chip-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.kl-stats-strip {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.kl-stats-strip strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.kl-tab-row {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+}
+
+.kl-tab {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.kl-tab.is-active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.kl-toolbar {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.kl-sort-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kl-sort-control label {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.kl-select {
+  background: var(--surface);
+  color: var(--text);
+  border: 0.5px solid var(--border-strong);
+  padding: 6px 28px 6px 10px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4l3 3 3-3' fill='none' stroke='%235F5E5A' stroke-width='1.2'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  cursor: pointer;
+}
+
+.kl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--text);
+  border: 0.5px solid var(--border-strong);
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.1s;
+}
+
+.kl-btn:hover {
+  background: var(--surface-2);
+}
+
+.kl-btn--secondary {
+  color: var(--text-2);
+}
+
+.kl-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 4px 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.kl-empty-state {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.kl-empty-state p {
+  margin: 0 0 12px;
+  color: var(--text-2);
+}
+
+.kl-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 0%,
+    var(--border) 50%,
+    var(--surface-2) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: 4px;
+}
