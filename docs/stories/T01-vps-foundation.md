@@ -2,7 +2,7 @@
 id: T01
 title: Provision VPS foundation — PostGIS, DB user, directories
 phase: 1
-status: audited
+status: done
 blocked_by: []
 blocks: [T02, T20]
 owner: implementer
