@@ -30,11 +30,12 @@ error via truthiness checks - see ``extract_field`` contract below.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import pdfplumber
 
