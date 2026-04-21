@@ -161,6 +161,41 @@ No other deviations. Public slug list matches T03 mock-data (3 slugs).
 
 ---
 
+## T05 follow-ups
+
+Non-blocking items from the Phase A audit (audit report §3) plus the Phase B verification checklist for when Andy has GCP credentials.
+
+### Non-blocking items (post-audit, future sprints)
+
+1. **`?signin=1` UX gap — no client-side handler.** Middleware correctly redirects unauthenticated users to `/?signin=1`, but neither `app/(public)/page.tsx` nor any client component inspects the `signin` query param to auto-open a modal or show a "Please sign in to view this page" banner. The user lands on the hero with a visible "Sign in with Google" button, so the flow is functional — but the redirect context is lost. **Suggested fix:** read `searchParams.signin` in `app/(public)/page.tsx` (server component) and pass a `redirectedToSignIn: boolean` prop to the hero; render a dismissible banner when true. Alternatively, wire the query param to auto-invoke `signIn('google')` via a small client component.
+
+2. **`middleware.ts` → `proxy.ts` deprecation (Next 16).** The dev server and build emit:
+   ```
+   ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+   ```
+   The spec mandates `middleware.ts`; the file works correctly and the Proxy (Middleware) entry appears in the build output. No functional regression in v0.1. Track as a sprint-N task: rename `middleware.ts` → `proxy.ts` and update imports/references accordingly.
+
+3. **`UserMenu` `await auth()` on every public page render.** Mounted unconditionally in `(public)/layout.tsx`; runs one cookie lookup + one adapter session SELECT per request. Acceptable for v0.1 traffic. At scale, consider caching the session result (e.g., wrapping in `React.cache()` or moving to a session context provider).
+
+4. **`OnboardingGate` DB query unmemoised.** Every authed `(app)` page render issues one primary-key SELECT against `users`. Cheap (indexed) but not free. Consider hoisting into a memoised session wrapper if layout re-renders become frequent under load.
+
+### Phase B verification checklist (Andy runs after GCP setup)
+
+Prerequisites: `docs/runbooks/google-oauth-setup.md` completed; `.env.local` contains real `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL=http://localhost:3000`, and a working `DATABASE_URL`. `npm run dev` restarted.
+
+| # | AC | Action | Pass condition |
+|---|---|---|---|
+| 1 | AC-1 | Open `http://localhost:3000`, click "Sign in with Google", complete consent | Redirect back with no `?error=` param; name/avatar in top nav |
+| 2 | AC-2 | `SELECT email, name, email_digest_opt_in, persona FROM users WHERE email='<my-email>';` | 1 row; `email_digest_opt_in = t`; `persona IS NULL` |
+| 3 | AC-3 | `SELECT provider, provider_account_id, access_token IS NOT NULL FROM accounts WHERE user_id=(SELECT id FROM users WHERE email='<my-email>');` | `provider='google'`; `access_token IS NOT NULL = t` — **exercises T04 snake_case fix** |
+| 4 | AC-4 | `SELECT expires FROM sessions WHERE user_id=(SELECT id FROM users WHERE email='<my-email>');` | `expires > NOW()` |
+| 5 | AC-5 | Navigate to any `(app)` page immediately after first login | Onboarding modal visible with persona select + organisation input |
+| 6 | AC-6 | Select persona='researcher', enter organization='ACME Corp', click Submit | `SELECT persona, organization FROM users WHERE email='<my-email>';` → `('researcher','ACME Corp')`; modal closed |
+| 7 | AC-9 | With session cookie set: `curl -I http://localhost:3000/prices` | HTTP 200 |
+| 8 | AC-10 | Click "Sign out"; check avatar gone; check sessions table; navigate to `/prices` | 0 rows with `expires > NOW()`; `/prices` redirects to `/?signin=1` |
+
+---
+
 ## 10. Commit history
 
 Commits on `feature/T05-nextauth-google` (atomic, each with Co-Authored-By footer):
