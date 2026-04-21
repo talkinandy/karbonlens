@@ -2,7 +2,7 @@
 id: T16
 title: Notifications bell + alerts inbox
 phase: 3
-status: audited
+status: done
 blocked_by: [T04, T05, T07]
 blocks: [T17]
 owner: implementer-agent
