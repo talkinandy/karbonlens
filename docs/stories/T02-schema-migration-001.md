@@ -2,7 +2,7 @@
 id: T02
 title: Create schema migration 001 (initial tables)
 phase: 1
-status: draft
+status: audited
 blocked_by: [T01]
 blocks: [T04, T06, T07, T08, T09, T10, T21]
 owner: spec-writer agent
@@ -37,8 +37,17 @@ Key constraints:
   - `CREATE EXTENSION IF NOT EXISTS postgis;`
   - `CREATE EXTENSION IF NOT EXISTS pgcrypto;`
   - `CREATE EXTENSION IF NOT EXISTS pg_trgm;`
-  - `schema_migrations` bookkeeping table (first, so later tables can reference it in comments)
-  - All 14 application tables from `docs/architecture.md` §3, in dependency order:
+  - `schema_migrations` bookkeeping table (created first, before any application table):
+
+    ```sql
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version    TEXT PRIMARY KEY,
+      applied_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    ```
+
+  - All 14 application tables from `docs/architecture.md` §3, in dependency order, giving **15 total** (14 application tables + `schema_migrations`):
+    0. `schema_migrations` *(created first — see above)*
     1. `projects`
     2. `registries`
     3. `issuances`
@@ -53,9 +62,40 @@ Key constraints:
     12. `sessions`
     13. `verification_tokens`
     14. `notifications`
-  - All indexes from `docs/architecture.md` §3 (every `CREATE INDEX IF NOT EXISTS`)
+  - All indexes from `docs/architecture.md` §3. **Every index DDL must use `CREATE INDEX IF NOT EXISTS`** — including the GIST indexes (`idx_projects_centroid`, `idx_sat_location`). This is mandatory for idempotence and is verified in AC-4.
   - Trailing `INSERT INTO schema_migrations (version) VALUES ('001') ON CONFLICT DO NOTHING;`
+  - Ownership block at the very end of the file: `ALTER TABLE ... OWNER TO karbonlens;` for all 15 tables and all sequences — see §5 Apply command for the full pattern.
 - Create `scrapers/migrations/.gitkeep` if the directory does not yet exist in the repo (keeps the directory tracked before the SQL file is present).
+
+#### `users` table — `email_verified` column (required for NextAuth adapter)
+
+The `users` table **must include** `email_verified TIMESTAMPTZ` as a nullable column. This is required by `@auth/drizzle-adapter` v5, which writes an `emailVerified` timestamp on every first login via Google OAuth. Source of truth: `docs/architecture.md` §3 (updated).
+
+```sql
+CREATE TABLE IF NOT EXISTS users (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email                TEXT UNIQUE NOT NULL,
+  email_verified       TIMESTAMPTZ,          -- required by @auth/drizzle-adapter v5
+  name                 TEXT,
+  image                TEXT,
+  organization         TEXT,
+  persona              TEXT,
+  email_digest_opt_in  BOOLEAN DEFAULT TRUE,
+  created_at           TIMESTAMPTZ DEFAULT NOW(),
+  last_seen_at         TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+SQL column name is `email_verified` (snake_case). T04 must expose this as Drizzle field `emailVerified` (camelCase) — see §6 Auth table field-naming contract below.
+
+#### `project_scores` and `verification_tokens` — composite primary keys
+
+Both tables use composite primary keys (no `id UUID` column). Implementers creating these tables must **not** add a separate `id` column:
+
+- `project_scores PRIMARY KEY (project_id, score_date)` — no UUID `id`.
+- `verification_tokens PRIMARY KEY (identifier, token)` — no UUID `id`.
+
+T04 must mirror these composite PKs in Drizzle; see §6 for the cross-story note.
 
 ### Out of scope (explicit non-goals)
 
@@ -109,9 +149,12 @@ Then the output lists: postgis, pgcrypto, pg_trgm
 ```
 Given AC-1 has passed (migration applied once)
 When Andy re-runs:
-    sudo -u postgres psql -d karbonlens -f /opt/karbonlens/migrations/001_init.sql
+    sudo -u postgres psql --single-transaction -d karbonlens \
+      -f /opt/karbonlens/migrations/001_init.sql
 Then the command exits 0 with no errors and no "already exists" failures
-And the table count is still 15
+And psql -U karbonlens -d karbonlens -c "\dt" still lists exactly 15 tables
+And psql -U karbonlens -d karbonlens -c "\di" still lists all 11 indexes from AC-2
+     (verifies every CREATE INDEX uses IF NOT EXISTS, including the GIST indexes)
 ```
 
 **AC-5: Schema migrations bookkeeping**
@@ -179,13 +222,50 @@ Then a numeric similarity score is returned (no "function does not exist" error)
 
 ### Apply command (for the record — Andy runs this, not the implementer)
 
+The migration runs as the `postgres` superuser (required to create extensions). Ownership is transferred to the `karbonlens` role at the end of the file via explicit `ALTER TABLE ... OWNER TO` statements. This approach is preferred because it keeps all ownership changes auditable in one place at the bottom of the migration.
+
 ```bash
 # Copy file to VPS
 scp scrapers/migrations/001_init.sql karbonlens@<vps-ip>:/opt/karbonlens/migrations/
 
-# Apply
-sudo -u postgres psql -d karbonlens -f /opt/karbonlens/migrations/001_init.sql
+# Apply as postgres (extensions require superuser; ownership block runs at end)
+sudo -u postgres psql --single-transaction -d karbonlens \
+  -f /opt/karbonlens/migrations/001_init.sql
 ```
+
+The `--single-transaction` flag wraps the entire file in `BEGIN`/`COMMIT`, making partial-apply (E4) impossible. If any statement fails the whole migration rolls back cleanly.
+
+**Ownership block** — the tail of `001_init.sql` must contain:
+
+```sql
+-- Grant schema usage, then transfer ownership of every table and sequence
+-- to the karbonlens role so scrapers and the Next.js app can ALTER/INSERT freely.
+GRANT USAGE ON SCHEMA public TO karbonlens;
+
+ALTER TABLE schema_migrations           OWNER TO karbonlens;
+ALTER TABLE projects                    OWNER TO karbonlens;
+ALTER TABLE registries                  OWNER TO karbonlens;
+ALTER TABLE issuances                   OWNER TO karbonlens;
+ALTER TABLE retirements                 OWNER TO karbonlens;
+ALTER TABLE idx_monthly_snapshots       OWNER TO karbonlens;
+ALTER TABLE satellite_alerts            OWNER TO karbonlens;
+ALTER TABLE regulatory_events           OWNER TO karbonlens;
+ALTER TABLE project_scores              OWNER TO karbonlens;
+ALTER TABLE project_match_queue         OWNER TO karbonlens;
+ALTER TABLE users                       OWNER TO karbonlens;
+ALTER TABLE accounts                    OWNER TO karbonlens;
+ALTER TABLE sessions                    OWNER TO karbonlens;
+ALTER TABLE verification_tokens         OWNER TO karbonlens;
+ALTER TABLE notifications               OWNER TO karbonlens;
+
+-- Sequences (auto-created for UUID defaults via gen_random_uuid() — none needed,
+-- but enumerate any explicit sequences if added later).
+-- Safety net: grant DML on all tables and sequences to karbonlens.
+GRANT ALL ON ALL TABLES    IN SCHEMA public TO karbonlens;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO karbonlens;
+```
+
+This pattern ensures that future migrations (`002_*.sql`) applied as `postgres` can also add `ALTER TABLE ... OWNER TO karbonlens;` without surprises. T07's `002_add_geostore.sql` must follow the same ownership convention.
 
 ---
 
@@ -204,6 +284,38 @@ sudo -u postgres psql -d karbonlens -f /opt/karbonlens/migrations/001_init.sql
 - **T09** — Score job writes to `project_scores`; reads `satellite_alerts`.
 - **T10** — Regulatory seed writes to `regulatory_events`.
 - **T21** — Entity resolution admin reads `project_match_queue`.
+
+### Auth table field-naming contract (T02 → T04 bridge)
+
+T02 writes SQL column names in snake_case. T04's `lib/schema.ts` must expose the auth-table columns under camelCase Drizzle field names that `@auth/drizzle-adapter` v5 reads by exact JavaScript property name. Mismatches cause silent adapter failures at runtime.
+
+**Required mapping — T04 must implement these field names exactly:**
+
+| Table | SQL column | Drizzle field name (T04) |
+|---|---|---|
+| `users` | `email_verified` | `emailVerified` |
+| `accounts` | `user_id` | `userId` |
+| `accounts` | `provider_account_id` | `providerAccountId` |
+| `accounts` | `refresh_token` | `refreshToken` |
+| `accounts` | `access_token` | `accessToken` |
+| `accounts` | `expires_at` (BIGINT) | `expiresAt` |
+| `accounts` | `token_type` | `tokenType` |
+| `accounts` | `id_token` | `idToken` |
+| `accounts` | `session_state` | `sessionState` |
+| `sessions` | `session_token` | `sessionToken` |
+| `sessions` | `user_id` | `userId` |
+| `sessions` | `expires` | `expires` |
+| `verification_tokens` | `identifier` | `identifier` |
+| `verification_tokens` | `token` | `token` |
+| `verification_tokens` | `expires` | `expires` |
+
+`verification_tokens` uses a composite primary key `PRIMARY KEY (identifier, token)`. T04 must declare this using Drizzle's `primaryKey({ columns: [t.identifier, t.token] })` callback — not `.primaryKey()` on a single column.
+
+`project_scores` likewise uses a composite primary key `PRIMARY KEY (project_id, score_date)`. T04 must use `primaryKey({ columns: [t.projectId, t.scoreDate] })`.
+
+### T04 cross-reference — `total_vcus_available` generated column
+
+`projects.total_vcus_available` is a `NUMERIC GENERATED ALWAYS AS (total_vcus_issued - total_vcus_retired) STORED` column. T02's SQL DDL retains this as-is. T04 must use Drizzle's `generatedAlwaysAs()` (available in drizzle-orm ≥ 0.30) to mark it read-only and prevent inserts/updates on that column. If `generatedAlwaysAs()` is unavailable in the installed version, T04 must omit the column from the table definition and read it explicitly via `sql\`"total_vcus_available"\`` in select queries — not assume it appears in the inferred row type. Document whichever approach is used in a comment in `lib/schema.ts`. Downstream stories T11, T12, and T09 must not assume `totalVcusAvailable` is in Drizzle's default select output.
 
 ### File ownership
 
@@ -227,13 +339,25 @@ If Andy ran ad-hoc DDL before T02, some tables may already exist with potentiall
 `CREATE EXTENSION IF NOT EXISTS postgis/pgcrypto/pg_trgm` is safe whether or not the extension was installed during T01. PostgreSQL `IF NOT EXISTS` is a no-op if already present.
 
 **E3 — `pg_trgm` OS package not installed.**
-`CREATE EXTENSION pg_trgm` will fail if the `postgresql-16-pg_trgm` OS package is absent. Unlike PostGIS, this package may not have been installed in T01. If extension creation fails, the migration aborts. Fix: install the package (`apt install postgresql-16-contrib`, which includes pg_trgm) and re-run. Document in T01 notes.
+`CREATE EXTENSION pg_trgm` will fail if the required Postgres module files are absent. On this box (Postgres 16, Debian/Ubuntu), `pg_trgm` ships with the core `postgresql-16` package — **no separate `postgresql-16-contrib` package is required**. T01 installs `postgresql-16`, so `CREATE EXTENSION IF NOT EXISTS pg_trgm` is a safe no-op in the normal T01-complete flow. If extension creation fails unexpectedly, verify the full `postgresql-16` package is installed and re-run.
 
 **E4 — Partial apply due to connection drop.**
 `psql -f` is not wrapped in a single transaction by default. If the session drops mid-file, some tables will exist and some will not. Re-running the file is safe (IF NOT EXISTS covers all objects) but verify with AC-1's `\dt` check.
 
 **E5 — `total_vcus_available` generated column on older Postgres.**
 `NUMERIC GENERATED ALWAYS AS (...) STORED` requires Postgres 12+. Hetzner is running Postgres 16, so this is fine. Do not backport to older Postgres.
+
+**E6 — Re-running on a DB where `users` already exists without `email_verified`.**
+If migration 001 was partially applied (e.g., from an earlier draft) before `email_verified` was added to the spec, `CREATE TABLE IF NOT EXISTS users` will silently skip the create — and the missing column will not be added. In this case, run a targeted fix manually before proceeding:
+
+```sql
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified TIMESTAMPTZ;
+```
+
+This is a one-time remediation for pre-spec-revision deployments; it is not part of `001_init.sql`. Since T01 and T02 are both still `draft`/`audited` and the database has not been deployed, amending migration 001 directly is the correct path — no migration 002 is needed for this column.
+
+**E7 — `project_match_queue` FK cascade policy (RESTRICT by default).**
+`candidate_a_id` and `candidate_b_id` reference `projects(id)` with no `ON DELETE` clause, so Postgres defaults to `ON DELETE RESTRICT`. Deleting a project that appears in the match queue will fail with a FK violation until the queue row is manually resolved or removed. This is intentional for v0.1 — it forces review before a project can be deleted. See OQ-1 for the full cascade policy table.
 
 ---
 
@@ -265,13 +389,19 @@ Architecture §3 uses two deletion policies:
 | `accounts` | `user_id → users` | `ON DELETE CASCADE` |
 | `sessions` | `user_id → users` | `ON DELETE CASCADE` |
 | `notifications` | `user_id → users` | `ON DELETE CASCADE` |
+| `project_match_queue` | `candidate_a_id → projects` | `ON DELETE RESTRICT` (Postgres default — no clause specified) |
+| `project_match_queue` | `candidate_b_id → projects` | `ON DELETE RESTRICT` (Postgres default — no clause specified) |
 
 The `SET NULL` choices for `satellite_alerts.project_id` and `notifications.project_id` mean: if a project is deleted, historical alerts and notifications are retained (orphaned, project_id = NULL) rather than cascade-deleted. This is a strategic choice — alerts are forensic records; deleting a project should not erase its deforestation history.
 
+The `RESTRICT` default for `project_match_queue` means deleting a project that appears in the queue will fail with a FK violation until the queue row is resolved. This is intentional (see E7).
+
 **Question for Andy:** Are the cascade vs SET NULL choices above final, or should all project-linked tables use CASCADE (simpler) or all use SET NULL (maximum data retention)? Implementation will proceed with the architecture §3 choices unless Andy says otherwise.
 
-**OQ-2 — `pg_trgm` OS package in T01.**
-T01 as written installs `postgresql-16-postgis-3` but does not mention `postgresql-contrib` (which ships `pg_trgm`). Should T01's acceptance criteria be updated to verify pg_trgm availability, or is it acceptable to resolve this during T02 apply if the extension fails?
+**OQ-2 — CLOSED.** `pg_trgm` ships with `postgresql-16` on this box; no separate `postgresql-contrib` package is needed. T01 installs `postgresql-16`. `CREATE EXTENSION IF NOT EXISTS pg_trgm` will succeed without additional OS packages. See E3.
+
+**OQ-3 — Drizzle `generatedAlwaysAs()` for `projects.total_vcus_available` (T04 action item).**
+T02 keeps the SQL `GENERATED ALWAYS AS (total_vcus_issued - total_vcus_retired) STORED` as-is. T04 must decide at implementation time whether to use `generatedAlwaysAs(sql\`total_vcus_issued - total_vcus_retired\`, { mode: 'stored' })` (preferred if drizzle-orm ≥ 0.30 is installed) or to omit the column from the table definition and read it via raw `sql` tag. Whichever approach is chosen must be documented in a comment in `lib/schema.ts`. Downstream stories T09, T11, T12 must not assume `totalVcusAvailable` appears in Drizzle's default select output — they should use the approach T04 documents. This is a T04 concern; T02's DDL does not change.
 
 ---
 

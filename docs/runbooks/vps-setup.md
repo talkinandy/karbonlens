@@ -25,6 +25,8 @@ apt update
 apt install -y postgresql-16-postgis-3 postgresql-16-postgis-3-scripts
 ```
 
+Note: `postgresql-contrib` is **not required**. The `pg_trgm` and `pgcrypto` extensions ship with the core `postgresql-16` package on PGDG Ubuntu builds and are already on disk after a standard Postgres 16 install.
+
 ---
 
 ## 2. Create Unix system user
@@ -52,7 +54,7 @@ if [ ! -f /root/karbonlens-secrets.txt ]; then
 # KarbonLens secrets — $(date +%Y-%m-%d)
 # chmod 600 is set below; do not share this file
 DB_PASS=${DB_PASS}
-DATABASE_URL=postgresql://karbonlens:${DB_PASS}@127.0.0.1:5432/karbonlens
+DATABASE_URL=postgresql://karbonlens:${DB_PASS}@localhost:5432/karbonlens
 EOF
   chmod 600 /root/karbonlens-secrets.txt
   echo "Password generated and saved."
@@ -103,57 +105,65 @@ SQL
 
 ---
 
-## 6. Verify localhost-only binding
+## 6. Set listen_addresses explicitly and verify binding
 
 ```bash
-# Check current setting
+PGCONF=/etc/postgresql/16/main/postgresql.conf
+
+# Unconditionally set listen_addresses = 'localhost' (removes commented-out default)
+grep -qE "^listen_addresses\s*=\s*'localhost'" "$PGCONF" \
+  || (sed -i "s|^#*listen_addresses\s*=.*|listen_addresses = 'localhost'|" "$PGCONF" \
+     && systemctl restart postgresql)
+
+# Verify effective setting
 sudo -u postgres psql -c "SHOW listen_addresses;"
 
-# If it shows anything other than 'localhost', edit postgresql.conf:
-# sudo nano /etc/postgresql/16/main/postgresql.conf
-# Set:  listen_addresses = 'localhost'
-# Then: systemctl restart postgresql
-
-# Confirm port is bound only to 127.0.0.1
+# Confirm port is bound only to loopback (both 127.0.0.1 and ::1 are expected and safe)
 ss -tlnp | grep 5432
-# Expected: 127.0.0.1:5432 (NOT 0.0.0.0:5432)
+# Expected: 127.0.0.1:5432 and [::1]:5432 (NOT 0.0.0.0:5432 or a public IP)
 ```
 
 ---
 
-## 7. Ensure pg_hba.conf allows TCP connections from localhost
+## 7. Force scram-sha-256 auth for karbonlens in pg_hba.conf
+
+pg_hba.conf is first-match wins. These lines must appear BEFORE any `trust` line covering 127.0.0.1/::1, otherwise `trust` takes precedence and the generated password is never validated.
 
 ```bash
-# Check existing rules for karbonlens role over TCP
-grep karbonlens /etc/postgresql/16/main/pg_hba.conf || true
+PGHBA=/etc/postgresql/16/main/pg_hba.conf
 
-# If no matching line exists, add one:
-# echo "host karbonlens karbonlens 127.0.0.1/32 scram-sha-256" \
-#   >> /etc/postgresql/16/main/pg_hba.conf
-# systemctl reload postgresql
+# IPv4 loopback
+LINE='host    karbonlens    karbonlens    127.0.0.1/32    scram-sha-256'
+grep -qxF "$LINE" "$PGHBA" || echo "$LINE" | sudo tee -a "$PGHBA"
+
+# IPv6 loopback
+LINE6='host    karbonlens    karbonlens    ::1/128         scram-sha-256'
+grep -qxF "$LINE6" "$PGHBA" || echo "$LINE6" | sudo tee -a "$PGHBA"
+
+# Remove any trust entry that would apply to the karbonlens user on TCP loopback
+# (Leaves peer auth for the postgres superuser on Unix socket intact)
+sudo sed -i '/^host[[:space:]]\+karbonlens[[:space:]]\+karbonlens[[:space:]]\+127\.0\.0\.1\/32[[:space:]]\+trust/d' "$PGHBA"
+sudo sed -i '/^host[[:space:]]\+karbonlens[[:space:]]\+karbonlens[[:space:]]\+::1\/128[[:space:]]\+trust/d' "$PGHBA"
+
+# Reload so changes take effect without a full restart
+sudo systemctl reload postgresql
+
+# Verify
+grep karbonlens "$PGHBA"
 ```
 
 ---
 
 ## 8. Create application directories
 
+`install -d` creates the directory (including parents) and sets owner/mode atomically. It is idempotent — safe to re-run.
+
 ```bash
-mkdir -p /opt/karbonlens
-mkdir -p /var/log/karbonlens
-mkdir -p /var/lib/karbonlens/backups
-mkdir -p /var/lib/karbonlens/pdf-archive
-
-chown -R karbonlens:karbonlens \
-  /opt/karbonlens \
-  /var/log/karbonlens \
-  /var/lib/karbonlens
-
-chmod 755 \
-  /opt/karbonlens \
-  /var/log/karbonlens \
-  /var/lib/karbonlens \
-  /var/lib/karbonlens/backups \
-  /var/lib/karbonlens/pdf-archive
+install -d -o karbonlens -g karbonlens -m 755 /opt/karbonlens
+install -d -o karbonlens -g karbonlens -m 755 /var/log/karbonlens
+install -d -o karbonlens -g karbonlens -m 755 /var/lib/karbonlens
+install -d -o karbonlens -g karbonlens -m 755 /var/lib/karbonlens/backups
+install -d -o karbonlens -g karbonlens -m 755 /var/lib/karbonlens/pdf-archive
 
 # Verify
 stat -c "%U:%G %a %n" \
@@ -180,14 +190,17 @@ sudo -u postgres psql -d karbonlens -c "\dx" | grep -E "pgcrypto|pg_trgm|postgis
 id karbonlens
 getent passwd karbonlens | cut -d: -f7
 
-# AC-4: Postgres role can connect via TCP
+# AC-4: Postgres role can connect via TCP with scram-sha-256
 DB_PASS=$(grep '^DB_PASS=' /root/karbonlens-secrets.txt | cut -d= -f2)
 PGPASSWORD="$DB_PASS" psql -U karbonlens -h 127.0.0.1 -d karbonlens \
   -c "SELECT current_user, current_database();"
+# Also confirm scram-sha-256 is in pg_hba.conf (not trust)
+grep "karbonlens.*scram-sha-256" /etc/postgresql/16/main/pg_hba.conf
 
-# AC-5: Localhost-only binding
+# AC-5: Localhost-only binding (::1 alongside 127.0.0.1 is expected and safe)
 sudo -u postgres psql -c "SHOW listen_addresses;"
 ss -tlnp | grep 5432
+# Expected: 127.0.0.1:5432 and [::1]:5432 — neither 0.0.0.0 nor a public IP
 
 # AC-6: Directory ownership
 stat -c "%U:%G %a %n" \
@@ -198,34 +211,52 @@ stat -c "%U:%G %a %n" \
 stat -c "%a %U" /root/karbonlens-secrets.txt
 grep DATABASE_URL /root/karbonlens-secrets.txt
 
-# AC-8: .env.example placeholder present (run from repo root)
-grep DATABASE_URL .env.example
+# AC-8: Idempotence — re-run sections 2–8 and confirm no errors
+# (Re-run the blocks above; each guard should print "already exists — skipping")
 ```
 
 ---
 
-## 10. Copy the connection string into .env.example
+## 10. Copy the connection string into .env.local (local dev)
 
-From the repo root on the VPS (or locally if you have the secrets file):
+T01 does **not** touch `.env.example` — that file is owned by T03.
 
-```bash
-DB_PASS=$(grep '^DB_PASS=' /root/karbonlens-secrets.txt | cut -d= -f2)
-
-# Print the line to add to .env.example (do NOT commit the real password)
-echo "DATABASE_URL=postgresql://karbonlens:CHANGE_ME@localhost:5432/karbonlens"
-```
-
-Manually ensure `.env.example` contains:
-
-```
-DATABASE_URL=postgresql://karbonlens:CHANGE_ME@localhost:5432/karbonlens
-```
-
-For local dev, copy the real connection string into `.env.local` (gitignored):
+To wire up local dev against the VPS database:
 
 ```bash
+# Show the real DATABASE_URL from the secrets file
 grep DATABASE_URL /root/karbonlens-secrets.txt
-# Paste the real DATABASE_URL line into .env.local
+# Paste the output into your local .env.local (gitignored)
+```
+
+---
+
+## Rollback (manual teardown)
+
+If provisioning is botched and must be torn down:
+
+```bash
+# 1. Drop the database (destroys data — verify it is safe to do so)
+sudo -u postgres psql -c "DROP DATABASE IF EXISTS karbonlens;"
+
+# 2. Drop the role
+sudo -u postgres psql -c "DROP ROLE IF EXISTS karbonlens;"
+
+# 3. Remove Unix user
+userdel -r karbonlens 2>/dev/null; true
+
+# 4. Remove directories
+rm -rf /opt/karbonlens /var/log/karbonlens /var/lib/karbonlens
+
+# 5. Remove secrets file
+rm -f /root/karbonlens-secrets.txt
+
+# 6. Remove pg_hba.conf entries
+sudo sed -i '/karbonlens.*scram-sha-256/d' /etc/postgresql/16/main/pg_hba.conf
+sudo systemctl reload postgresql
+
+# 7. Revert listen_addresses (re-comment the line if desired, then restart)
+# sudo systemctl restart postgresql
 ```
 
 ---

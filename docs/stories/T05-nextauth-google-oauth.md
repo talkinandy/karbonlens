@@ -2,7 +2,7 @@
 id: T05
 title: NextAuth.js v5 with Google OAuth
 phase: 1
-status: draft
+status: audited
 blocked_by: [T04]
 blocks: [T16, T17, T18, T21]
 owner: implementer-agent
@@ -23,7 +23,7 @@ NextAuth v5 (Auth.js) with `@auth/drizzle-adapter` stores sessions in Postgres a
 
 **Local dev note:** Google OAuth allows `http://localhost:3000` as an authorized JavaScript origin and `http://localhost:3000/api/auth/callback/google` as a redirect URI — localhost is explicitly permitted by Google, so HTTPS is not required for local development. Netlify deployment (`https://karbonlens.netlify.app`) is configured in the Google Cloud Console at the same time, but production release is deferred to a later sprint; v0.1 acceptance criteria are validated locally.
 
-**Credential handling:** Andy registers the OAuth client in Google Cloud Console and drops `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` into `.env.local`. The implementer only edits `.env.example` and writes the setup runbook at `docs/runbooks/google-oauth-setup.md`.
+**Credential handling:** Andy registers the OAuth client in Google Cloud Console and drops `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` into `.env.local`. The implementer only verifies `.env.example` (owned by T03) and produces the runbook at `docs/runbooks/google-oauth-setup.md`.
 
 ---
 
@@ -33,9 +33,9 @@ NextAuth v5 (Auth.js) with `@auth/drizzle-adapter` stores sessions in Postgres a
 
 1. **`lib/auth.ts`** — NextAuth v5 configuration.
    - Provider: `Google` (from `next-auth/providers/google`), requesting `profile` and `email` scopes only.
-   - Adapter: `DrizzleAdapter(db)` from `@auth/drizzle-adapter`.
-   - Session strategy: `database` (token stored in `sessions` table; not JWT).
-   - Session callback: copies `user.id` from the adapter onto `session.user.id` so downstream server components and API routes can read the authenticated user's UUID without an extra DB lookup.
+   - Adapter: `DrizzleAdapter(db)` from `@auth/drizzle-adapter`. DB writes during login happen via the `karbonlens` role through `DrizzleAdapter(db)`; no owner-elevation needed — this is handled by T02's ownership block.
+   - Session strategy: `database` (token stored in `sessions` table; not JWT). One SELECT per authed request is adequate for v0.1; revisit JWT strategy in v0.2 if traffic warrants.
+   - Session callback: copies `user.id` from the adapter onto `session.user.id` so downstream server components and API routes can read the authenticated user's UUID without an extra DB lookup. **Important:** implement this check in the `(app)` group layout server component — not inside the NextAuth `signIn` callback. The NextAuth adapter guarantees the `users` row is fully committed before the session callback fires (adapter `createUser` → `linkAccount` → `createSession` → `session` callback, in that order). Moving the check into the callback would create a race; the layout approach correctly avoids it.
    - Named exports: `{ handlers, auth, signIn, signOut }`.
 
 2. **`app/api/auth/[...nextauth]/route.ts`** — catch-all route handler.
@@ -43,28 +43,24 @@ NextAuth v5 (Auth.js) with `@auth/drizzle-adapter` stores sessions in Postgres a
    - No business logic here; all config lives in `lib/auth.ts`.
 
 3. **`middleware.ts`** (repo root) — route protection via the `auth` middleware exported from `lib/auth.ts`.
-   - **Protected paths** — any unauthenticated request to a URL matching the following patterns redirects to `/?signin=1`:
-     - `/projects` (exact) — projects explorer (full dataset requires auth)
-     - `/projects/:path+` except public detail slugs (see partial gating note below)
-     - `/prices`
+   - **Approach:** clean matcher listing the four protected route groups. Inside the middleware function, check whether `pathname` matches a public-slug pattern under `/projects/[slug]` and allow if so. This keeps all protection logic visible in one place.
+   - **Protected paths** — any unauthenticated request matching the matcher redirects to `/?signin=1`:
+     - `/projects/:path*`
      - `/prices/:path*`
-     - `/regulatory`
      - `/regulatory/:path*`
-     - `/alerts`
      - `/alerts/:path*`
    - **Public paths** — never intercepted by the auth middleware:
      - `/` (landing)
-     - `/projects/[id]` public slugs for the three flagship projects (Katingan, Sumatra Merang, Rimba Raya) — the detail page itself performs page-level gating to hide issuance detail and alert history for unauthenticated visitors; the middleware does not block the route entirely.
+     - `/projects/[slug]` public slugs — see note below on slug values.
      - `/api/auth/[...nextauth]` — must remain fully public so the OAuth callback can complete before a session exists.
      - `/api/regulatory` — public endpoint per architecture §6.
      - `/api/map/projects` — public (limited) endpoint.
-   - **Exact matcher config** in `middleware.ts`:
+   - **Matcher config:**
 
      ```typescript
      export const config = {
        matcher: [
-         '/projects',
-         '/projects/((?!katingan-peatland|sumatra-merang-peat|rimba-raya).+)',
+         '/projects/:path*',
          '/prices/:path*',
          '/regulatory/:path*',
          '/alerts/:path*',
@@ -72,27 +68,66 @@ NextAuth v5 (Auth.js) with `@auth/drizzle-adapter` stores sessions in Postgres a
      };
      ```
 
-     The negative lookahead in the projects pattern excludes the three public slugs.
-   - **Redirect behaviour:** `NextResponse.redirect(new URL(`/?signin=1`, request.url))` — the `signin=1` query param triggers the sign-in modal on the landing page.
+   - **Public slug in-body check:** Inside the middleware function, before redirecting, check whether `pathname` matches a known public project slug. Use the sample slug `katingan-peatland` (the slug T03 declares as a representative flagship project). Cross-reference T03 §3 for the authoritative slug list; if T03 declares additional public slugs, add them to this check. Example:
 
-4. **UI components** in `components/auth/`:
+     ```typescript
+     const PUBLIC_PROJECT_SLUGS = new Set(['katingan-peatland']);
+     // add further slugs from T03 §3 at implementation time
+
+     export default auth((req) => {
+       const { pathname } = req.nextUrl;
+       // Allow public project detail pages
+       const slugMatch = pathname.match(/^\/projects\/([^/]+)$/);
+       if (slugMatch && PUBLIC_PROJECT_SLUGS.has(slugMatch[1])) {
+         return NextResponse.next();
+       }
+       if (!req.auth) {
+         return NextResponse.redirect(new URL('/?signin=1', req.url));
+       }
+     });
+     ```
+
+   - **Redirect behaviour:** `NextResponse.redirect(new URL('/?signin=1', request.url))` — the `signin=1` query param triggers the sign-in modal on the landing page.
+
+4. **`types/next-auth.d.ts`** — TypeScript module augmentation. Required so that `session.user.id` resolves correctly in downstream server components and API routes (NextAuth's default `Session` type does not include `id` on `session.user`).
+
+   ```typescript
+   declare module 'next-auth' {
+     interface Session {
+       user: { id: string; email: string; name?: string; image?: string };
+     }
+   }
+   ```
+
+5. **UI components** in `components/auth/`:
    - `SignInButton.tsx` — renders a "Sign in with Google" button that calls `signIn('google')`. Used in the landing hero and the top-nav unauthenticated state.
-   - `UserMenu.tsx` — avatar + dropdown shown when authenticated. Dropdown items: user email (non-interactive), "Sign out" (calls `signOut()`). Mounts in the `(app)` group layout.
-   - `OnboardingModal.tsx` — one-time modal shown immediately after first login (see item 5).
+   - `UserMenu.tsx` — avatar + dropdown shown when authenticated. Dropdown items: user email (non-interactive), "Sign out" (calls `signOut({ redirectTo: '/' })` to redirect to the landing page after sign-out). Mounts in the `(app)` group layout.
+   - `OnboardingModal.tsx` — one-time modal shown immediately after first login (see item 6).
 
-5. **First-login onboarding modal** — shown once, immediately after the first Google OAuth callback completes:
+6. **First-login onboarding modal** — shown once, immediately after the first Google OAuth callback completes:
    - **Trigger:** on the server, after `auth()` resolves and `session.user.id` is available, check whether `users.persona IS NULL` for that user. If so, pass a `showOnboarding: true` prop to the layout; the `OnboardingModal` component renders as an overlay.
    - **Fields:**
      - `persona` — `<select>` with options: `buyer`, `broker`, `corporate`, `researcher`, `developer`, `other`. Required for submission; skippable (see below).
      - `organization` — `<input type="text">` free text. Optional.
    - **Submit action:** POST to a new server action or API route (`/api/user/onboard`) that executes `UPDATE users SET persona = $1, organization = $2 WHERE id = $3`.
-   - **Skip / dismissal:** if the user dismisses without submitting, nothing is written to the DB. The modal reappears on each subsequent visit until `persona` is set, with a maximum frequency of once per week (implemented by storing a `onboarding_snoozed_until` timestamp in a cookie with 7-day expiry; the modal is suppressed if the cookie is present and not yet expired, even if `persona` remains null). This prevents the modal from firing on every single page load after a deliberate skip, while still nudging the user to complete onboarding.
+   - **Skip / dismissal behaviour:**
+
+     | State | Persona set? | Snooze cookie? | Shown on load? |
+     |---|---|---|---|
+     | First login | No | No | Yes |
+     | Skipped once | No | Yes, 7d | No until cookie expires |
+     | Completed | Yes | N/A | No |
+     | Session resumed after cookie expiry | No | Expired | Yes |
+
+     If the user dismisses without submitting, nothing is written to the DB. Set cookie `kl_onboarding_snooze_until=<unix-timestamp>` with a 7-day expiry. On subsequent visits, if the cookie is present and not expired, suppress the modal even though `persona` is still null. After 7 days the cookie expires; the modal reappears.
+
+     **Known limitation (v0.1):** if the user clears cookies, the snooze is lost and the modal reappears immediately within the 7-day window. This is acceptable for v0.1.
+
    - **`email_digest_opt_in`:** the column defaults to `TRUE` in the schema (migration 001). No action needed at onboarding — the default fires automatically on `INSERT INTO users` by the NextAuth adapter. Do not override this in the onboarding form; users manage their digest preference via the unsubscribe link in T17.
 
-6. **`docs/runbooks/google-oauth-setup.md`** — step-by-step guide for Andy to configure the OAuth client (see §5 Outputs).
+7. **`docs/runbooks/google-oauth-setup.md`** — step-by-step guide for Andy to configure the OAuth client (see §5 Outputs). Content defined by extraction from this story's Appendix A.
 
-7. **`.env.example` additions:**
-
+8. **`.env.example` — verify only.** T03 owns `.env.example`. T05 must verify that the following keys are present; do not append or reorder lines if they are already there:
    ```bash
    # NextAuth — Google OAuth
    # Generate NEXTAUTH_SECRET with: openssl rand -base64 32
@@ -101,6 +136,7 @@ NextAuth v5 (Auth.js) with `@auth/drizzle-adapter` stores sessions in Postgres a
    GOOGLE_CLIENT_ID=
    GOOGLE_CLIENT_SECRET=
    ```
+   If any of these keys are absent, raise with Andy — do not silently add them without coordination with T03.
 
 ### Out of scope (explicit non-goals)
 
@@ -112,10 +148,43 @@ NextAuth v5 (Auth.js) with `@auth/drizzle-adapter` stores sessions in Postgres a
 - Weekly digest emails — T17.
 - Automated tests of any kind — none for v0.1.
 - Production deployment to Netlify — deferred; acceptance criteria are validated locally.
+- Table ownership elevation — not T05's concern. The `karbonlens` role has DML rights on all auth tables via T02's ownership block.
+- `users.email_verified` generated column concerns — fully resolved upstream (T02 + T04). The column exists; the adapter will succeed.
+- Localhost HTTPS — not required; Google explicitly permits `http://localhost:3000`.
+- Design brief for sign-in UI beyond the component specs above — not T05's concern.
 
 ---
 
 ## 4. Acceptance criteria (Gherkin)
+
+**Two-phase verification:** AC-7 through AC-11 (middleware redirects, SQL post-login, typecheck) are independent of real Google credentials and can be verified before Andy drops the GCP client ID/secret into `.env.local`. AC-1 through AC-6 require a functioning OAuth round-trip and are validated after credentials are available.
+
+**Phase 1 — pre-credential (no GCP client required)**
+
+**AC-7: Dismissed onboarding does not reappear immediately**
+```
+Given the onboarding modal is visible
+When I close the modal without submitting
+And  I navigate to another protected page in the same browser session
+Then the onboarding modal does NOT reappear
+And  a cookie named 'kl_onboarding_snooze_until' is present with expiry ~7 days from now
+```
+
+**AC-8: Unauthenticated access to /prices redirects**
+```
+Given I am not signed in
+When  I make a GET request to http://localhost:3000/prices
+Then  I receive an HTTP 307 redirect to /?signin=1
+```
+
+**AC-11: TypeScript compiles clean**
+```
+Given all files in §6 (File ownership) have been created or modified
+When  I run: npx tsc --noEmit
+Then  the command exits with code 0 and prints no errors
+```
+
+**Phase 2 — post-credential (GCP client ID/secret in .env.local)**
 
 **AC-1: Google OAuth round-trip completes**
 ```
@@ -170,22 +239,6 @@ And    SELECT persona, organization FROM users WHERE email='<my-email>'
        returns ('researcher', 'ACME Corp')
 ```
 
-**AC-7: Dismissed onboarding does not reappear immediately**
-```
-Given  the onboarding modal is visible
-When   I close the modal without submitting
-And    I navigate to another protected page in the same browser session
-Then   the onboarding modal does NOT reappear
-And    a cookie named 'onboarding_snoozed_until' is present with expiry ~7 days from now
-```
-
-**AC-8: Unauthenticated access to /prices redirects**
-```
-Given  I am not signed in
-When   I make a GET request to http://localhost:3000/prices
-Then   I receive an HTTP 307 redirect to /?signin=1
-```
-
 **AC-9: Authenticated access to /prices succeeds**
 ```
 Given  I am signed in (AC-1 has passed)
@@ -203,13 +256,6 @@ And    SELECT * FROM sessions WHERE user_id = (SELECT id FROM users WHERE email=
 And    navigating to http://localhost:3000/prices redirects to /?signin=1
 ```
 
-**AC-11: TypeScript compiles clean**
-```
-Given  all files in §6 (File ownership) have been created or modified
-When   I run: npx tsc --noEmit
-Then   the command exits with code 0 and prints no errors
-```
-
 ---
 
 ## 5. Inputs & outputs
@@ -223,8 +269,8 @@ Then   the command exits with code 0 and prints no errors
 | `GOOGLE_CLIENT_SECRET` | `.env.local` — same |
 | `NEXTAUTH_SECRET` | `.env.local` — `openssl rand -base64 32` |
 | `NEXTAUTH_URL` | `.env.local` — `http://localhost:3000` for local dev |
-| `users`, `accounts`, `sessions`, `verification_tokens` tables | migration 001 (T02) |
-| `lib/db.ts` Drizzle client | T04 |
+| `users`, `accounts`, `sessions`, `verification_tokens` tables | migration 001 (T02); `users.email_verified TIMESTAMPTZ` column confirmed present |
+| `lib/db.ts` Drizzle client | T04; `accounts.expiresAt` confirmed as `bigint({ mode: 'number' })` per T04 §5 column-type mapping |
 | `next-auth@beta` and `@auth/drizzle-adapter` packages | T03 (`npm install`) |
 
 ### Outputs
@@ -233,14 +279,14 @@ Then   the command exits with code 0 and prints no errors
 |---|---|
 | `lib/auth.ts` | NextAuth v5 configuration, exports `{ handlers, auth, signIn, signOut }` |
 | `app/api/auth/[...nextauth]/route.ts` | Catch-all route re-exporting `handlers.GET` and `handlers.POST` |
-| `middleware.ts` | Auth middleware with matcher config protecting `(app)` routes |
+| `middleware.ts` | Auth middleware with matcher config protecting `(app)` routes; public slug in-body check |
+| `types/next-auth.d.ts` | TypeScript module augmentation for `session.user.id` |
 | `components/auth/SignInButton.tsx` | "Sign in with Google" button component |
-| `components/auth/UserMenu.tsx` | Authenticated avatar + sign-out dropdown |
-| `components/auth/OnboardingModal.tsx` | First-login persona/organisation capture modal |
+| `components/auth/UserMenu.tsx` | Authenticated avatar + sign-out dropdown; calls `signOut({ redirectTo: '/' })` |
+| `components/auth/OnboardingModal.tsx` | First-login persona/organisation capture modal with 7-day cookie snooze |
 | `app/(app)/layout.tsx` (modified) | Mount `UserMenu` and conditionally render `OnboardingModal` |
 | `/api/user/onboard` route or server action | Writes persona + organization to `users` table |
-| `.env.example` | Append `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
-| `docs/runbooks/google-oauth-setup.md` | Step-by-step Google Cloud Console runbook for Andy |
+| `docs/runbooks/google-oauth-setup.md` | Step-by-step Google Cloud Console runbook for Andy (content extracted from Appendix A; verify keys listed in §3 item 8 are present in `.env.example` — T03 owns that file) |
 
 ---
 
@@ -248,7 +294,8 @@ Then   the command exits with code 0 and prints no errors
 
 ### Blocked by
 
-- **T04** — Drizzle client (`lib/db.ts`) and schema (`lib/schema.ts`) must exist before the DrizzleAdapter can be wired up.
+- **T04** — Drizzle client (`lib/db.ts`) and schema (`lib/schema.ts`) must exist before the DrizzleAdapter can be wired up. T04 confirms `accounts.expiresAt: bigint('expires_at', { mode: 'number' })` is correct for `@auth/drizzle-adapter` v5 (documented in T04 §5 column-type mapping and edge case iv).
+- **T02** — `users.email_verified TIMESTAMPTZ` column is present in migration 001 and in T04's Drizzle schema as `emailVerified`. The adapter will write this column on every Google sign-in. No blocker remains.
 
 ### Blocks
 
@@ -264,12 +311,14 @@ The following paths are owned exclusively by T05. No other task may create or mo
 - `lib/auth.ts`
 - `app/api/auth/[...nextauth]/route.ts`
 - `middleware.ts`
+- `types/next-auth.d.ts`
 - `components/auth/SignInButton.tsx`
 - `components/auth/UserMenu.tsx`
 - `components/auth/OnboardingModal.tsx`
 - `app/(app)/layout.tsx` — T05 modifies the `(app)` group layout to mount UserMenu and OnboardingModal; coordinate with T11/T12 if those tasks also need to touch this file.
-- `.env.example` — append only; do not reorder existing lines.
 - `docs/runbooks/google-oauth-setup.md`
+
+**`.env.example` is owned by T03.** T05 verifies only; do not modify.
 
 ---
 
@@ -285,25 +334,28 @@ NextAuth's `accounts` table links by `provider_account_id` (Google's stable sub 
 The session `expires` timestamp in Postgres passes. On the next request to a protected route, the `auth` middleware finds no valid session and redirects to `/?signin=1`. The user signs in again and gets a fresh session row.
 
 **(iv) Onboarding modal dismissed without submit**
-No DB write occurs. A `onboarding_snoozed_until` cookie is set with a 7-day expiry. On the next visit, if the cookie is present and not expired, the modal is suppressed even though `persona` is still null. After 7 days the cookie expires, the modal reappears. Rationale: 7 days is long enough not to be annoying, short enough to eventually collect the data. This is preferable to a permanent one-time skip because the data has product value.
+No DB write occurs. Cookie `kl_onboarding_snooze_until=<unix-timestamp>` is set with a 7-day expiry. On the next visit, if the cookie is present and not expired, the modal is suppressed even though `persona` is still null. After 7 days the cookie expires; the modal reappears. Rationale: 7 days is long enough not to be annoying, short enough to eventually collect the data. If the user clears cookies, the snooze resets and the modal reappears immediately — acceptable for v0.1.
 
 **(v) `NEXTAUTH_SECRET` is missing**
-NextAuth v5 refuses to start and throws at boot time: `[next-auth] MissingSecret: Please define a `secret`...`. This is the desired behaviour — it is a hard misconfiguration, not a graceful-degradation case. `.env.example` documents the generation command.
+NextAuth v5 refuses to start and throws at boot time: `[next-auth] MissingSecret: Please define a 'secret'...`. This is the desired behaviour — it is a hard misconfiguration, not a graceful-degradation case. `.env.example` documents the generation command.
 
 **(vi) Concurrent logins across tabs / devices**
 With `strategy: 'database'`, each login creates a new `sessions` row with its own `session_token`. Multiple simultaneous sessions for the same user are valid and handled naturally. Sign-out in one tab invalidates only that session row; other tabs remain authenticated until their own sessions expire or are explicitly signed out.
 
-**(vii) DrizzleAdapter migration mismatch**
-If the adapter version expects columns that do not exist in migration 001, the app will throw at runtime when attempting to insert an account or session row. The implementer must verify column names during setup (see §9 Open questions). If a gap is found, a new migration `002_auth_fix.sql` must be written before merging.
+**(vii) NextAuth adapter and `email_verified`**
+The NextAuth adapter writes `email_verified` on every Google sign-in (Google always returns a verified email). The column exists in migration 001 as `email_verified TIMESTAMPTZ` (T02) and is exposed in T04's Drizzle schema as `emailVerified: timestamp('email_verified', { withTimezone: true })`. The adapter will succeed. No further action needed.
+
+**(viii) First-login race condition**
+The NextAuth adapter guarantees write order: `createUser` → `linkAccount` → `createSession` → `session` callback. The `users` row is fully committed before the session callback fires. The onboarding modal check (`persona IS NULL`) runs in the `(app)` layout server component on each request — not inside any NextAuth callback. Do not "optimise" by moving the check into a NextAuth callback; the layout approach correctly avoids the race.
 
 ---
 
 ## 8. Definition of done
 
-- [ ] All 11 acceptance criteria pass against a locally running `npm run dev` with a real Google OAuth client.
+- [ ] All 11 acceptance criteria pass against a locally running `npm run dev` with a real Google OAuth client (Phase 1 ACs verified before credentials; Phase 2 ACs verified after credentials are available).
 - [ ] `npx tsc --noEmit` exits 0 with no errors.
 - [ ] All files listed in §6 (File ownership) are present and committed to `feature/t05-nextauth-google-oauth`.
-- [ ] `.env.example` updated with the four NextAuth variables.
+- [ ] `.env.example` verified to contain the four NextAuth variables (T03 owns the file; T05 verifies only).
 - [ ] `docs/runbooks/google-oauth-setup.md` exists and is accurate (Andy can follow it end-to-end without Claude's help).
 - [ ] CHANGELOG entry added under `[Unreleased]`.
 - [ ] `TASKS.md` T05 status flipped from `todo` → `done`.
@@ -313,28 +365,21 @@ If the adapter version expects columns that do not exist in migration 001, the a
 
 ## 9. Open questions
 
-**OQ-1 (schema compatibility — confirm before implementing)**
+**OQ-1 (adapter schema audit — cross-reference resolved)**
 
-The `@auth/drizzle-adapter` v5 expects specific column names in the Drizzle *TypeScript schema* (field names map to JS property names, which in turn must match what the adapter reads). The SQL schema in migration 001 uses snake_case column names (`user_id`, `provider_account_id`). Drizzle maps these to camelCase via the `.name()` column descriptor in `lib/schema.ts`.
+~~`email_verified` column missing~~ — resolved upstream. `email_verified TIMESTAMPTZ` is present in migration 001 (T02 §3) and in T04's Drizzle schema as `emailVerified`. The adapter will write this column on every Google sign-in without error.
 
-Known potential mismatches to verify:
+~~`accounts.expires_at` BigInt mode ambiguity~~ — resolved by T04. T04 §5 column-type mapping confirms `bigint('expires_at', { mode: 'number' })` and documents the rationale. T05 inherits this without further action.
 
-| Adapter expects (JS property) | SQL column in migration 001 | Drizzle field name | Risk |
-|---|---|---|---|
-| `userId` | `user_id` | must be defined as `userId: uuid('user_id')` | Low — standard Drizzle pattern |
-| `providerAccountId` | `provider_account_id` | must be `providerAccountId: text('provider_account_id')` | **Medium** — easy to miss; adapter reads `.providerAccountId`, not `.provider_account_id` |
-| `sessionToken` | `session_token` | must be `sessionToken: text('session_token')` | Low |
-| `emailVerified` | not present in `users` table | adapter may attempt to read/write this | **High** — the `users` table in migration 001 does not have an `emailVerified` column, but `@auth/drizzle-adapter` v5 expects it on the `users` table for email-verified providers. Google OAuth always sets this, so the adapter will try to write `email_verified`. **Action: add `email_verified TIMESTAMPTZ` to the users table in a new migration 001 amendment or migration 002 before this story is implemented. Confirm with Andy whether to amend 001 (simpler, already undeployed) or create 002.** |
-
-**Confirm:** Run a local integration test immediately after wiring up the adapter. Attempt a sign-in and check for runtime errors. If the adapter throws a column-not-found error, trace the exact column name, add it to `lib/schema.ts`, and (if not yet deployed) amend migration 001 or add migration 002.
+The remaining field-naming mappings (`userId`, `providerAccountId`, `sessionToken`) are standard Drizzle camelCase patterns; verified in T02 §6 auth table field-naming contract.
 
 **OQ-2 (adapter migration for v5)**
 
-Confirm that `@auth/drizzle-adapter` at the version installed in T03 (`npm i next-auth@beta @auth/drizzle-adapter`) does not require any additional migration beyond what migration 001 provides. The adapter changelog between Auth.js v4 and v5 dropped the `created_at` column requirement on `sessions` and changed the `verification_tokens` primary key — verify the current adapter version's exact expectations against the schema in migration 001 before committing.
+Confirm that `@auth/drizzle-adapter` at the version installed in T03 does not require any additional migration beyond what migration 001 provides. The adapter changelog between Auth.js v4 and v5 dropped the `created_at` column requirement on `sessions` and changed the `verification_tokens` primary key — verify the current adapter version's exact expectations against the schema in migration 001 before committing.
 
-**OQ-3 (public slug list for middleware)**
+**OQ-3 (public slug list for middleware — partially resolved)**
 
-The middleware negative lookahead pattern currently hardcodes three slugs: `katingan-peatland`, `sumatra-merang-peat`, `rimba-raya`. Confirm exact slug values with Andy (they are set when T06 seeds the `projects` table). If slugs differ, update the middleware matcher accordingly.
+The middleware in-body check uses `katingan-peatland` as the baseline public slug (as declared by T03). Cross-reference T03 §3 for the authoritative full slug list; add any additional public slugs to `PUBLIC_PROJECT_SLUGS` at implementation time. The matcher approach (list slugs in the in-body set rather than in the regex) makes this update safe and visible.
 
 ---
 
@@ -342,88 +387,16 @@ The middleware negative lookahead pattern currently hardcodes three slugs: `kati
 
 - [NextAuth v5 (Auth.js) docs](https://authjs.dev/getting-started/installation)
 - [Auth.js Drizzle adapter](https://authjs.dev/getting-started/adapters/drizzle)
-- `docs/architecture.md` §3 — DB schema for `users`, `accounts`, `sessions`, `verification_tokens`
+- `docs/architecture.md` §3 — DB schema for `users`, `accounts`, `sessions`, `verification_tokens`; `users.email_verified TIMESTAMPTZ` confirmed present
 - `docs/architecture.md` §6 — API routes and public vs authenticated data boundary
 - `docs/architecture.md` §7 — environment variables
 - `docs/TASKS.md` §T05 — original task definition
-- `docs/runbooks/google-oauth-setup.md` — Andy's Google Cloud Console steps (created by this story)
+- `docs/stories/T02-schema-migration-001.md` — `email_verified` column spec and auth table field-naming contract
+- `docs/stories/T04-drizzle-schema-db-client.md` — `bigint({ mode: 'number' })` for `expires_at`; Drizzle client
+- `docs/runbooks/google-oauth-setup.md` — Andy's Google Cloud Console steps (extracted from Appendix A during spec revision)
 
 ---
 
-## Appendix A — Runbook outline (google-oauth-setup.md)
+## Appendix A — Runbook
 
-The implementer must create `docs/runbooks/google-oauth-setup.md` with the following content. It is a human-facing guide for Andy, not for Claude.
-
-```markdown
-# Runbook: Google OAuth setup for KarbonLens
-
-## Prerequisites
-- Google account with access to Google Cloud Console
-- The KarbonLens repo cloned locally
-
-## Step 1 — Create a Google Cloud project
-1. Go to https://console.cloud.google.com/
-2. Click the project dropdown (top left) → "New Project"
-3. Name: `KarbonLens`, Location: No organisation
-4. Click Create. Wait for the project to provision (~30 seconds).
-5. Ensure the new project is selected in the dropdown.
-
-## Step 2 — Configure the OAuth consent screen
-1. Navigate to "APIs & Services" → "OAuth consent screen"
-2. User Type: External → Create
-3. App name: `KarbonLens`
-4. User support email: your Google email
-5. Developer contact information: your Google email
-6. Click Save and Continue through Scopes (add nothing extra — defaults are fine)
-7. On Test Users: add your own Google email so you can test before verification
-8. Click Back to Dashboard
-
-## Step 3 — Create the OAuth 2.0 Web client
-1. Navigate to "APIs & Services" → "Credentials"
-2. Click "+ Create Credentials" → "OAuth 2.0 Client ID"
-3. Application type: Web application
-4. Name: `KarbonLens Web`
-
-### Authorised JavaScript origins
-Add both:
-- http://localhost:3000
-- https://karbonlens.netlify.app
-
-### Authorised redirect URIs
-Add both:
-- http://localhost:3000/api/auth/callback/google
-- https://karbonlens.netlify.app/api/auth/callback/google
-
-5. Click Create
-
-## Step 4 — Copy credentials into .env.local
-The dialog shows Your Client ID and Your Client Secret.
-
-In the repo root, open `.env.local` (create it from `.env.example` if it doesn't exist):
-
-```bash
-cp .env.example .env.local
-```
-
-Fill in:
-```
-GOOGLE_CLIENT_ID=<paste Client ID here>
-GOOGLE_CLIENT_SECRET=<paste Client Secret here>
-NEXTAUTH_SECRET=<run: openssl rand -base64 32>
-NEXTAUTH_URL=http://localhost:3000
-```
-
-Never commit `.env.local`. It is listed in `.gitignore`.
-
-## Step 5 — Verify locally
-```bash
-npm run dev
-```
-Navigate to http://localhost:3000 and click "Sign in with Google".
-Complete the consent flow. You should be redirected back to the app.
-
-## Netlify production (deferred)
-When deploying to production, add the four variables above to Netlify:
-Site → Configuration → Environment variables
-Set NEXTAUTH_URL=https://karbonlens.netlify.app for the production context.
-```
+Runbook extracted to `docs/runbooks/google-oauth-setup.md` during spec revision.
