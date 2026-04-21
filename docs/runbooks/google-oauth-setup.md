@@ -28,8 +28,13 @@ configuring environment variables locally and on Netlify, and smoke-testing the 
 3. App name: `KarbonLens`
 4. User support email: your Google email
 5. Developer contact information: your Google email
-6. Click **Save and Continue** through Scopes (add nothing extra — the defaults cover `profile` and `email`)
-7. On Test Users: add your own Google email so you can test before verification
+6. On **Scopes**, click "Add or Remove Scopes" and tick these three non-sensitive scopes, then **Update**:
+   - `openid`
+   - `.../auth/userinfo.email`
+   - `.../auth/userinfo.profile`
+
+   Click **Save and Continue**. (NextAuth's Google provider requests these same scopes by default; they are non-sensitive so Google does not gate them behind additional verification.)
+7. On **Test users**: add your own Google email so you can test before verification
 8. Click **Back to Dashboard**
 
 ---
