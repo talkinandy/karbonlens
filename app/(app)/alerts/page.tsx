@@ -1,80 +1,105 @@
-// TODO T11+: replace with db query
-import { mockAlerts } from "@/lib/mock-data";
+/**
+ * /alerts — personal notifications inbox. T16 replaces the T03 mock with
+ * a Drizzle-backed RSC. Reads the session via `auth()` (middleware already
+ * enforces redirect-to-signin; the extra guard here keeps the types honest
+ * and lets the file be refactored independently).
+ *
+ * Filters (URL search params):
+ *   - `?type=reversal,regulatory` — multi-value, comma-separated.
+ *   - `?read=unread`              — toggle unread-only.
+ *   - `?project=<slug>`           — deep-link; resolved to project.id.
+ *   - `?before=<uuid>`            — cursor-based pagination.
+ */
 
-export default function AlertsPage() {
+import { redirect } from 'next/navigation';
+import { auth } from '@/lib/auth';
+import {
+  getInboxNotifications,
+  getUnreadCount,
+  resolveProjectSlug,
+  type NotificationRow as NotificationRowDto,
+} from '@/lib/queries/notifications';
+import { AlertsInbox } from './AlertsInbox';
+
+const PAGE_SIZE = 50;
+
+const KNOWN_TYPES = new Set([
+  'reversal',
+  'price',
+  'regulatory',
+  'news',
+  'retirement',
+  'issuance',
+]);
+
+type SearchParams = Record<string, string | string[] | undefined>;
+
+export default async function AlertsPage(props: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect('/?signin=1');
+  }
+
+  const sp = await props.searchParams;
+
+  const typeParam = firstString(sp.type);
+  const types = typeParam
+    ? typeParam
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => KNOWN_TYPES.has(s))
+    : [];
+
+  const readParam = firstString(sp.read);
+  const read: 'all' | 'unread' = readParam === 'unread' ? 'unread' : 'all';
+
+  const projectSlug = firstString(sp.project) ?? null;
+  const projectFilter = projectSlug
+    ? await resolveProjectSlug(projectSlug)
+    : null;
+
+  const before = firstString(sp.before);
+
+  // If the slug didn't resolve, render the empty state instead of
+  // running an unfiltered query.
+  const rows: NotificationRowDto[] =
+    projectSlug && !projectFilter
+      ? []
+      : await getInboxNotifications(session.user.id, {
+          limit: PAGE_SIZE,
+          before,
+          types: types.length > 0 ? types : undefined,
+          read,
+          projectId: projectFilter?.id,
+        });
+
+  const unreadCount = await getUnreadCount(session.user.id);
+
+  const nextCursor =
+    rows.length === PAGE_SIZE ? rows[rows.length - 1]?.id ?? null : null;
+
   return (
-    <main className="kl-page">
-      <header className="kl-page-header">
-        <div>
-          <p className="kl-section-label">Notifications · personal inbox</p>
-          <h1 className="kl-page-title">Alerts</h1>
-          <p className="kl-page-subtitle">
-            Reversal warnings, price thresholds, regulatory updates, news,
-            retirements, and issuances on projects you track.
-          </p>
-        </div>
-      </header>
-
-      {mockAlerts.length === 0 ? (
-        <section
-          className="kl-card"
-          style={{ padding: 40, textAlign: "center" }}
-        >
-          <p className="kl-stat-label" style={{ marginBottom: 16 }}>
-            No notifications yet
-          </p>
-          <p
-            style={{
-              fontFamily: "var(--font-instrument-serif), Georgia, serif",
-              fontSize: 22,
-              lineHeight: 1.3,
-              margin: "0 auto",
-              maxWidth: 480,
-            }}
-          >
-            Your alerts will appear here once the scrapers go live.
-          </p>
-          <p className="kl-page-subtitle" style={{ marginTop: 12 }}>
-            Satellite alerts and IDXCarbon transactions populate weekly; new
-            Permenhut / Perpres publications within 24 hours.
-          </p>
-        </section>
-      ) : (
-        <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {mockAlerts.map((a) => (
-            <article key={a.id} className="kl-card">
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  alignItems: "flex-start",
-                }}
-              >
-                <div>
-                  <p className="kl-section-label">
-                    {a.typeLabel} · {a.project} · {a.time}
-                  </p>
-                  <h2
-                    style={{
-                      fontFamily:
-                        "var(--font-instrument-serif), Georgia, serif",
-                      fontSize: 18,
-                      margin: "0 0 8px",
-                    }}
-                  >
-                    {a.title}
-                  </h2>
-                  <p className="kl-page-subtitle">{a.description}</p>
-                </div>
-                <span className={`kl-pill kl-pill--${a.severity}`}>
-                  {a.typeLabel}
-                </span>
-              </div>
-            </article>
-          ))}
-        </section>
-      )}
-    </main>
+    <AlertsInbox
+      rows={rows}
+      unreadCount={unreadCount}
+      activeTypes={types}
+      activeRead={read}
+      activeProject={
+        projectFilter
+          ? { slug: projectSlug!, name: projectFilter.name }
+          : projectSlug && !projectFilter
+            ? { slug: projectSlug, name: projectSlug }
+            : null
+      }
+      nextCursor={nextCursor}
+      currentCursor={before ?? null}
+    />
   );
+}
+
+function firstString(v: string | string[] | undefined): string | undefined {
+  if (Array.isArray(v)) return v[0];
+  return v;
 }

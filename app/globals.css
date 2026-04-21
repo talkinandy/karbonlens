@@ -502,3 +502,55 @@ button {
   background-size: 200% 100%;
   border-radius: 4px;
 }
+
+/* T16 — notification type badges. Six distinct background colors + icons
+ * (icons rendered inline by the component). Each class must be visually
+ * distinguishable per AC-10. */
+.kl-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.kl-badge--reversal {
+  background: #fcebeb;
+  color: #a32d2d;
+}
+
+.kl-badge--price {
+  background: #efe7fb;
+  color: #5a2ca0;
+}
+
+.kl-badge--regulatory {
+  background: #e6f1fb;
+  color: #185fa5;
+}
+
+.kl-badge--news {
+  background: #ececea;
+  color: #5f5e5a;
+}
+
+.kl-badge--retirement {
+  background: #e1f5ee;
+  color: #0f6e56;
+}
+
+.kl-badge--issuance {
+  background: #faeeda;
+  color: #854f0b;
+}
+
+/* T16 — notification bell pulse animation for the skeleton loader. */
+@keyframes pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.8; }
+}
