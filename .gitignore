@@ -56,3 +56,9 @@ next-env.d.ts
 # drizzle introspect output — config is committed, generated artifacts are not
 /drizzle/*
 !/drizzle/.gitkeep
+
+# Python scraper venv and caches — pyproject.toml + uv.lock are committed
+scrapers/.venv/
+scrapers/**/__pycache__/
+scrapers/.ruff_cache/
+
