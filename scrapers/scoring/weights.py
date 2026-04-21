@@ -25,14 +25,15 @@ VERSION: Final[str] = "v1"
 # skipped and the project uses the default community_score of 75 (see edge
 # case E5 in docs/stories/T09-score-computation.md §7).
 #
-# Real-slug-drift note: the spec's placeholder keys (rimba-raya,
-# cendrawasih-aru, kalimantan-forest-carbon-partnership) predate T06's canonical
-# slugger. After T06 ran, only one of the three documented projects is present
-# in the DB (`rimba-raya-biodiversity-reserve-project`). The other two are
-# retained as placeholders pending Andy's OQ-1 confirmation — they will log a
-# WARNING on each daily run but will not abort the job.
+# Reconciled 2026-04-21: the spec's original placeholder keys `cendrawasih-aru`
+# and `kalimantan-forest-carbon-partnership` do not correspond to any project
+# in the Verra Indonesia dataset ingested by T06. They are kept as
+# commented-out placeholders — if/when those projects appear (e.g. re-
+# registered under Gold Standard or a successor methodology), uncomment the
+# matching entry. Keeping them dormant rather than active avoids the runtime
+# warning that would otherwise fire on every daily score run.
 COMMUNITY_OVERRIDES: Final[dict[str, int]] = {
     "rimba-raya-biodiversity-reserve-project": 45,  # documented community tension
-    "cendrawasih-aru": 30,  # OQ-1 placeholder — no matching DB slug yet
-    "kalimantan-forest-carbon-partnership": 60,  # OQ-1 placeholder — no matching DB slug yet
+    # "cendrawasih-aru-placeholder-slug": 30,                      # not in DB
+    # "kalimantan-forest-carbon-partnership-placeholder-slug": 60, # not in DB
 }
