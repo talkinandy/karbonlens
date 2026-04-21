@@ -2,7 +2,7 @@
 id: T04
 title: Drizzle schema + DB client + env plumbing
 phase: 1
-status: draft
+status: audited
 blocked_by: [T02, T03]
 blocks: [T05, T09, T11, T12, T14, T15, T16]
 owner: implementer-agent
@@ -27,11 +27,22 @@ T02 created the Postgres schema in SQL. T03 bootstrapped the Next.js monorepo. T
 
 ### In scope
 
-1. **`lib/schema.ts`** — Drizzle TypeScript table definitions mirroring all 15 tables from `docs/architecture.md` §3 (including `schema_migrations`). Full column-type mapping specified in §5 below.
-2. **`lib/db.ts`** — singleton Drizzle client; named export `db`; throws at import time if `DATABASE_URL` is missing.
-3. **`drizzle.config.ts`** — Drizzle Kit config pointing at `lib/schema.ts` and the local database; output dir `drizzle/`. Used for `drizzle-kit introspect` to validate round-trips; _not_ used for migrations in v0.1.
-4. **`app/api/health/route.ts`** — GET endpoint; executes `SELECT 1` via Drizzle raw query; returns JSON health payload; marked `force-dynamic`.
-5. **`.env.example`** — confirm `DATABASE_URL` key is present with the `localhost` placeholder. Append only — do not remove keys added by T03.
+1. **`lib/schema.ts`** — Drizzle TypeScript table definitions mirroring all 15 tables from `docs/architecture.md` §3 (including `schema_migrations`). Full column-type mapping specified in §5 below. All four auth-related tables (`users`, `accounts`, `sessions`, `verification_tokens`) must use the exact camelCase field names required by `@auth/drizzle-adapter` v5 — enumerated in §5.
+
+2. **`lib/db.ts`** — singleton Drizzle client; named export `db`; throws at module load time if `DATABASE_URL` is missing:
+   ```typescript
+   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
+   ```
+
+3. **`drizzle.config.ts`** — Drizzle Kit config pointing at `lib/schema.ts` and the local database; output dir `drizzle/`. Used for `drizzle-kit introspect` to validate round-trips during development; **not used for migrations in v0.1**. A prominent comment at the top of the file must warn against running `drizzle-kit generate` or `drizzle-kit migrate`.
+
+4. **`app/api/health/route.ts`** — GET endpoint; executes `SELECT 1` via Drizzle raw query; returns JSON health payload; marked `force-dynamic`. Error field in 503 responses must be a sanitised classifier string (not raw `err.message`) — see §7(viii).
+
+5. **`.env.example` — verify only.** T03 writes `DATABASE_URL` into `.env.example`. T04's only responsibility is to assert:
+   - (a) `.env.example` contains a `DATABASE_URL` key (if absent for any reason, append it — otherwise no change).
+   - (b) `.env.local` is listed in `.gitignore`.
+   - (c) `lib/db.ts` reads `process.env.DATABASE_URL` at module load.
+   T04 does **not** append any new keys to `.env.example`. The file is owned by T03; T04 is verify-only.
 
 ### Out of scope (explicit non-goals)
 
@@ -61,7 +72,10 @@ Given `npm run dev` is running
 When the implementer runs `curl -s localhost:3000/api/health`
 Then the response status is 503
  And the response body contains {"ok":false,"db":"error"}
- And the body contains an "error" field with a non-empty string message
+ And the body contains an "error" field with a sanitised classifier string
+   such as "connection refused", "auth failed", or "unknown"
+ And the "error" field does NOT contain the DATABASE_URL value,
+   a stack trace, or any credential material
 ```
 
 **AC-3: TypeScript compiles clean**
@@ -78,13 +92,15 @@ Then the command exits with code 0
 Given lib/schema.ts defines customType declarations for
       projects.centroid and satellite_alerts.location
 When the implementer runs `npx tsc --noEmit`
-Then those columns have an explicit TypeScript type (string for raw WKT/GeoJSON)
+Then those columns have an explicit TypeScript type (string containing
+     raw WKB hex — consumers must call ST_AsGeoJSON() or ST_AsText()
+     via sql tag to obtain human-readable geometry)
  And no column is typed as `unknown` or `any`
 ```
 
 **AC-5: Server component import type-checks**
 ```
-Given a throwaway server component or route that imports {db} from 'lib/db'
+Given a throwaway server component or route that imports {db} from '@/lib/db'
   And runs `await db.select().from(schema.projects).limit(1)`
 When the implementer runs `npx tsc --noEmit`
 Then the expression type-checks without error
@@ -94,7 +110,7 @@ Then the expression type-checks without error
 **AC-6: Missing DATABASE_URL throws at import time**
 ```
 Given DATABASE_URL is not set in the environment
-When any module that imports from 'lib/db' is evaluated
+When any module that imports from '@/lib/db' is evaluated
 Then the process throws an Error with a message indicating DATABASE_URL is missing
  And it does not silently produce an undefined connection string
 ```
@@ -109,15 +125,24 @@ Note: This AC is advisory — it validates the drizzle.config.ts is correctly wi
       but does not block story sign-off.
 ```
 
+**AC-8: Generated column is not insertable**
+```
+Given lib/schema.ts uses generatedAlwaysAs() on projects.totalVcusAvailable
+When the implementer runs `npx tsc --noEmit`
+Then the TypeScript type for a projects insert does NOT include totalVcusAvailable
+ And attempting to assign a value to totalVcusAvailable in an insert expression
+     produces a compile-time type error
+```
+
 ## 5. Inputs & outputs
 
 ### Inputs
 
-- `DATABASE_URL` in `.env.local` — format: `postgresql://karbonlens:CHANGE_ME@localhost:5432/karbonlens`
+- `DATABASE_URL` in `.env.local` — format: `postgresql://karbonlens:CHANGE_ME@localhost:5432/karbonlens?sslmode=disable`
 - `docs/architecture.md` §3 — canonical SQL schema (source of truth)
 - `docs/architecture.md` §7 — full env var list
-- T02 must be complete (tables exist in the live DB)
-- T03 must be complete (Next.js monorepo and `package.json` with `drizzle-orm`, `postgres`, `drizzle-kit` already installed)
+- T02 must be complete (tables exist in the live DB, including `email_verified` on `users`)
+- T03 must be complete (Next.js monorepo and `package.json` with `drizzle-orm`, `postgres`, `drizzle-kit` already installed; `.env.example` already contains `DATABASE_URL`)
 
 ### Outputs — files created or modified
 
@@ -127,10 +152,24 @@ Note: This AC is advisory — it validates the drizzle.config.ts is correctly wi
 | `lib/db.ts` | Create | Singleton client, named export `db` |
 | `drizzle.config.ts` | Create | Drizzle Kit config |
 | `app/api/health/route.ts` | Create | GET handler, force-dynamic |
-| `.env.example` | Append | Confirm DATABASE_URL key |
+| `.env.example` | Verify only | Confirm DATABASE_URL key is present (written by T03); no new keys added |
 | `drizzle/.gitkeep` | Create | Keeps empty drizzle/ dir in git |
 
 `drizzle/` (generated output) must be added to `.gitignore` except for the `.gitkeep`. Generated introspection artifacts are not committed.
+
+### Adapter field-name enumeration (auth tables)
+
+`@auth/drizzle-adapter` v5 reads table columns by the camelCase JavaScript property name on the Drizzle table object. T04 must use the exact names below. Cross-reference: T02 §3 (camelCase ↔ snake_case mapping). The implementer must mirror these in `lib/schema.ts`:
+
+| Table | Drizzle TS field | SQL column |
+|---|---|---|
+| `users` | `emailVerified` | `email_verified` |
+| `accounts` | `userId` | `user_id` |
+| `accounts` | `providerAccountId` | `provider_account_id` |
+| `sessions` | `sessionToken` | `session_token` |
+| `sessions` | `userId` | `user_id` |
+| `verification_tokens` | `identifier` | `identifier` |
+| `verification_tokens` | `token` | `token` |
 
 ### Drizzle column-type mapping (implementer reference)
 
@@ -140,25 +179,30 @@ The table below translates every SQL type from `docs/architecture.md` §3 to its
 |---|---|---|
 | `UUID PRIMARY KEY DEFAULT gen_random_uuid()` | `uuid('id').primaryKey().defaultRandom()` | |
 | `TEXT` | `text('col')` | |
-| `TEXT[]` | `text('col').array()` | Use `.array()` helper; validated at app layer |
+| `TEXT[]` | `text('col').array()` | Use `.array()` helper; Drizzle's postgres-js driver handles the `{}` wire format automatically |
 | `CHAR(2)` | `char('col', { length: 2 })` | |
 | `NUMERIC` | `numeric('col')` | Returns string from DB; cast in app if needed |
 | `INTEGER` | `integer('col')` | |
-| `BIGINT` (accounts.expires_at) | `bigint('expires_at', { mode: 'number' })` | JS Number loses precision above 2^53; safe for Unix epoch seconds, not for arbitrary 64-bit ints. Document this caveat in a comment on the column. |
+| `BIGINT` (accounts.expires_at) | `bigint('expires_at', { mode: 'number' })` | JS Number loses precision above 2^53; safe for Unix epoch seconds, not for arbitrary 64-bit ints. Add an inline comment on the column explaining this — see §7(iv). |
 | `BOOLEAN` | `boolean('col')` | |
 | `DATE` | `date('col')` | Returns string 'YYYY-MM-DD' in Drizzle's default mode |
 | `TIMESTAMPTZ` | `timestamp('col', { withTimezone: true })` | |
 | `JSONB` (known shape) | `jsonb('col').$type<MyShape>()` | Provide the generic when payload shape is known (e.g. score components) |
-| `JSONB` (unknown shape) | `jsonb('col').$type<unknown>()` | For raw_payload columns where shape evolves |
-| `GEOGRAPHY(POINT, 4326)` | `customType<{ data: string }>` | See pattern below |
-| `NUMERIC GENERATED ALWAYS AS ... STORED` | Omit from schema or use `generatedAlwaysAs()` | The computed column `total_vcus_available` can be omitted from Drizzle inserts/updates; read it via `sql` if needed. Check Drizzle docs for `generatedAlwaysAs()` support at implementation time. |
-| `TEXT PRIMARY KEY` (verification_tokens) | `text('identifier').notNull()` + composite PK | |
+| `JSONB` (unknown/evolving shape) | `jsonb('col').$type<Record<string, unknown>>()` | For raw_payload columns where shape evolves; use `Record<string, unknown>` not `unknown` |
+| `GEOGRAPHY(POINT, 4326)` | `customType<{ data: string }>` | Returns raw WKB hex on bare SELECT; see PostGIS pattern below |
+| `NUMERIC GENERATED ALWAYS AS ... STORED` | `generatedAlwaysAs(sql\`total_vcus_issued - total_vcus_retired\`)` | Drizzle automatically excludes this from the insertable type — do not add `.notNull()` or a default |
+| `TEXT PRIMARY KEY` (verification_tokens composite) | `text('identifier').notNull()` + composite PK in table config | See composite PK pattern below |
 
 **PostGIS custom type pattern** — use this for `projects.centroid` and `satellite_alerts.location`:
 
 ```typescript
 import { customType } from 'drizzle-orm/pg-core';
 
+// Returns raw WKB hex on a plain SELECT.
+// To get human-readable geometry use the sql tag:
+//   sql<string>`ST_AsGeoJSON(${projects.centroid})`
+//   sql<string>`ST_AsText(${projects.centroid})`
+// Writing uses: sql`ST_Point(${lon}, ${lat})::geography`
 const geography = customType<{ data: string }>({
   dataType() {
     return 'geography(Point, 4326)';
@@ -170,22 +214,57 @@ centroid: geography('centroid'),
 location: geography('location'),
 ```
 
-Queries that need to read these columns as GeoJSON should use Drizzle's `sql` tag to call `ST_AsGeoJSON()` or `ST_AsText()`. Writing uses `ST_Point(lon, lat)::geography` via `sql`.
+**Generated column pattern** for `projects.totalVcusAvailable`:
+
+```typescript
+import { sql } from 'drizzle-orm';
+
+// Drizzle marks this column as not-insertable at the type level.
+// Do not attempt to write to it — Postgres will reject the statement.
+totalVcusAvailable: numeric('total_vcus_available')
+  .generatedAlwaysAs(sql`total_vcus_issued - total_vcus_retired`),
+```
+
+**Composite PK pattern** — use Drizzle's second-argument config object:
+
+```typescript
+import { primaryKey } from 'drizzle-orm/pg-core';
+
+// verification_tokens
+export const verificationTokens = pgTable('verification_tokens', {
+  identifier: text('identifier').notNull(),
+  token:      text('token').notNull(),
+  expires:    timestamp('expires', { withTimezone: true }).notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.identifier, t.token] }),
+}));
+
+// project_scores
+export const projectScores = pgTable('project_scores', {
+  projectId:   uuid('project_id').notNull().references(() => projects.id),
+  scoreDate:   date('score_date').notNull(),
+  // ... remaining columns
+}, (t) => ({
+  pk: primaryKey({ columns: [t.projectId, t.scoreDate] }),
+}));
+```
 
 ### Table inventory (15 tables)
 
-`schema_migrations`, `projects`, `registries`, `issuances`, `retirements`, `idx_monthly_snapshots`, `satellite_alerts`, `regulatory_events`, `project_scores`, `project_match_queue`, `users`, `accounts`, `sessions`, `verification_tokens`, `notifications`.
+All 15 must appear in `lib/schema.ts` as named exports:
 
-All must appear in `lib/schema.ts` as named exports so downstream tasks can import them individually (e.g. `import { projects, notifications } from '@/lib/schema'`).
+`schemaMigrations`, `projects`, `registries`, `issuances`, `retirements`, `idxMonthlySnapshots`, `satelliteAlerts`, `regulatoryEvents`, `projectScores`, `projectMatchQueue`, `users`, `accounts`, `sessions`, `verificationTokens`, `notifications`.
+
+Each must be a named export so downstream tasks can import individually (e.g. `import { projects, notifications } from '@/lib/schema'`).
 
 ## 6. Dependencies & interactions
 
 ### Blocked by
-- **T02** — tables must exist in the DB before the health check can pass
-- **T03** — `drizzle-orm`, `postgres`, `drizzle-kit` must be installed; Next.js project must exist
+- **T02** — tables must exist in the DB before the health check can pass; specifically `users.email_verified` must be present in the SQL schema before T04 finalises `lib/schema.ts`
+- **T03** — `drizzle-orm`, `postgres`, `drizzle-kit` must be installed; Next.js project must exist; `.env.example` must already contain `DATABASE_URL`
 
 ### Blocks
-- **T05** — NextAuth DrizzleAdapter needs `db` and the auth-related table definitions (`users`, `accounts`, `sessions`, `verification_tokens`)
+- **T05** — NextAuth DrizzleAdapter needs `db` and the auth-related table definitions (`users`, `accounts`, `sessions`, `verification_tokens`) with correct camelCase field names
 - **T09** — Score job imports `project_scores` table type for insert
 - **T11** — Projects explorer queries `projects`, `project_scores`, `registries`
 - **T12** — Project detail queries `issuances`, `satellite_alerts`, `notifications`
@@ -202,20 +281,24 @@ T04 exclusively owns the following paths. No other concurrent task may create or
 - `drizzle.config.ts`
 - `app/api/health/route.ts`
 - `drizzle/` directory
-- `.env.example` (append-only; do not modify keys added by T03)
 
 T05 will create `lib/auth.ts` — do not create or pre-populate that file here.
+
+`.env.example` is owned by T03 (written) and T05 (appends auth keys). T04 is verify-only for this file.
 
 ## 7. Edge cases & failure modes
 
 **(i) Missing DATABASE_URL**
-`lib/db.ts` must check `process.env.DATABASE_URL` before constructing the client. Throw an explicit `Error('DATABASE_URL is not set')` if undefined or empty. Do not use the `!` non-null assertion silently — make the failure visible. This means the server process crashes early with a clear message rather than propagating a cryptic connection error later.
+`lib/db.ts` must check `process.env.DATABASE_URL` before constructing the client. Throw an explicit error if undefined or empty. Do not use the `!` non-null assertion silently — make the failure visible. This means the server process crashes early with a clear message rather than propagating a cryptic connection error later.
 
 ```typescript
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
-  throw new Error('DATABASE_URL is not set. Add it to .env.local.');
+  throw new Error('DATABASE_URL is required. Add it to .env.local.');
 }
+// max: 10 is appropriate for local dev / single-process VPS.
+// Reduce to 2–3 if deploying to serverless (Netlify, Vercel) to avoid
+// exhausting Postgres max_connections.
 const client = postgres(connectionString, { max: 10 });
 export const db = drizzle(client, { schema });
 ```
@@ -230,32 +313,61 @@ Use Drizzle's `.array()` modifier: `text('name_aliases').array()`. Do not model 
 Use `bigint('expires_at', { mode: 'number' })`. JavaScript's `Number` can represent integers up to 2^53 − 1 safely. Unix epoch seconds will not exceed this for any foreseeable expiry. Add an inline comment:
 ```typescript
 // expires_at is a Unix timestamp in seconds. Safe as JS Number until year 285,428,751.
+// If @auth/drizzle-adapter v5 requires BigInt mode, switch to { mode: 'bigint' }
+// and verify against adapter source at the installed version.
 expiresAt: bigint('expires_at', { mode: 'number' }),
 ```
-If NextAuth v5's DrizzleAdapter expects `BigInt` mode, switch to `{ mode: 'bigint' }` — check the adapter source at implementation time.
 
 **(v) JSONB typing**
 - `project_scores.components` — type with a known interface `ScoreComponents` defined in the same file or imported from `lib/score.ts`.
-- `raw_payload` columns (registries, issuances, retirements, satellite_alerts, idx_monthly_snapshots) — type as `.$type<unknown>()` since scraper payload shapes evolve.
-- `raw_metadata` on registries — same: `.$type<unknown>()`.
+- `raw_payload` columns (registries, issuances, retirements, satellite_alerts, idx_monthly_snapshots) — type as `.$type<Record<string, unknown>>()` since scraper payload shapes evolve. Use `Record<string, unknown>` rather than `unknown` or `any`.
+- `raw_metadata` on registries — same: `.$type<Record<string, unknown>>()`.
 
 **(vi) Computed column total_vcus_available**
-The SQL column is `GENERATED ALWAYS AS (total_vcus_issued - total_vcus_retired) STORED`. Drizzle's support for generated columns varies by version. At implementation time, check whether `generatedAlwaysAs()` is available in the installed version. If not, simply omit this column from inserts/updates and read it explicitly with `sql<string>\`total_vcus_available\`` in select queries. Document whichever approach is used with a comment.
+Use `generatedAlwaysAs(sql\`total_vcus_issued - total_vcus_retired\`)` on the `totalVcusAvailable` column. Drizzle automatically excludes generated columns from the insert type — no manual `Omit<>` is needed. Do not attempt to write a value to this column in any insert or update expression; Postgres will reject it.
 
 **(vii) schema_migrations table**
 Include a minimal Drizzle definition for `schema_migrations` for completeness, even though T04 never writes to it:
 ```typescript
 export const schemaMigrations = pgTable('schema_migrations', {
-  version: text('version').primaryKey(),
+  version:   text('version').primaryKey(),
   appliedAt: timestamp('applied_at', { withTimezone: true }).defaultNow(),
 });
 ```
 
+**(viii) Health endpoint error sanitisation**
+The 503 response `error` field must contain a sanitised classifier, not raw `err.message`. The raw message may include the connection string, Postgres version banner, or stack trace. Map errors as follows:
+
+```typescript
+function classifyDbError(err: unknown): string {
+  const msg = err instanceof Error ? err.message.toLowerCase() : '';
+  if (msg.includes('connection refused') || msg.includes('econnrefused')) return 'connection refused';
+  if (msg.includes('password') || msg.includes('authentication')) return 'auth failed';
+  return 'unknown';
+}
+```
+
+Return: `{ ok: false, db: 'error', error: classifyDbError(err) }`.
+
+**(ix) SSL mode — localhost vs production**
+For v0.1, `DATABASE_URL` uses `sslmode=disable` since Postgres is on the same host. For v0.2+ production, switch to `sslmode=require`. Document this as a TODO comment in `lib/db.ts`:
+```typescript
+// TODO v0.2: switch DATABASE_URL to sslmode=require for production VPS connectivity.
+```
+
+**(x) drizzle-kit generate / migrate are off-limits**
+v0.1 applies migrations via raw `.sql` files under `scrapers/migrations/` executed with `psql`. `drizzle-kit push` and `drizzle-kit generate` are NOT part of the migration pipeline. `drizzle.config.ts` exists solely to support `drizzle-kit introspect` during development. The file must carry a top-of-file comment:
+```typescript
+// READ-ONLY in v0.1. Do NOT run drizzle-kit generate or migrate —
+// migrations are applied via psql -f scrapers/migrations/*.sql.
+// Safe to use: npx drizzle-kit introspect (advisory validation only).
+```
+
 ## 8. Definition of done
 
-- [ ] All acceptance criteria pass (AC-1 through AC-6; AC-7 advisory).
+- [ ] All acceptance criteria pass (AC-1 through AC-6, AC-8; AC-7 advisory).
 - [ ] `lib/schema.ts`, `lib/db.ts`, `drizzle.config.ts`, `app/api/health/route.ts` landed in `feature/v0.1-impl`.
-- [ ] `.env.example` contains `DATABASE_URL=postgresql://karbonlens:CHANGE_ME@localhost:5432/karbonlens`.
+- [ ] `.env.example` verified to contain `DATABASE_URL=postgresql://karbonlens:CHANGE_ME@localhost:5432/karbonlens?sslmode=disable` (written by T03; T04 does not modify the file unless the key is absent).
 - [ ] `drizzle/.gitkeep` committed; `drizzle/` output is gitignored.
 - [ ] `npx tsc --noEmit` exits 0.
 - [ ] CHANGELOG entry added under `[Unreleased]`.
@@ -277,18 +389,24 @@ The original TASKS.md §T04 suggested exposing Postgres publicly (with `pg_hba.c
 **OQ-2: `lib/schema.test.sql` spot-query helper.**
 The prompt asks whether to add a helper SQL file that spot-queries each table to validate Drizzle schema types stay in sync. Recommendation: skip for v0.1. Rationale: (a) no automated tests in v0.1 by project convention, (b) `npx tsc --noEmit` already catches type drift at the TypeScript layer, (c) `drizzle-kit introspect` (AC-7) provides a manual validation path. Revisit in v0.2 when adding a pytest scraper test suite.
 
-**OQ-3: NextAuth DrizzleAdapter column naming.**
-The `@auth/drizzle-adapter` for NextAuth v5 has specific expectations about column names and types in the `users`, `accounts`, `sessions`, and `verification_tokens` tables. The architecture schema in `docs/architecture.md` §3 was written to match these expectations, but there may be minor mismatches (e.g., `emailVerified` vs `email_verified`, camelCase vs snake_case field names, `expires` vs `expires_at`). The implementer must verify against the adapter source before finalizing `lib/schema.ts`. Flag any required migrations as a new SQL file rather than modifying `001_init.sql`.
+**OQ-3: NextAuth DrizzleAdapter column naming — RESOLVED.**
+The camelCase ↔ snake_case mapping for all four auth tables is now enumerated in §5. The `emailVerified` field is explicitly required in the Drizzle `users` table and in the SQL schema (T02 §3). OQ-3 is closed.
 
 **OQ-4: `drizzle-kit introspect` and PostGIS types.**
 When `drizzle-kit introspect` encounters `geography(Point, 4326)` columns, it may emit unsupported-type warnings or fall back to `text`. This is expected — the introspect output is for reference only; `lib/schema.ts` is hand-authored and supersedes it.
+
+**OQ-5: PostGIS return shape — DEFERRED to T11+.**
+Bare `SELECT` on geography columns returns WKB hex. Consumers must call `ST_AsGeoJSON()` or `ST_AsText()` via the `sql` tag. A proper geometry serialiser/deserialiser is deferred to T11 (projects explorer) when the actual rendering requirements are known. AC-4 reflects WKB hex as the TS type contract.
 
 ## 10. References
 
 - `docs/architecture.md` §3 — canonical SQL schema (source of truth for all column names and types)
 - `docs/architecture.md` §7 — full environment variable list
+- `docs/stories/T02-schema-migration-001.md` §3 — `users.email_verified` SQL definition and camelCase ↔ snake_case field-name mapping for auth tables
+- `docs/stories/T05-nextauth-google-oauth.md` — shows expected shape of `lib/auth.ts` that T04 must not pre-create
 - `docs/TASKS.md` §T04 — original task description (superseded by Andy's local-dev-first override on connectivity)
-- `docs/TASKS.md` §T05 — NextAuth config (shows expected shape of `lib/auth.ts` that T04 must not pre-create)
 - Drizzle ORM docs: `customType` API — https://orm.drizzle.team/docs/custom-types
+- Drizzle ORM docs: `generatedAlwaysAs()` — https://orm.drizzle.team/docs/column-types/pg#generated-columns
+- Drizzle ORM docs: `primaryKey()` composite — https://orm.drizzle.team/docs/indexes-constraints#composite-primary-key
 - Drizzle ORM docs: `postgres-js` driver — https://orm.drizzle.team/docs/get-started-postgresql#postgresjs
 - NextAuth v5 DrizzleAdapter — https://authjs.dev/getting-started/adapters/drizzle

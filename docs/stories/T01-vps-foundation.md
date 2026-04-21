@@ -2,7 +2,7 @@
 id: T01
 title: Provision VPS foundation — PostGIS, DB user, directories
 phase: 1
-status: draft
+status: audited
 blocked_by: []
 blocks: [T02, T20]
 owner: implementer
@@ -27,7 +27,7 @@ KarbonLens uses PostgreSQL 16 + PostGIS for all spatial project data (centroids,
 
 **Binding decision (v0.1):** PostgreSQL listens on `localhost` only. Netlify cannot reach a localhost-only Postgres directly — that problem is deferred to T04, which will decide between Tailscale, a small proxy, or selective public exposure. Callers of this story must not open port 5432 on the public interface.
 
-**Password strategy:** Credentials are generated locally with `openssl rand -base64 24`, stored in `/root/karbonlens-secrets.txt` (mode 600), and stubbed in `.env.example` as `CHANGE_ME` placeholders. Andy wires real values into `.env.local` (local dev) and Netlify env vars (frontend) when those steps arrive in T03/T04.
+**Password strategy:** Credentials are generated locally with `openssl rand -base64 24` and stored in `/root/karbonlens-secrets.txt` (mode 600). Andy copies the real `DATABASE_URL` into `.env.local` (local dev, gitignored) and Netlify env vars (frontend) when those steps arrive in T03/T04. T01 does not write to `.env.example` — T03 owns that file.
 
 ---
 
@@ -39,15 +39,14 @@ KarbonLens uses PostgreSQL 16 + PostGIS for all spatial project data (centroids,
 - Create Unix system user `karbonlens` (no shell login, home at `/home/karbonlens`).
 - Create Postgres role `karbonlens` with a generated password, and database `karbonlens` owned by that role.
 - Enable extensions `postgis`, `pgcrypto`, and `pg_trgm` in the `karbonlens` database.
-- Verify `listen_addresses = 'localhost'` in `postgresql.conf` (default on Hetzner Ubuntu is already safe; confirm and document).
+- Explicitly set `listen_addresses = 'localhost'` in `postgresql.conf` and verify the effective value. Do not rely on the compiled-in default; make the setting explicit so future configuration tooling cannot silently revert it.
 - Create the standard directory tree:
   - `/opt/karbonlens` — application and scraper code
   - `/var/log/karbonlens` — scraper log files
   - `/var/lib/karbonlens/backups` — nightly `pg_dump` archives (populated by T20)
   - `/var/lib/karbonlens/pdf-archive` — IDXCarbon PDF cache (populated by T08)
 - Set all four directories to `karbonlens:karbonlens` ownership, mode `755`.
-- Write generated credentials to `/root/karbonlens-secrets.txt` (mode `600`).
-- Add `DATABASE_URL` placeholder to `.env.example` in the repo root.
+- Write generated credentials to `/root/karbonlens-secrets.txt` (mode `600`). T03 owns `.env.example` entirely — do not touch it.
 - Produce `docs/runbooks/vps-setup.md` with copy-pasteable commands.
 - All setup steps must be idempotent (safe to re-run).
 
@@ -97,13 +96,16 @@ And when we run:
 Then the output is /usr/sbin/nologin
 ```
 
-**AC-4: Postgres role can authenticate and connect**
+**AC-4: Postgres role can authenticate and connect via scram-sha-256**
 
 ```
 Given the karbonlens Postgres role and database exist
 When we run (substituting the actual password from /root/karbonlens-secrets.txt):
   psql -U karbonlens -h 127.0.0.1 -d karbonlens -c "SELECT current_user, current_database();"
 Then the command exits 0 and the result row shows "karbonlens | karbonlens"
+And when we run:
+  grep "karbonlens.*scram-sha-256" /etc/postgresql/16/main/pg_hba.conf
+Then the line is present (confirming scram-sha-256 password auth — not trust — is in effect)
 ```
 
 **AC-5: Postgres listens on localhost only**
@@ -115,7 +117,7 @@ When we run:
 Then the output shows "localhost" (not "*" or a public IP)
 And when we run:
   ss -tlnp | grep 5432
-Then port 5432 is bound only to 127.0.0.1 (not 0.0.0.0)
+Then port 5432 is bound only to loopback addresses (127.0.0.1 and/or ::1) — not 0.0.0.0 or any public IP
 ```
 
 **AC-6: Directory tree exists with correct ownership**
@@ -137,25 +139,15 @@ When we run:
 Then the output is "600 root"
 And when we run:
   grep "DATABASE_URL" /root/karbonlens-secrets.txt
-Then the line is present and contains "karbonlens" and "@127.0.0.1:5432/karbonlens"
+Then the line is present and contains "karbonlens" and "@localhost:5432/karbonlens"
 ```
 
-**AC-8: .env.example contains DATABASE_URL placeholder**
-
-```
-Given the repo root .env.example has been updated
-When we run:
-  grep "DATABASE_URL" .env.example
-Then the line is present and reads exactly:
-  DATABASE_URL=postgresql://karbonlens:CHANGE_ME@localhost:5432/karbonlens
-```
-
-**AC-9: Idempotence — re-running the setup is safe**
+**AC-8: Idempotence — re-running the setup is safe**
 
 ```
 Given all provisioning steps have already been run once successfully
-When we run the full setup sequence a second time (using IF NOT EXISTS guards and
-  "create only if missing" checks throughout)
+When we re-run runbook sections 2–8 (skip section 1 apt install if packages already present):
+  bash -e /opt/karbonlens/runbook-setup.sh 2>&1 | grep -cE "^(ERROR|FATAL)" ; echo "exit: $?"
 Then no command exits non-zero
 And no new duplicate OS users, Postgres roles, databases, or directories are created
 And the existing karbonlens database and its contents are untouched
@@ -188,21 +180,16 @@ And the existing karbonlens database and its contents are untouched
 | `/var/lib/karbonlens/backups` | directory | `pg_dump` output (populated by T20) |
 | `/var/lib/karbonlens/pdf-archive` | directory | IDXCarbon PDFs (populated by T08) |
 | `/root/karbonlens-secrets.txt` | file, mode 600 | Generated DB password + connection string |
-| `/etc/postgresql/16/main/postgresql.conf` | config | `listen_addresses = 'localhost'` verified (no edit needed if already correct) |
+| `/etc/postgresql/16/main/postgresql.conf` | config | `listen_addresses = 'localhost'` explicitly set and verified |
+| `/etc/postgresql/16/main/pg_hba.conf` | config | `host karbonlens karbonlens 127.0.0.1/32 scram-sha-256` and `::1/128` lines present; `trust` auth removed for karbonlens role |
 
 ### Outputs — repository files
 
 | File | Change |
 |---|---|
-| `.env.example` | Add `DATABASE_URL=postgresql://karbonlens:CHANGE_ME@localhost:5432/karbonlens` |
 | `docs/runbooks/vps-setup.md` | New file: copy-pasteable provisioning commands (see §6 for ownership) |
 
-### Environment variables added to `.env.example`
-
-```bash
-# Database (generated password goes in /root/karbonlens-secrets.txt, NOT here)
-DATABASE_URL=postgresql://karbonlens:CHANGE_ME@localhost:5432/karbonlens
-```
+T01 does **not** touch `.env.example` — that file is owned by T03.
 
 ---
 
@@ -223,12 +210,11 @@ This story is exclusively responsible for creating and modifying:
 
 | Path | Action |
 |---|---|
-| `.env.example` | Add `DATABASE_URL` line |
 | `docs/runbooks/vps-setup.md` | Create (new file) |
 
 No other files in the repository are touched. System-level objects (OS user, Postgres role/database, extensions, directories, secrets file) are side effects of shell commands, not tracked files.
 
-**Parallel implementer note:** T03 (Next.js bootstrap) also touches `.env.example` to add `NEXTAUTH_*`, `GOOGLE_*`, `GFW_API_KEY`, etc. Merge conflict risk is low if each task appends its own block with a comment header. T01 must append only the `# Database` block.
+**`.env.example` boundary:** T03 (Next.js bootstrap) owns `.env.example` entirely. T01 does not add any line to it. The real `DATABASE_URL` lives in `/root/karbonlens-secrets.txt` on the VPS; T03's `DATABASE_URL=CHANGE_ME` placeholder is what ends up in `.env.example`.
 
 ---
 
@@ -256,7 +242,9 @@ Check with `\l` in psql. If it exists, verify ownership with `\l karbonlens`. If
 
 **What if port 5432 is already bound to a public interface?**
 
-If `ss -tlnp | grep 5432` shows `0.0.0.0:5432`, the current `listen_addresses` setting is not `localhost`. Edit `/etc/postgresql/16/main/postgresql.conf` to set `listen_addresses = 'localhost'`, then `systemctl restart postgresql`. Confirm the port is no longer exposed before proceeding. This is a security-critical check for v0.1.
+If `ss -tlnp | grep 5432` shows `0.0.0.0:5432`, the current `listen_addresses` setting is not `localhost`. The runbook step 6 sets it explicitly via `sed`; after applying that step, run `systemctl restart postgresql` and confirm `0.0.0.0:5432` is gone. This is a security-critical check for v0.1.
+
+**Expected `ss` output with `listen_addresses = 'localhost'`:** On Linux, `localhost` resolves to both IPv4 and IPv6 loopback, so `ss -tlnp | grep 5432` will typically show two entries: `127.0.0.1:5432` and `[::1]:5432`. Both are expected and safe. Seeing `[::1]:5432` is not a misconfiguration — do not attempt to suppress it.
 
 **What if directories already exist with wrong ownership?**
 
@@ -270,10 +258,11 @@ Do not overwrite without checking contents first. If it contains a valid connect
 
 ## 8. Definition of done
 
-- [ ] All nine acceptance criteria pass when verified manually.
+- [ ] All eight acceptance criteria pass when verified manually.
 - [ ] `docs/runbooks/vps-setup.md` is present and copy-pasteable end-to-end.
-- [ ] `.env.example` contains the `DATABASE_URL` placeholder line.
-- [ ] Both changed/created repo files are committed and pushed to `feature/v0.1-impl`.
+- [ ] `pg_hba.conf` contains the `scram-sha-256` lines for both 127.0.0.1/32 and ::1/128; no `trust` entry covers the karbonlens role.
+- [ ] `listen_addresses = 'localhost'` is explicitly set (not commented out) in `postgresql.conf`.
+- [ ] The repo file `docs/runbooks/vps-setup.md` is committed and pushed to `feature/v0.1-impl`.
 - [ ] CHANGELOG entry added under `[Unreleased]`: `T01 — VPS foundation provisioned`.
 - [ ] `TASKS.md` T01 status flipped from `todo` → `done`.
 - [ ] Story frontmatter `status` set to `done`.
@@ -282,19 +271,52 @@ Do not overwrite without checking contents first. If it contains a valid connect
 
 ## 9. Open questions
 
-1. **pg_trgm inclusion in T01 vs T02:** `docs/architecture.md` §3 mentions adding `pg_trgm` to migration 001 (T06 note says "amend and re-apply"). This story installs it at T01 time (alongside postgis/pgcrypto) to keep all extension setup in one place. Andy should confirm: is that the right boundary, or should `pg_trgm` live in the T02 migration file? The current spec installs it here to reduce the risk of T06 breaking because it forgot an extension dependency.
+1. ~~**pg_trgm OS package:**~~ **CLOSED.** Confirmed: `pg_trgm` ships with the core `postgresql-16` package on PGDG Ubuntu builds. No `postgresql-contrib` package is required. `CREATE EXTENSION pg_trgm` succeeds after a bare `postgresql-16` install.
 
 2. **Postgres binding and Netlify connectivity:** The v0.1 default is `localhost`-only. T04 must decide how Netlify reaches the database (Tailscale, public SSL with IP allowlist, or a proxy). This story explicitly defers that decision but calls it out so the T04 spec-writer knows it is unresolved. Andy: any preference now (e.g., "lean toward Tailscale") that the T04 spec should assume?
 
-3. **Secrets file location:** `/root/karbonlens-secrets.txt` is readable only by root. If Andy switches to a non-root sudo user for day-to-day ops, the file should move (e.g., to `/home/<user>/karbonlens-secrets.txt` with appropriate permissions). Is root the permanent operator account for this box?
+3. ~~**Secrets file location:**~~ **CLOSED.** Root is the operator account for v0.1. The `/root/karbonlens-secrets.txt` location is accepted. Revisit when a non-root operator account is introduced in v0.2 ops hardening.
 
 4. **Off-site backup destination (Hetzner Storage Box):** T20 references an optional Hetzner Storage Box (€4/mo) for off-site rsync. This is within the <$30/mo budget. Andy needs to confirm whether to provision the Storage Box before T20, and whether T01 should pre-create credentials or leave that entirely to T20.
 
-5. **`pg_hba.conf` for local connections:** Ubuntu's Postgres default uses `peer` auth for local Unix socket connections (meaning `sudo -u postgres psql` works without a password) and `scram-sha-256` for TCP connections. AC-4 uses TCP (`-h 127.0.0.1`), which requires `pg_hba.conf` to have a `host` or `hostssl` entry for `karbonlens`. Verify the default config already allows this; if not, add: `host karbonlens karbonlens 127.0.0.1/32 scram-sha-256`. This detail should be in the runbook.
+5. ~~**`pg_hba.conf` for local connections:**~~ **CLOSED.** The runbook now unconditionally adds `scram-sha-256` entries for both 127.0.0.1/32 and ::1/128, placed before any `trust` line for the karbonlens role, and reloads Postgres. The `postgres` superuser's `peer` auth on Unix socket is not affected. AC-4 verifies the `scram-sha-256` line is present.
 
 ---
 
-## 10. References
+## 10. Rollback notes
+
+If provisioning is partially botched and must be torn down, run these commands manually (order matters):
+
+```bash
+# 1. Drop database (destroys all data — confirm nothing important is in there)
+sudo -u postgres psql -c "DROP DATABASE IF EXISTS karbonlens;"
+
+# 2. Drop role
+sudo -u postgres psql -c "DROP ROLE IF EXISTS karbonlens;"
+
+# 3. Remove Unix user and home directory
+userdel -r karbonlens 2>/dev/null; true
+
+# 4. Remove application directories
+rm -rf /opt/karbonlens /var/log/karbonlens /var/lib/karbonlens
+
+# 5. Remove secrets file
+rm -f /root/karbonlens-secrets.txt
+
+# 6. Revert postgresql.conf if you edited listen_addresses
+#    (Uncomment or delete the listen_addresses line; restart postgres)
+# sudo systemctl restart postgresql
+
+# 7. Remove pg_hba.conf lines for karbonlens, then reload
+#    sudo sed -i '/karbonlens.*scram-sha-256/d' /etc/postgresql/16/main/pg_hba.conf
+#    sudo systemctl reload postgresql
+```
+
+This is a manual teardown guide, not an automated script. Verify with `id karbonlens`, `\du`, and `\l` in psql after running.
+
+---
+
+## 11. References
 
 - PRD §5 Architecture at a glance — Hetzner CX32, PostgreSQL + PostGIS
 - PRD §3 Scope — <$30/mo budget constraint, no Docker orchestration
