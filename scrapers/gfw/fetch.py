@@ -178,6 +178,14 @@ class GfwAuthError(RuntimeError):
     """401 from GFW — the API key is invalid/expired. Hard fail."""
 
 
+class GfwGeostoreNotFound(RuntimeError):
+    """404 from the GFW query endpoint — the cached geostore_id is stale.
+
+    Raised only by _get_with_retry when `raise_on_404=True` is set (opt-in by
+    query_alerts). Caller clears projects.gfw_geostore_id and re-registers.
+    """
+
+
 def _post_with_retry(
     client: httpx.Client,
     url: str,
@@ -237,8 +245,14 @@ def _get_with_retry(
     *,
     params: dict[str, str] | None = None,
     headers: dict[str, str],
+    raise_on_404: bool = False,
 ) -> dict[str, Any] | None:
-    """GET with retry. Same contract as _post_with_retry."""
+    """GET with retry. Same contract as _post_with_retry.
+
+    If `raise_on_404` is True, a 404 response raises GfwGeostoreNotFound
+    instead of being swallowed as a generic client error — used by
+    `query_alerts` to trigger stale-geostore re-registration.
+    """
     last_exc: Exception | None = None
     for attempt in range(RETRY_MAX):
         try:
@@ -257,6 +271,10 @@ def _get_with_retry(
             if r.status_code >= 500:
                 raise httpx.HTTPStatusError(
                     f"status {r.status_code}", request=r.request, response=r
+                )
+            if r.status_code == 404 and raise_on_404:
+                raise GfwGeostoreNotFound(
+                    f"404 from {url} — cached geostore_id is stale"
                 )
             if r.status_code >= 400:
                 log.warning(
@@ -359,7 +377,9 @@ def query_alerts(
         f"WHERE gfw_integrated_alerts__date >= '{since.isoformat()}'"
     )
     params = {"geostore_id": geostore_id, "sql": sql}
-    response = _get_with_retry(client, GFW_QUERY_URL, params=params, headers=headers)
+    response = _get_with_retry(
+        client, GFW_QUERY_URL, params=params, headers=headers, raise_on_404=True
+    )
     if response is None:
         return None
     # Response shape: {"data": [ {...}, ... ], "status": "success", ...}
@@ -520,7 +540,12 @@ def upsert_alert(
             TRUE,
             %s::jsonb
         )
-        ON CONFLICT ON CONSTRAINT uq_sat_project_date_loc DO NOTHING
+        ON CONFLICT (
+            project_id,
+            alert_date,
+            (ROUND(ST_Y(location::geometry)::NUMERIC, 6)),
+            (ROUND(ST_X(location::geometry)::NUMERIC, 6))
+        ) DO NOTHING
         RETURNING id
         """,
         (
@@ -571,7 +596,12 @@ def fan_out_notifications(
         ) batch
         JOIN projects p ON p.id = batch.project_id
         WHERE u.email_digest_opt_in = TRUE
-        ON CONFLICT ON CONSTRAINT uq_notifications_dedupe DO NOTHING
+        ON CONFLICT (
+            user_id,
+            type,
+            project_id,
+            ((created_at AT TIME ZONE 'UTC')::date)
+        ) DO NOTHING
         RETURNING id
         """,
         (project_id, run_started_at),
@@ -655,9 +685,66 @@ def process_project(
             return
 
     # --- Step 3: Query alerts ---
-    raw_rows = query_alerts(
-        client, geostore_id=geostore_id, since=since, api_key=api_key
-    )
+    try:
+        raw_rows = query_alerts(
+            client, geostore_id=geostore_id, since=since, api_key=api_key
+        )
+    except GfwGeostoreNotFound:
+        # Stale cached geostore_id (F-2). Clear it, re-register, retry once.
+        log.warning(
+            "project_geostore_stale_reregister", **log_ctx, stale_geostore_id=geostore_id
+        )
+        try:
+            execute_with_retry(
+                conn,
+                "UPDATE projects SET gfw_geostore_id = NULL, updated_at = NOW() "
+                "WHERE id = %s::uuid",
+                (project.id,),
+            )
+            conn.commit()
+        except psycopg.DatabaseError as exc:
+            conn.rollback()
+            stats.errors.append(
+                {"event": "geostore_clear_failed", **log_ctx, "error": str(exc)}
+            )
+            log.error("project_geostore_clear_failed", **log_ctx, error=str(exc))
+            return
+        new_id = register_geostore(
+            client, geojson_polygon=polygon, api_key=api_key
+        )
+        if not new_id:
+            log.warning("project_skipped_reregister_fail", **log_ctx)
+            stats.errors.append({"event": "reregister_failed", **log_ctx})
+            return
+        try:
+            save_geostore_id(conn, project_id=project.id, geostore_id=new_id)
+            conn.commit()
+            stats.geostores_registered += 1
+            log.info(
+                "project_geostore_reregistered", **log_ctx, geostore_id=new_id
+            )
+        except psycopg.DatabaseError as exc:
+            conn.rollback()
+            stats.errors.append(
+                {"event": "geostore_save_failed", **log_ctx, "error": str(exc)}
+            )
+            log.error("project_geostore_save_failed", **log_ctx, error=str(exc))
+            return
+        geostore_id = new_id
+        try:
+            raw_rows = query_alerts(
+                client, geostore_id=geostore_id, since=since, api_key=api_key
+            )
+        except GfwGeostoreNotFound:
+            log.warning(
+                "project_skipped_reregister_still_404",
+                **log_ctx,
+                geostore_id=new_id,
+            )
+            stats.errors.append(
+                {"event": "reregister_still_404", **log_ctx, "geostore_id": new_id}
+            )
+            return
     if raw_rows is None:
         log.warning("project_skipped_query_fail", **log_ctx)
         stats.errors.append({"event": "query_failed", **log_ctx})
