@@ -24,7 +24,7 @@ Tasks are numbered for referencing, not for strict ordering. Parallel tasks are 
 | T01 | VPS foundation: PostGIS, users, backups | — | 2h | done |
 | T02 | Schema migration 001 (initial) | T01 | 1h | done |
 | T03 | Next.js monorepo bootstrap + Netlify deploy | — | 3h | done |
-| T04 | Drizzle schema + DB client + env plumbing | T02, T03 | 2h | todo |
+| T04 | Drizzle schema + DB client + env plumbing | T02, T03 | 2h | done |
 | T05 | NextAuth.js with Google OAuth | T04 | 2h | todo |
 | T06 | Verra scraper: fetch + parse + upsert | T02 | 6h | todo |
 | T07 | GFW alerts scraper: geostore + query + upsert | T02, T06 | 4h | todo |
