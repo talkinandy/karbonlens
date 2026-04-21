@@ -30,7 +30,7 @@ Tasks are numbered for referencing, not for strict ordering. Parallel tasks are 
 | T07 | GFW alerts scraper: geostore + query + upsert | T02, T06 | 4h | todo |
 | T08 | IDXCarbon monthly PDF scraper | T02 | 4h | todo |
 | T09 | Score computation daily job | T06, T07 | 2h | todo |
-| T10 | Seed regulatory events manually | T02 | 1h | todo |
+| T10 | Seed regulatory events manually | T02 | 1h | done (pending Andy fact-check rows 6-10) |
 | T11 | Projects explorer screen (table + filters) | T04, T06 | 4h | todo |
 | T12 | Project detail screen | T04, T06, T07, T09 | 4h | todo |
 | T13 | Map integration on projects + detail | T11, T12 | 6h | todo |
