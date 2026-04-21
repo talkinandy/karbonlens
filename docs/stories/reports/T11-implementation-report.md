@@ -188,3 +188,12 @@ Queried via `getProjectsList({ limit: 100 })` with verification harness
 - `mockProjects` export from `lib/mock-data.ts` — T18's cleanup scope.
 - Search by name / developer (`q=`) — v0.2, not implemented.
 - CSV export / saved views / infinite scroll — v0.2.
+
+## T11 follow-ups
+
+Non-blocking findings from code audit (PASS verdict). No rework required before merge; tracked here for future sprints.
+
+- **NB-1:** `<th>` elements missing `scope="col"` (WAI-ARIA best practice, one-line fix deferred).
+- **NB-2:** `app/globals.css` +185 lines not listed in spec §6 owned-files (implied by Tailwind v4 extend language; accepted as-is).
+- **NB-3:** `SortControl` doesn't reset `?page=` on sort change — `FilterChips` does reset it; the inconsistency is an easy follow-up (one-line `buildFilterUrl` call change).
+- **NB-4:** `FilterChips` duplicates `clearHref` logic already present in `page.tsx`; worth extracting into `build-filter-url.ts` helper in a later cleanup pass.
