@@ -1,5 +1,11 @@
 # KarbonLens — v0.1 handoff
 
+## Current status (2026-04-21)
+
+**Phase 1 complete.** T01–T04 fully done; T05 Phase A (all code, middleware, auth UI, adapter wiring) done. T05 Phase B (live Google OAuth round-trip) is pending Andy's GCP client credentials — the code is ready. Phase 2 (data pipelines, T06–T10) can start after Andy's checkpoint.
+
+See [`docs/retros/phase-1.md`](retros/phase-1.md) for the full retrospective, and [`CHANGELOG.md`](../CHANGELOG.md) for per-story details.
+
 This folder contains the complete v0.1 handoff package for KarbonLens: the Indonesian carbon market intelligence platform.
 
 ## Read order
@@ -53,7 +59,7 @@ This folder contains the complete v0.1 handoff package for KarbonLens: the Indon
 1. Clone the karbonlens repo locally.
 2. Read the three core docs in order.
 3. Start at `TASKS.md` T01 (VPS foundation). Works in parallel with T03 (Next.js bootstrap).
-4. By end of week 1: T01–T05 done, auth working, schema live.
+4. ~~By end of week 1: T01–T05 done, auth working, schema live.~~ **Done (2026-04-21).**
 5. By end of week 2: T06–T10 done, data flowing, scores computed.
 6. By end of week 3: T11–T18 done, frontend live with real data.
 7. By end of week 4: T19–T23, ops hardening, v0.1 shipped.
