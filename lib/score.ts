@@ -31,10 +31,15 @@ export const METHODOLOGY_VERSION = 'v1' as const;
  * fall back to the default community_score of 75. Keep this mirror consistent
  * with `scrapers/scoring/weights.py :: COMMUNITY_OVERRIDES`.
  */
+// Reconciled 2026-04-21: only Rimba Raya matches a real T06 slug. The two
+// other spec placeholders (cendrawasih-aru, kalimantan-forest-carbon-partnership)
+// have no matching project in the current Verra Indonesia dataset and are
+// dormant here — uncomment when/if those projects appear via a future
+// scraper pass.
 export const COMMUNITY_OVERRIDES: Record<string, number> = {
   'rimba-raya-biodiversity-reserve-project': 45,
-  'cendrawasih-aru': 30,
-  'kalimantan-forest-carbon-partnership': 60,
+  // 'cendrawasih-aru-placeholder-slug': 30,
+  // 'kalimantan-forest-carbon-partnership-placeholder-slug': 60,
 };
 
 /**
