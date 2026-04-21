@@ -2,7 +2,7 @@
 id: T04
 title: Drizzle schema + DB client + env plumbing
 phase: 1
-status: audited
+status: done
 blocked_by: [T02, T03]
 blocks: [T05, T09, T11, T12, T14, T15, T16]
 owner: implementer-agent
@@ -159,17 +159,25 @@ Then the TypeScript type for a projects insert does NOT include totalVcusAvailab
 
 ### Adapter field-name enumeration (auth tables)
 
-`@auth/drizzle-adapter` v5 reads table columns by the camelCase JavaScript property name on the Drizzle table object. T04 must use the exact names below. Cross-reference: T02 §3 (camelCase ↔ snake_case mapping). The implementer must mirror these in `lib/schema.ts`:
+`@auth/drizzle-adapter` v1.11.2 reads table columns by the JavaScript property name on the Drizzle table object. It uses a MIX of conventions — most fields are camelCase but the six OAuth-token fields on `accounts` are snake_case. T04 must use the exact names below. Cross-reference: T02 §6 (auth field-naming contract). The implementer must mirror these in `lib/schema.ts`:
 
 | Table | Drizzle TS field | SQL column |
 |---|---|---|
 | `users` | `emailVerified` | `email_verified` |
 | `accounts` | `userId` | `user_id` |
 | `accounts` | `providerAccountId` | `provider_account_id` |
+| `accounts` | `refresh_token` | `refresh_token` |
+| `accounts` | `access_token` | `access_token` |
+| `accounts` | `expires_at` | `expires_at` |
+| `accounts` | `token_type` | `token_type` |
+| `accounts` | `id_token` | `id_token` |
+| `accounts` | `session_state` | `session_state` |
 | `sessions` | `sessionToken` | `session_token` |
 | `sessions` | `userId` | `user_id` |
 | `verification_tokens` | `identifier` | `identifier` |
 | `verification_tokens` | `token` | `token` |
+
+> **Auditor-confirmed correction 2026-04-21:** adapter v1.11.2 uses snake_case JS keys for the six OAuth-token fields on `accounts` (`refresh_token`, `access_token`, `expires_at`, `token_type`, `id_token`, `session_state`). An earlier revision of this table listed them in camelCase — that was wrong; Drizzle's `insert.values()` silently drops unknown keys, so the adapter would have written NULL for all six. Authoritative source: `node_modules/@auth/drizzle-adapter/lib/pg.js` lines 22-28.
 
 ### Drizzle column-type mapping (implementer reference)
 

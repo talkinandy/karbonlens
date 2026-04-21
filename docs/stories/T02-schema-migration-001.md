@@ -287,7 +287,7 @@ This pattern ensures that future migrations (`002_*.sql`) applied as `postgres` 
 
 ### Auth table field-naming contract (T02 → T04 bridge)
 
-T02 writes SQL column names in snake_case. T04's `lib/schema.ts` must expose the auth-table columns under camelCase Drizzle field names that `@auth/drizzle-adapter` v5 reads by exact JavaScript property name. Mismatches cause silent adapter failures at runtime.
+T02 writes SQL column names in snake_case. T04's `lib/schema.ts` must expose each auth-table column under the Drizzle JS field name that `@auth/drizzle-adapter` v1.11.2 reads by exact JavaScript property name. The adapter uses a MIX of conventions — most fields are camelCase but the six OAuth-token fields on `accounts` are snake_case JS keys. Mismatches cause silent adapter failures at runtime (Drizzle's `insert.values()` drops unknown keys without error).
 
 **Required mapping — T04 must implement these field names exactly:**
 
@@ -296,18 +296,20 @@ T02 writes SQL column names in snake_case. T04's `lib/schema.ts` must expose the
 | `users` | `email_verified` | `emailVerified` |
 | `accounts` | `user_id` | `userId` |
 | `accounts` | `provider_account_id` | `providerAccountId` |
-| `accounts` | `refresh_token` | `refreshToken` |
-| `accounts` | `access_token` | `accessToken` |
-| `accounts` | `expires_at` (BIGINT) | `expiresAt` |
-| `accounts` | `token_type` | `tokenType` |
-| `accounts` | `id_token` | `idToken` |
-| `accounts` | `session_state` | `sessionState` |
+| `accounts` | `refresh_token` | `refresh_token` |
+| `accounts` | `access_token` | `access_token` |
+| `accounts` | `expires_at` (BIGINT) | `expires_at` |
+| `accounts` | `token_type` | `token_type` |
+| `accounts` | `id_token` | `id_token` |
+| `accounts` | `session_state` | `session_state` |
 | `sessions` | `session_token` | `sessionToken` |
 | `sessions` | `user_id` | `userId` |
 | `sessions` | `expires` | `expires` |
 | `verification_tokens` | `identifier` | `identifier` |
 | `verification_tokens` | `token` | `token` |
 | `verification_tokens` | `expires` | `expires` |
+
+> **Auditor-confirmed correction 2026-04-21:** adapter v1.11.2 uses snake_case JS keys for the six OAuth-token fields on `accounts` (`refresh_token`, `access_token`, `expires_at`, `token_type`, `id_token`, `session_state`). An earlier revision of this table listed them in camelCase — that was wrong. Authoritative source: `node_modules/@auth/drizzle-adapter/lib/pg.js` lines 22-28.
 
 `verification_tokens` uses a composite primary key `PRIMARY KEY (identifier, token)`. T04 must declare this using Drizzle's `primaryKey({ columns: [t.identifier, t.token] })` callback — not `.primaryKey()` on a single column.
 
