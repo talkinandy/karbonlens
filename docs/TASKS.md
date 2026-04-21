@@ -33,7 +33,7 @@ Tasks are numbered for referencing, not for strict ordering. Parallel tasks are 
 | T09 | Score computation daily job | T06, T07 | 2h | done |
 | T10 | Seed regulatory events manually | T02 | 1h | done — fact-checked 2026-04-21; 2 unverified rows removed, 3 corrected; 8 events total |
 | T11 | Projects explorer screen (table + filters) | T04, T06 | 4h | done |
-| T12 | Project detail screen | T04, T06, T07, T09 | 4h | todo |
+| T12 | Project detail screen | T04, T06, T07, T09 | 4h | done |
 | T13 | Map integration on projects + detail | T11, T12 | 6h | todo |
 | T14 | Price intelligence screen | T04, T08 | 3h | done |
 | T15 | Regulatory timeline screen | T04, T10 | 2h | done |
