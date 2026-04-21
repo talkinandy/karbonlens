@@ -148,3 +148,15 @@ Sub-score bucket logic was hand-compared between `compute.py` and `lib/score.ts`
 - **OQ-5:** update `docs/architecture.md §8` to match the Appendix B 5-band bucket thresholds before T12 renders a methodology tooltip.
 - **T06 follow-up:** populate `registries.status` with real values so `transparency_score` picks up the 70/85 bands.
 - **T07 Phase B:** once GFW key arrives and real `satellite_alerts` rows land, re-check AC-5 without re-running implementation.
+
+## T09 follow-ups
+
+1. **AC-5 pending re-verification after T07 Phase B.** Rimba Raya scored 72 in Phase A because `satellite_alerts` is empty (no GFW API key yet), forcing `reversal_score = 100`. AC-5 target band is 50–65. Once T07 Phase B populates real alerts, re-run `python -m scrapers.scoring.compute` and confirm Rimba Raya falls into the [50, 65] range. No code change expected — this is a data-availability constraint.
+
+2. **Slug drift on COMMUNITY_OVERRIDES: `cendrawasih-aru` and `kalimantan-forest-carbon-partnership` do NOT match real slugs.** Neither slug appears in the 64-project T06 output. Andy to confirm: are these projects in scope for v0.1 (not yet scraped) or should the placeholders be removed? Both Python (`weights.py`) and TypeScript (`lib/score.ts`) carry the stubs and emit a `community_override_unmatched` WARNING on each run. Update or remove per Andy's confirmation (OQ-1).
+
+3. **Transparency = 55 universally because Verra's registry statuses (`Registered`, `Under development`, etc.) don't match the code's `'active'` filter.** T06 stored `registries.status = NULL` for every row (the Verra OData API does not surface a normalized status in a format the scraper maps). The transparency formula uses `LOWER(status) = 'active'` — correct per Appendix B — but no project has an active registry row today. T06 follow-up: standardize `registries.status` to the canonical `active/pipeline/suspended/flagged` values per architecture §3. Current spec-literal behavior is correct but data-reality drift means the 70/85 transparency bands are unreachable until T06 is augmented.
+
+4. **Architecture §8 bucket ranges need reconciling with T09's revised spec (if §8 exists).** T09's implementation follows the Appendix B 5-band bucket thresholds (0–2 yrs → 100, 2–4 → 85, 4–6 → 70, 6–10 → 55, >10 → 40 for validation_recency; alert-count bands for reversal_risk). If `docs/architecture.md §8` carries different bucket values from a prior draft, update §8 to match before T12 renders a methodology tooltip. (OQ-5.)
+
+5. **Wrapper cron-time comment drift noted.** `run_daily_score.sh` contains the comment `# cron: 0 4 * * *` (04:00 UTC = 11:00 WIB). `docs/architecture.md §4` (cron schedule table) should be verified to list the same time for the daily score job before T19 installs the cron. Minor but worth cross-checking at T19 time to avoid a silent drift.
