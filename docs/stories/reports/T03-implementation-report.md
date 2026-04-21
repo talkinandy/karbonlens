@@ -340,3 +340,17 @@ real data; at that point visual polish becomes the primary concern.
 - **T22** reads `SENTRY_DSN` (empty in dev) and instruments the
   Next.js app.
 - **T23** runs `npm run build` in Netlify with `@netlify/plugin-nextjs`.
+
+---
+
+## T03 follow-ups (non-blocking audit findings)
+
+The code audit (PASS-WITH-FIXES) flagged 8 non-blocking findings. NB-1 (CHANGELOG entry) was resolved at merge time. The remaining 7 are parked here for downstream pickup:
+
+- **NB-2** Next.js version 15 vs 16.2.4 — acceptable deviation; build is clean. If Andy requires strict Next 15, T04 implementer can downgrade with `npm i next@15 eslint-config-next@15` before any new work.
+- **NB-3** Font stack (IBM Plex Sans / Mono / Instrument Serif) diverges from prototype (Inter + system-mono) without a committed design brief — flag for Andy to confirm the Plex/Instrument choice once `KarbonLens_Design_Brief.md` is committed; T11 implementer should verify before screen polish.
+- **NB-4** `globals.css` declares design tokens twice (`@theme` + `:root`) — synchronisation burden for future edits. T11+ should collapse to a single source (use `@theme inline` or migrate `kl-*` classes to Tailwind utilities and drop `:root`).
+- **NB-5** `components/site-nav.tsx` is additive beyond spec minimum — T05 implementer should compose `UserMenu`/`OnboardingModal` alongside `<SiteNav />` in `(app)/layout.tsx` rather than replacing it.
+- **NB-6** `npm ls` reports extraneous wasm-runtime packages (`@emnapi/*`, `@napi-rs/wasm-runtime`, `@tybys/wasm-util`) — cosmetic transitive deps from Tailwind v4/Turbopack; clears on next `npm install` lock refresh.
+- **NB-7** AC-7 (README quickstart) verified by mental trace only, not a fresh-clone test — Andy or T23 implementer should verify line-for-line on a clean clone before declaring production-ready.
+- **NB-8** `NEXTAUTH_URL` placeholder pins port 3000; dev server binds port 3001 on this VPS (port 3000 held by Gitea) — T05 implementer must update `.env.local` to match the actual dev port before wiring NextAuth callbacks.
