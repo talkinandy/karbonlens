@@ -35,7 +35,7 @@ Tasks are numbered for referencing, not for strict ordering. Parallel tasks are 
 | T11 | Projects explorer screen (table + filters) | T04, T06 | 4h | todo |
 | T12 | Project detail screen | T04, T06, T07, T09 | 4h | todo |
 | T13 | Map integration on projects + detail | T11, T12 | 6h | todo |
-| T14 | Price intelligence screen | T04, T08 | 3h | todo |
+| T14 | Price intelligence screen | T04, T08 | 3h | done |
 | T15 | Regulatory timeline screen | T04, T10 | 2h | done |
 | T16 | Notifications bell + alerts inbox | T04, T05, T07 | 3h | todo |
 | T17 | Weekly digest email via Resend | T16 | 3h | todo |
