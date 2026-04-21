@@ -9,11 +9,14 @@ KarbonLens is a carbon-market intelligence terminal that reconciles SRN-PPI, IDX
 
 ## Status
 
-**v0.1 Phase 1 of 4 complete (2026-04-21).** Foundation stories T01–T05 are merged into `feature/v0.1-impl`. Phase 2 (data pipelines) starts next.
+**v0.1 Phase 1 complete + Phase 2 Phase-A complete (2026-04-21).** Foundation (T01–T05) and data pipelines (T06–T10) are merged into `feature/v0.1-impl` at HEAD `a45a07f`. Phase B items pending Andy's external keys/data: T07 Phase B (GFW_API_KEY — satellite alerts ingestion), T09 AC-5 re-verify (auto-resolves after T07 Phase B), T10 rows 6–10 fact-check. Ready for Phase 3 (frontend integration) after checkpoint.
+
+**Live DB:** 64 projects · 307 issuances · 10 IDXCarbon monthly snapshots · 10 regulatory events · 64 project scores · 55/64 gfw_geostore_id cached · 0 satellite alerts (Phase B pending)
 
 - Sprint overview and task statuses: [`docs/TASKS.md`](docs/TASKS.md)
 - What shipped in each story: [`CHANGELOG.md`](CHANGELOG.md)
 - Phase 1 retrospective: [`docs/retros/phase-1.md`](docs/retros/phase-1.md)
+- Phase 2 retrospective: [`docs/retros/phase-2.md`](docs/retros/phase-2.md)
 
 ## Quickstart (local dev)
 
@@ -42,6 +45,22 @@ npm run dev
 # 4. Health check
 curl http://localhost:3000/api/health
 # → {"ok":true,"db":"connected"}
+```
+
+### Scrapers (Python 3.12)
+
+- `scrapers/verra/` — weekly Indonesia VCS registry ingest (public OData API reverse-engineered from the Angular SPA). 64 projects in DB.
+- `scrapers/gfw/` — weekly deforestation alerts from Global Forest Watch. Needs `GFW_API_KEY` (see `docs/runbooks/gfw-api-key.md`). Phase B pending.
+- `scrapers/idxcarbon/` — monthly PDF scraper. 10 months ingested (Jun 2025 – Mar 2026; IDXCarbon listing exposes only 10 months at a time).
+- `scrapers/scoring/` — daily score compute. 64 project_scores rows. AC-5 (Rimba Raya range) environment-conditional until T07 Phase B populates satellite alerts.
+- `scrapers/seed/regulatory_events_v1.sql` — 10 hand-curated regulatory events (rows 6–10 pending Andy fact-check).
+
+Running a scraper locally:
+
+```sh
+cd /root/.openclaw/workspace/karbonlens
+source scrapers/.venv/bin/activate   # or: uv run ... from scrapers/
+python -m scrapers.verra.fetch --dry-run --limit 3
 ```
 
 ### Routes (Phase 1 — mock data, auth wired)
