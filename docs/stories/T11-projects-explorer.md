@@ -2,7 +2,7 @@
 id: T11
 title: Projects explorer screen — table + filters (real data)
 phase: 3
-status: audited
+status: done
 blocked_by: [T04, T06]
 blocks: [T13, T18]
 owner: spec-writer agent
