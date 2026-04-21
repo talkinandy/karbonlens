@@ -1,5 +1,13 @@
 -- =============================================================================
--- T10: Seed regulatory_events — 10 curated Indonesian carbon-market milestones
+-- T10: Seed regulatory_events — 8 curated Indonesian carbon-market milestones
+-- =============================================================================
+-- Fact-check pass 2026-04-21 (commit introducing the corrections landed in
+-- the same day as initial seed): two unverified rows (Permenhut 7/2024,
+-- Kepmen LH 20/2025) were removed. Rows 8 (Perpres 110/2025) and 9
+-- (Permenhut 6/2026) had incorrect dates and titles — corrected here from
+-- primary sources (peraturan.go.id, antaranews.com, kehutanan.go.id).
+-- Row 10 (IDX full launch) had an unsupported specific date; placeholder
+-- year-end used pending an official announcement.
 -- =============================================================================
 -- Apply:  sudo -u postgres psql -d karbonlens --single-transaction \
 --             -f scrapers/seed/regulatory_events_v1.sql
@@ -157,33 +165,26 @@ WHERE NOT EXISTS (
 );
 
 -- ---------------------------------------------------------------------------
--- Row 6 — Permenhut 7/2024 — SRN-PPI registry operationalization
+-- Rows 6 and 7 REMOVED on 2026-04-21 fact-check pass:
+--   • Permenhut 7/2024 (SRN-PPI operationalization) — not found on
+--     peraturan.bpk.go.id or jdih.menlhk.go.id; only Permenhut 1/2024 exists
+--     for that year. Likely fabricated or mis-attributed (correct SRN-PPI
+--     doc may be Permen LHK 7/2023, KLHK-issued; to be re-added only when
+--     verified).
+--   • Kepmen LH 20/2025 (DRAM/DPP) — not verifiable; Permenhut 20/2025
+--     exists but is unrelated (forest-area planning). No DRAM/DPP Kepmen
+--     found in any primary source.
+-- Consequence: row count is 8, not 10. Self-validation and T15 filter
+-- dynamic tag vocabulary remain correct.
 -- ---------------------------------------------------------------------------
-INSERT INTO regulatory_events (
-    event_date, ministry, document_type, document_number,
-    title, document_url, summary_en, summary_id,
-    importance, tags, is_upcoming
-)
-SELECT
-    '2024-07-08',
-    'Kemenhut',
-    'Permenhut',
-    '7/2024',
-    'Operasionalisasi Registri SRN-PPI',
-    NULL, -- URL: not found at time of authoring; check peraturan.bpk.go.id
-    'Operationalised the SRN-PPI national carbon registry for the forestry sector, setting out the procedures for project registration, issuance of carbon units, and data reporting obligations. Required all forest-carbon projects to list through SRN-PPI as a condition for trading on IDXCarbon.',
-    'Mengoperasionalkan registri karbon nasional SRN-PPI untuk sektor kehutanan, mengatur tata cara pendaftaran proyek, penerbitan unit karbon, dan kewajiban pelaporan data. Mewajibkan seluruh proyek karbon hutan mendaftar melalui SRN-PPI sebagai syarat untuk diperdagangkan di IDXCarbon.',
-    'medium',
-    ARRAY['srn-ppi','registry','forestry','mrv'],
-    FALSE
-WHERE NOT EXISTS (
-    SELECT 1 FROM regulatory_events
-    WHERE document_number = '7/2024'
-      AND ministry = 'Kemenhut'
-);
 
 -- ---------------------------------------------------------------------------
--- Row 7 — Kepmen LH 20/2025 — DRAM/DPP data portals
+-- Row 6 (post-correction) — Perpres 110/2025 — NEK framework overhaul
+-- Fact-check 2026-04-21: date was 2025-04-22 (wrong); correct signing/
+-- promulgation date per peraturan.go.id is 10 October 2025. Title +
+-- scope corrected from "re-opening international trade" to the actual
+-- consolidating-NEK-governance framing (international trade is one
+-- consequence among many). Document URL added.
 -- ---------------------------------------------------------------------------
 INSERT INTO regulatory_events (
     event_date, ministry, document_type, document_number,
@@ -191,42 +192,16 @@ INSERT INTO regulatory_events (
     importance, tags, is_upcoming
 )
 SELECT
-    '2025-03-15',
-    'Kementerian LH',
-    'Kepmen',
-    '20/2025',
-    'DRAM/DPP — Pendaftaran dan Portal Data Iklim',
-    NULL, -- URL: not found at time of authoring; check peraturan.bpk.go.id
-    'Established the DRAM (Daftar Rencana Aksi Mitigasi) and DPP (Data Pendukung Pemantauan) data portals under the Ministry of Environment (KLH), centralising MRV reporting for all registered GHG mitigation actions and linking SRN-PPI data to the national GHG inventory.',
-    'Menetapkan portal data DRAM dan DPP di bawah Kementerian Lingkungan Hidup, memusatkan pelaporan MRV untuk seluruh aksi mitigasi GRK yang terdaftar dan menghubungkan data SRN-PPI ke inventaris GRK nasional.',
-    'medium',
-    ARRAY['registry','dram','data-portal','klh'],
-    FALSE
-WHERE NOT EXISTS (
-    SELECT 1 FROM regulatory_events
-    WHERE document_number = '20/2025'
-      AND ministry = 'Kementerian LH'
-);
-
--- ---------------------------------------------------------------------------
--- Row 8 — Perpres 110/2025 — re-opening international carbon credit trade
--- ---------------------------------------------------------------------------
-INSERT INTO regulatory_events (
-    event_date, ministry, document_type, document_number,
-    title, document_url, summary_en, summary_id,
-    importance, tags, is_upcoming
-)
-SELECT
-    '2025-04-22',
+    '2025-10-10',
     'Presidential',
     'Perpres',
     '110/2025',
-    'Pembukaan Kembali Perdagangan Kredit Karbon Internasional',
-    NULL, -- URL: not found at time of authoring; check peraturan.bpk.go.id
-    'Re-opened international carbon credit trade after a period of restriction, establishing the conditions and approval pathway for Indonesian carbon credits to be sold to foreign buyers under Article 6 of the Paris Agreement. A landmark shift that significantly increases the addressable market for Indonesian project developers.',
-    'Membuka kembali perdagangan kredit karbon internasional setelah masa pembatasan, menetapkan syarat dan jalur persetujuan agar kredit karbon Indonesia dapat dijual ke pembeli asing berdasarkan Pasal 6 Perjanjian Paris. Perubahan penting yang secara signifikan memperluas pasar bagi pengembang proyek Indonesia.',
+    'Penyelenggaraan Instrumen Nilai Ekonomi Karbon dan Pengendalian Emisi GRK Nasional',
+    'https://peraturan.go.id/id/perpres-no-110-tahun-2025',
+    'Overhauls the national carbon-economy framework, replacing Perpres 98/2021. Consolidates governance of carbon pricing, emissions trading, and MRV under a single Presidential regulation. Enables international carbon credit trade under Article 6 of the Paris Agreement and sets the conditions for Indonesian credits to be sold to foreign buyers with proper authorisation. The most significant policy shift for the Indonesian carbon market since Perpres 98/2021.',
+    'Menyempurnakan kerangka ekonomi karbon nasional, menggantikan Perpres 98/2021. Mengonsolidasikan tata kelola pricing karbon, perdagangan emisi, dan MRV dalam satu peraturan presiden. Memungkinkan perdagangan kredit karbon internasional berdasarkan Pasal 6 Perjanjian Paris dan menetapkan syarat penjualan kredit karbon Indonesia ke pembeli asing dengan otorisasi yang sesuai. Perubahan kebijakan paling signifikan bagi pasar karbon Indonesia sejak Perpres 98/2021.',
     'critical',
-    ARRAY['international-trade','carbon-credits','article6','presidential'],
+    ARRAY['nek','carbon-economy','international-trade','article6','presidential','framework'],
     FALSE
 WHERE NOT EXISTS (
     SELECT 1 FROM regulatory_events
@@ -235,7 +210,12 @@ WHERE NOT EXISTS (
 );
 
 -- ---------------------------------------------------------------------------
--- Row 9 — Permenhut 6/2026 — re-enabling forestry carbon credits
+-- Row 7 (post-correction) — Permenhut 6/2026 — forestry offset trading procedures
+-- Fact-check 2026-04-21: date was 2026-01-14 (wrong); correct promulgation
+-- date per antaranews.com is 13 April 2026 (signed 6 April 2026). Title +
+-- framing corrected: this is an implementing regulation for Perpres 110/
+-- 2025 establishing forestry-offset trading procedures, not a moratorium
+-- lift (no four-year moratorium appears in the verified legal record).
 -- ---------------------------------------------------------------------------
 INSERT INTO regulatory_events (
     event_date, ministry, document_type, document_number,
@@ -243,16 +223,16 @@ INSERT INTO regulatory_events (
     importance, tags, is_upcoming
 )
 SELECT
-    '2026-01-14',
+    '2026-04-13',
     'Kemenhut',
     'Permenhut',
     '6/2026',
-    'Pencabutan Moratorium Kredit Karbon Kehutanan',
-    NULL, -- URL: not found at time of authoring; check peraturan.bpk.go.id
-    'Lifted the four-year moratorium on new forestry carbon credit approvals (in force since early 2022), re-enabling REDD+, peatland, and conservation projects to seek certification and trade on IDXCarbon. Widely regarded as the regulatory unlock most needed to scale Indonesia''s carbon market in 2026.',
-    'Mencabut moratorium empat tahun atas persetujuan kredit karbon kehutanan baru (berlaku sejak awal 2022), memungkinkan kembali proyek REDD+, gambut, dan konservasi untuk mendapatkan sertifikasi dan diperdagangkan di IDXCarbon. Dianggap sebagai pembukaan regulasi yang paling dibutuhkan untuk mengembangkan pasar karbon Indonesia pada 2026.',
+    'Tata Cara Perdagangan Karbon Melalui Offset Emisi GRK Sektor Kehutanan',
+    'https://www.antaranews.com/berita/5528569/ri-perkuat-aturan-perdagangan-karbon-hutan-lewat-permenhut-6-2026',
+    'Implementing regulation for Perpres 110/2025 in the forestry sector. Establishes the procedures for carbon-credit generation, trading, and offset approvals from REDD+, peatland, mangrove, and afforestation projects. Signed by Menteri Kehutanan on 6 April 2026; promulgated 13 April 2026.',
+    'Peraturan pelaksana Perpres 110/2025 untuk sektor kehutanan. Menetapkan tata cara penerbitan, perdagangan, dan persetujuan offset kredit karbon dari proyek REDD+, gambut, mangrove, dan penanaman hutan. Ditandatangani Menteri Kehutanan 6 April 2026; diundangkan 13 April 2026.',
     'critical',
-    ARRAY['forestry','redd','peatland','moratorium-lifted'],
+    ARRAY['forestry','redd','peatland','offset','perpres-110-implementation'],
     FALSE
 WHERE NOT EXISTS (
     SELECT 1 FROM regulatory_events
@@ -261,15 +241,16 @@ WHERE NOT EXISTS (
 );
 
 -- ---------------------------------------------------------------------------
--- Row 10 — IDXCarbon full-scale launch (upcoming / forecast)
--- event_date = 2026-07-01: forecast placeholder (first-of-month convention).
--- /* forecast; update when announced */
+-- Row 8 (post-correction) — IDXCarbon full-scale launch (upcoming / unannounced)
+-- Fact-check 2026-04-21: initial seed claimed event_date = 2026-07-01 as a
+-- "forecast" — no official source supports that specific date. As of
+-- January 2026 IEEFA reports that mandatory-compliance allowance
+-- allocation has been delayed and no official launch date has been
+-- announced by OJK or IDX. event_date now placeholder at 2026-12-31 (year-end)
+-- and importance downgraded from 'high' → 'medium' to reflect uncertainty.
 -- Sentinel: document_number = 'IDX-LAUNCH-2026' (unique identifiable sentinel).
--- Dedupe key: (document_number, title, event_date) — wider key used because
--- the sentinel is not a real document number and could theoretically collide
--- if another forecast row is added with the same sentinel pattern.
--- When OJK announces the real launch date and/or document, delete this row
--- and insert a corrected row via regulatory_events_v2.sql.
+-- Dedupe key: document_number alone (sentinel is globally unique, no collision risk).
+-- When OJK announces the real date, delete this row and re-insert via a v2 seed.
 -- ---------------------------------------------------------------------------
 INSERT INTO regulatory_events (
     event_date, ministry, document_type, document_number,
@@ -277,22 +258,20 @@ INSERT INTO regulatory_events (
     importance, tags, is_upcoming
 )
 SELECT
-    '2026-07-01', /* forecast; update when announced */
+    '2026-12-31', /* placeholder; no official launch date announced as of 2026-04-21 */
     'IDX',
     'Launch',
     'IDX-LAUNCH-2026',
-    'IDXCarbon Peluncuran Skala Penuh — Peserta Internasional',
+    'IDXCarbon Peluncuran Skala Penuh (tanggal belum diumumkan)',
     NULL, -- URL: not yet available; update when OJK publishes rulemaking
-    'Forecast mid-2026 opening of IDXCarbon to international participants, following the 2025 Perpres that re-enabled international carbon credit trade. Expected to significantly increase liquidity and price discovery on the exchange. Exact date subject to OJK rulemaking.',
-    'Perkiraan pembukaan IDXCarbon untuk peserta internasional pada pertengahan 2026, menyusul Perpres 2025 yang membuka kembali perdagangan kredit karbon internasional. Diharapkan meningkatkan likuiditas dan price discovery secara signifikan. Tanggal pasti menunggu aturan pelaksanaan OJK.',
-    'high',
-    ARRAY['idxcarbon','international','launch','upcoming'],
+    'IDXCarbon''s full-scale launch, expanding from the 2023 soft-launch to support mandatory-compliance trading with OJK-allocated allowances. As of early 2026, allowance allocation has been delayed; no official launch date announced. event_date is placeholder (2026-12-31) pending announcement.',
+    'Peluncuran skala penuh IDXCarbon, memperluas dari soft-launch 2023 untuk mendukung perdagangan wajib dengan alokasi izin OJK. Per awal 2026 alokasi izin tertunda; tanggal peluncuran resmi belum diumumkan. event_date berupa placeholder (2026-12-31) sampai ada pengumuman resmi.',
+    'medium',
+    ARRAY['idxcarbon','international','launch','upcoming','unannounced'],
     TRUE
 WHERE NOT EXISTS (
     SELECT 1 FROM regulatory_events
     WHERE document_number = 'IDX-LAUNCH-2026'
-      AND title = 'IDXCarbon Peluncuran Skala Penuh — Peserta Internasional'
-      AND event_date = '2026-07-01'
 );
 
 -- ---------------------------------------------------------------------------

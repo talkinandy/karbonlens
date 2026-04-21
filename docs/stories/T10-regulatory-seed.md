@@ -2,7 +2,7 @@
 id: T10
 title: Seed regulatory events manually
 phase: 2
-status: done-pending-factcheck
+status: done
 blocked_by: [T02]
 blocks: [T15]
 owner: agent
