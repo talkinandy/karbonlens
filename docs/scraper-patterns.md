@@ -211,6 +211,28 @@ scrapers/
 
 ---
 
+## ON CONFLICT with expression-based unique indexes
+
+Migration 002 (T07) introduced three expression-based unique indexes — `uq_sat_project_date_loc`, `uq_issuances_dedupe`, `uq_notifications_dedupe`. These are created with `CREATE UNIQUE INDEX ... ON table (expression)`, not `ALTER TABLE ... ADD CONSTRAINT`.
+
+**This matters because `ON CONFLICT ON CONSTRAINT <name>` only works against named constraints.** Expression-based indexes are not constraints; using the constraint form will raise a Postgres error at runtime (`there is no unique or exclusion constraint matching the ON CONFLICT specification`) even though ruff and dry-run both pass.
+
+**Always use the column-list form:**
+
+```sql
+-- WRONG (fails at runtime for expression indexes):
+INSERT INTO satellite_alerts (...) VALUES (...)
+ON CONFLICT ON CONSTRAINT uq_sat_project_date_loc DO NOTHING;
+
+-- CORRECT:
+INSERT INTO satellite_alerts (...) VALUES (...)
+ON CONFLICT (project_id, alert_date, ST_AsText(location)) DO NOTHING;
+```
+
+The column-list expression must exactly match the index definition (including function calls). Check `\di+` in psql or `pg_indexes.indexdef` to confirm the exact expression. Caught during T07 code audit via live DB repro — add a live-repro step to any code audit covering `ON CONFLICT`.
+
+---
+
 ## Testing
 
 v0.1 has no automated tests. A scraper is accepted when:
