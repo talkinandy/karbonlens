@@ -56,7 +56,12 @@ const adapter: Adapter = (DrizzleAdapter as unknown as (
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter,
-  providers: [Google],
+  providers: [
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    }),
+  ],
   session: { strategy: 'database' },
   callbacks: {
     async session({ session, user }) {
