@@ -1,109 +1,156 @@
-// TODO T11+: replace with db query
-import {
-  mockPriceSeries,
-  mockPriceStats,
-  mockTransactions,
-} from "@/lib/mock-data";
+// No ISR: auth-gated; server query is sub-ms on period_month index.
+import { getPriceHistory } from '@/lib/queries/prices';
+import { PriceChart } from '@/components/prices/PriceChart';
+import { MonthlyTable } from '@/components/prices/MonthlyTable';
 
-export default function PricesPage() {
+function formatPeriod(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
+function fmtVolumeK(val: string | null | undefined): string {
+  if (val == null) return '—';
+  const k = Number(val) / 1000;
+  return k.toFixed(1) + 'k tCO₂e';
+}
+
+function fmtValueB(val: string | null | undefined): string {
+  if (val == null) return '—';
+  const b = Number(val) / 1_000_000_000;
+  return 'Rp ' + b.toFixed(1) + 'B';
+}
+
+function fmtAvgPriceK(val: string | null | undefined): string {
+  if (val == null) return '—';
+  const k = Math.round(Number(val) / 1000);
+  return 'Rp ' + k + 'k';
+}
+
+function momDelta(
+  current: string | number | null | undefined,
+  previous: string | number | null | undefined,
+): { arrow: string; pct: string; positive: boolean } | null {
+  if (current == null || previous == null) return null;
+  const cur = Number(current);
+  const prev = Number(previous);
+  if (prev === 0) return null;
+  const delta = ((cur - prev) / prev) * 100;
+  if (Math.abs(delta) < 1) return null;
+  return {
+    arrow: delta >= 0 ? '↑' : '↓',
+    pct: Math.abs(delta).toFixed(1) + '%',
+    positive: delta >= 0,
+  };
+}
+
+function DeltaBadge({ delta }: { delta: { arrow: string; pct: string; positive: boolean } | null }) {
+  if (!delta) return null;
+  return (
+    <span
+      style={{
+        color: delta.positive ? 'var(--color-positive, #16a34a)' : 'var(--color-negative, #dc2626)',
+        fontSize: '0.8rem',
+        fontWeight: 500,
+      }}
+    >
+      {delta.arrow} {delta.pct}
+    </span>
+  );
+}
+
+export default async function PricesPage() {
+  let rows: Awaited<ReturnType<typeof getPriceHistory>>;
+  try {
+    rows = await getPriceHistory();
+  } catch {
+    return (
+      <div className="kl-page">
+        <p className="kl-section-label" style={{ color: 'var(--color-negative)' }}>
+          Unable to load price data. Please try again later.
+        </p>
+      </div>
+    );
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className="kl-page">
+        <p className="kl-section-label">
+          No data yet — check back after IDXCarbon publishes the next monthly report.
+        </p>
+      </div>
+    );
+  }
+
+  const latest = rows[0];
+  const previous = rows.length > 1 ? rows[1] : null;
+  const latestPeriod = formatPeriod(latest.periodMonth);
+
+  const volumeDelta = previous ? momDelta(latest.totalVolumeTco2e, previous.totalVolumeTco2e) : null;
+  const valueDelta = previous ? momDelta(latest.totalValueIdr, previous.totalValueIdr) : null;
+  const priceDelta = previous ? momDelta(latest.avgPriceIdr, previous.avgPriceIdr) : null;
+  const participantsDelta = previous
+    ? momDelta(latest.registeredParticipants, previous.registeredParticipants)
+    : null;
+
+  const heroCards = [
+    { label: 'Latest month', value: latestPeriod, delta: null as { arrow: string; pct: string; positive: boolean } | null },
+    { label: 'Volume', value: fmtVolumeK(latest.totalVolumeTco2e), delta: volumeDelta },
+    { label: 'Value', value: fmtValueB(latest.totalValueIdr), delta: valueDelta },
+    { label: 'Avg price', value: fmtAvgPriceK(latest.avgPriceIdr), delta: priceDelta },
+    { label: 'Participants', value: latest.registeredParticipants?.toLocaleString('en-US') ?? '—', delta: participantsDelta },
+  ];
+
   return (
     <main className="kl-page">
       <header className="kl-page-header">
         <div>
-          <p className="kl-section-label">IDXCarbon · Jan 2026</p>
+          <p className="kl-section-label">IDXCarbon · {latestPeriod}</p>
           <h1 className="kl-page-title">Price intelligence</h1>
           <p className="kl-page-subtitle">
-            Monthly IDXCarbon snapshot — IDTBS, IDTBS-RE, IDNBS. Marketplace and
-            negotiated transactions.
+            Monthly IDXCarbon snapshots — last 10 months. Per-credit-type breakdown in v0.2.
           </p>
         </div>
       </header>
 
+      {/* Hero stats */}
       <section
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: 16,
           marginBottom: 32,
         }}
       >
-        {mockPriceStats.map((s) => (
-          <div key={s.label} className="kl-card">
-            <p className="kl-stat-label">{s.label}</p>
-            <p className="kl-stat-value tnum">{s.value}</p>
-            <p className="kl-stat-delta">{s.delta}</p>
+        {heroCards.map((card) => (
+          <div key={card.label} className="kl-card">
+            <p className="kl-stat-label">{card.label}</p>
+            <p className="kl-stat-value tnum">{card.value}</p>
+            <DeltaBadge delta={card.delta} />
           </div>
         ))}
       </section>
 
+      {/* Chart */}
       <section style={{ marginBottom: 32 }}>
-        <p className="kl-section-label">Series (Rp 000s / tCO₂e)</p>
-        <div className="kl-card" style={{ padding: 0, overflow: "hidden" }}>
-          <table className="kl-table">
-            <thead>
-              <tr>
-                <th>Month</th>
-                <th style={{ textAlign: "right" }}>IDTBS-RE</th>
-                <th style={{ textAlign: "right" }}>IDTBS</th>
-                <th style={{ textAlign: "right" }}>IDNBS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mockPriceSeries.map((p) => (
-                <tr key={p.month}>
-                  <td>{p.month}</td>
-                  <td style={{ textAlign: "right" }}>
-                    {p.idtbsRe !== null ? p.idtbsRe : "—"}
-                  </td>
-                  <td style={{ textAlign: "right" }}>
-                    {p.idtbs !== null ? p.idtbs : "—"}
-                  </td>
-                  <td style={{ textAlign: "right" }}>
-                    {p.idnbs !== null ? p.idnbs : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="kl-page-subtitle" style={{ marginTop: 12 }}>
-          Chart component lands in T14. For T03 the data is rendered as a table.
-        </p>
+        <PriceChart rows={rows} />
       </section>
 
-      <section>
-        <p className="kl-section-label">Recent transactions</p>
-        <div className="kl-card" style={{ padding: 0, overflow: "hidden" }}>
-          <table className="kl-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Market</th>
-                <th>Credit type</th>
-                <th>Project</th>
-                <th style={{ textAlign: "right" }}>Volume</th>
-                <th style={{ textAlign: "right" }}>Price</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mockTransactions.map((t) => (
-                <tr key={`${t.date}-${t.project}`}>
-                  <td>{t.date}</td>
-                  <td>{t.market}</td>
-                  <td>
-                    <span className="kl-pill kl-pill--neutral">
-                      {t.creditType}
-                    </span>
-                  </td>
-                  <td>{t.project}</td>
-                  <td style={{ textAlign: "right" }}>{t.volume}</td>
-                  <td style={{ textAlign: "right" }}>{t.price}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Monthly detail table */}
+      <section style={{ marginBottom: 24 }}>
+        <p className="kl-section-label" style={{ marginBottom: 12 }}>Monthly detail</p>
+        <MonthlyTable rows={rows} />
       </section>
+
+      {/* Methodology note + source */}
+      <p className="kl-page-subtitle">
+        Data from IDXCarbon monthly reports. Source:{' '}
+        <a href="https://idxcarbon.co.id/data-monthly" target="_blank" rel="noopener noreferrer">
+          idxcarbon.co.id/data-monthly
+        </a>
+        . Reports typically published ~1 week after month-end. Historical coverage limited to
+        IDXCarbon&apos;s current archive (10 months).
+      </p>
     </main>
   );
 }
