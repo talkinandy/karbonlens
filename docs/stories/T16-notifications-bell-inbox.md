@@ -2,7 +2,7 @@
 id: T16
 title: Notifications bell + alerts inbox
 phase: 3
-status: draft
+status: audited
 blocked_by: [T04, T05, T07]
 blocks: [T17]
 owner: implementer-agent
@@ -42,16 +42,38 @@ T16 closes the loop: the bell makes unread notifications visible at a glance; th
      - Header: "Notifications" + "Mark all as read" button (calls `POST /api/notifications/mark-read` with `{all: true}`).
      - Body: latest 10 notifications for the user (fetched from `GET /api/notifications?limit=10`), newest first. Each row: unread dot, type badge, title, relative timestamp ("2h ago").
      - Footer: "View all →" link to `/alerts`.
-   - On route change (`usePathname`): refetch unread count from `GET /api/notifications?limit=0` (returns only `unread_count` when `limit=0`). This is the sole polling mechanism — no setInterval.
+   - On route change (`usePathname`): refetch unread count from `GET /api/notifications?countOnly=true` (returns only `{unread_count}` — no `latest` array). This is the sole polling mechanism — no setInterval.
    - Optimistic mark-read: decrement local unread count immediately on "Mark all as read", revert if the API call fails.
 
 2. **`app/api/notifications/route.ts`** — GET handler:
    - Calls `auth()`. Returns `401 { error: 'Unauthenticated' }` if no session.
    - Query params:
-     - `limit` (default 10, max 50). When `limit=0`, skip the `latest` array and return only `{unread_count}`.
+     - `countOnly` (boolean flag — `?countOnly=true`). When present, skip the `latest` array entirely and return only `{unread_count}`. Used by `NotificationBell` for lightweight count refreshes on route change.
+     - `limit` (default 10, max 50; ignored when `countOnly=true`).
      - `before` (UUID cursor — `id` of the last item from a previous page, for the `/alerts` page pagination). When omitted, returns the newest items.
    - Query: `SELECT * FROM notifications WHERE user_id = $1 [AND id < $before] ORDER BY created_at DESC LIMIT $limit`.
-   - Response shape:
+   - **Response shape — union type with discriminant:**
+     ```typescript
+     // GET /api/notifications?countOnly=true
+     type CountOnlyResponse = { unread_count: number };
+
+     // GET /api/notifications  (or with limit/before)
+     type NotificationDto = {
+       id: string;
+       type: string;
+       title: string;
+       description: string;
+       project_id: string | null;
+       url: string | null;
+       read_at: string | null;
+       created_at: string;
+     };
+     type FullResponse = { unread_count: number; latest: NotificationDto[] };
+
+     type NotificationsResponse = CountOnlyResponse | FullResponse;
+     ```
+     Callers must discriminate on the presence of `latest` before accessing it.
+   - Example full response:
      ```json
      {
        "unread_count": 42,
@@ -69,7 +91,7 @@ T16 closes the loop: the bell makes unread notifications visible at a glance; th
        ]
      }
      ```
-   - `unread_count` is a separate `SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND read_at IS NULL` — always returned regardless of `limit`.
+   - `unread_count` is a separate `SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND read_at IS NULL` — always returned regardless of `countOnly`.
 
 3. **`app/api/notifications/mark-read/route.ts`** — POST handler:
    - Calls `auth()`. Returns `401 { error: 'Unauthenticated' }` if no session.
@@ -87,7 +109,7 @@ T16 closes the loop: the bell makes unread notifications visible at a glance; th
      rightSlot={<><NotificationBell /> <UserMenu /></>}
      ```
    - `NotificationBell` is a client component; the layout server component imports it. `UserMenu` already exists from T05. The bell appears to the left of the avatar — preserving the T05 layout with bell inserted.
-   - File ownership: `app/(app)/layout.tsx` is modified (T05 owns it but adds only the bell alongside UserMenu; coordinate with T05 implementer if merging post-T05).
+   - **Cross-story edit (T05-owned file):** `app/(app)/layout.tsx` is owned by T05, which mounts `<UserMenu />` via `rightSlot`. T16's sole change to that file is widening `rightSlot` to `<><NotificationBell /><UserMenu /></>`. This is a narrow, additive edit — do not refactor any other part of the layout. T16 must branch from a commit that includes T05's final merged `layout.tsx`; if T05 is still in-flight, coordinate to avoid a merge conflict on that line before T16 implementation begins.
 
 5. **`app/(app)/alerts/page.tsx`** — full inbox, replacing the T03 mock:
    - Server component (RSC). Reads `session` via `auth()`; renders 0 loading state via `app/(app)/alerts/loading.tsx`.
@@ -95,7 +117,16 @@ T16 closes the loop: the bell makes unread notifications visible at a glance; th
    - Layout: filter bar (top) + card/table list + pagination footer.
    - **Columns / fields per notification row:**
      - Read indicator: filled dot (blue, `●`) if unread; hollow dot (`○`) if read.
-     - Type badge: pill with text — `reversal` (red), `price` (green), `regulatory` (amber), `news` (slate), `retirement` (purple), `issuance` (teal). Unknown types fall back to grey.
+     - Type badge: pill with icon + text — 6 canonical pairs (icon from Heroicons or Lucide):
+       | Type | Background / text | Icon |
+       |---|---|---|
+       | `reversal` | red / white | `AlertTriangle` |
+       | `price` | purple / white | `TrendingUp` |
+       | `regulatory` | blue / white | `Scale` |
+       | `news` | gray / white | `Newspaper` |
+       | `retirement` | green / white | `Check` |
+       | `issuance` | amber / white | `Plus` |
+       Unknown types fall back to gray/`Info`. Each badge must use a distinct CSS class (`kl-badge--<type>`) so AC-10 can assert colors programmatically.
      - Title (bold, truncated at 80 chars).
      - Description (muted, truncated at 120 chars, single line).
      - Project link: if `project_id IS NOT NULL`, look up `projects.slug` and render as `<Link href="/projects/{slug}">{project.name_canonical}</Link>`; otherwise show an em-dash.
@@ -110,7 +141,19 @@ T16 closes the loop: the bell makes unread notifications visible at a glance; th
    - **Empty state:** if 0 notifications after filters: illustration placeholder + copy "No notifications yet. Alerts from monitored projects will appear here."
 
 6. **Deep-link support:**
-   - `GET /alerts?project=katingan-peatland` pre-filters the inbox to notifications where `project_id` matches the Katingan project. The slug is resolved to UUID server-side via a Drizzle query on `projects.slug`.
+   - `GET /alerts?project=katingan-peatland` pre-filters the inbox to notifications where `project_id` matches the Katingan project. The slug is resolved to UUID server-side via a query helper in `app/(app)/alerts/page.tsx`:
+     ```typescript
+     // Inside the RSC, before filtering notifications:
+     const project = slug
+       ? await db.query.projects.findFirst({
+           where: eq(schema.projects.slug, slug),
+           columns: { id: true, name_canonical: true },
+         })
+       : null;
+     // project?.id is then used in the notifications WHERE clause
+     // project?.name_canonical is rendered as the active filter chip label
+     ```
+     If the slug does not match any project, render the empty state (no notifications) rather than an error.
    - The project detail page (`app/(app)/projects/[slug]/page.tsx`) should include a "View alerts →" button linking to `/alerts?project={slug}`. T16 owns the link spec; the detail page implementation is T12's file — coordinate with T12 if in-flight.
 
 ### Out of scope (explicit non-goals)
@@ -235,6 +278,21 @@ _Verification:_ `npx tsc --noEmit && npm run build` in the repo root.
 
 ---
 
+**AC-10: Type badge colors are distinguishable**
+```
+Given I am signed in as Andy
+And   the DB contains at least one notification of each type:
+      reversal, price, regulatory, news, retirement, issuance
+When  I navigate to /alerts
+Then  each type badge renders with its designated CSS class (kl-badge--<type>)
+And   no two badge types share the same background color
+And   the 'reversal' badge uses the red color variant
+And   the 'price' badge uses the purple color variant
+```
+_Verification:_ In browser DevTools, inspect `.kl-badge--reversal` → `background-color` must be a red variant; `.kl-badge--price` → purple; etc. All 6 classes must exist in the stylesheet and have distinct `background-color` computed values.
+
+---
+
 ## 5. Inputs & outputs
 
 ### Inputs
@@ -273,8 +331,8 @@ No new env vars. No new DB migrations (schema already has `notifications` table 
 ### Blocked by
 
 - **T04** — Drizzle client + schema (especially `notifications` and `projects` tables).
-- **T05** — `auth()`, `UserMenu.tsx`, `app/(app)/layout.tsx` with `rightSlot`. `session.user.id` must be available.
-- **T07** — 60 notification rows must be present for Andy's `user_id` for AC-2/AC-3 to pass.
+- **T05** — `auth()`, `UserMenu.tsx`, `app/(app)/layout.tsx` with `rightSlot`. `session.user.id` must be available. T16 must branch from a commit that includes T05's final `layout.tsx`.
+- **T07 Phase B** — 60 notification rows must be present for Andy's `user_id` for AC-2/AC-3 to pass. Critically, the `uq_notifications_dedupe` unique index (added in `scrapers/migrations/002_add_geostore.sql`) **must be present**. T16 does NOT implement its own deduplication logic; deduplication is enforced entirely by that index. If the index is absent or the migration is rolled back, duplicate notifications will silently accumulate.
 
 ### Blocks
 
@@ -318,7 +376,7 @@ Two tabs both call `POST /api/notifications/mark-read` with `{all: true}` simult
 `NotificationBell` decrements local unread count optimistically before the API call resolves. If the API call returns a non-2xx response, restore the previous count from a local `prev` snapshot held in component state. Show a toast error ("Failed to mark as read — please try again"). Do not use SWR mutation for this; plain `useState` + try/catch is sufficient.
 
 **(vi) Bell mounts before initial count fetch**
-On first render, before the initial `GET /api/notifications?limit=0` resolves, show no badge (treat as 0, not a loading spinner). This avoids layout shift.
+On first render, before the initial `GET /api/notifications?countOnly=true` resolves, show no badge (treat as 0, not a loading spinner). This avoids layout shift.
 
 **(vii) Stale count after navigation back from `/alerts`**
 After the user marks items read on `/alerts` and navigates back to another page, the bell count may be stale. The `usePathname` effect triggers a re-fetch on any path change, so navigating away from `/alerts` to `/projects` will re-fetch the count with the updated data.
@@ -327,7 +385,7 @@ After the user marks items read on `/alerts` and navigates back to another page,
 
 ## 8. Definition of done
 
-- [ ] All 9 acceptance criteria pass against `npm run dev` with Andy's real session.
+- [ ] All 10 acceptance criteria pass against `npm run dev` with Andy's real session.
 - [ ] `npx tsc --noEmit` exits 0.
 - [ ] `npm run build` exits 0 with no warnings.
 - [ ] All files listed in §6 (File ownership) are present and committed to `feature/t16-notifications-bell-inbox`.
@@ -346,10 +404,13 @@ Andy's override: route-change revalidation only (no SWR timer). Implementation: 
 Use `const session = await auth()` from `lib/auth.ts` at the top of each API route handler. Return `NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })` if `session` is null. This is the established pattern from T05 — no new mechanism required.
 
 **OQ-3: Notification type enum**
-The schema uses `type TEXT NOT NULL` (no DB-enforced enum). T07 inserts `'reversal'`. Other type values (`price`, `regulatory`, `news`, `retirement`, `issuance`) are anticipated for v0.2 scrapers. For v0.1, the type badge renderer should handle all 6 known values plus a fallback for unknown strings — no code change needed when new types are introduced.
+The schema uses `type TEXT NOT NULL` (no DB-enforced enum). T07 inserts `'reversal'`. Other type values (`price`, `regulatory`, `news`, `retirement`, `issuance`) are anticipated for v0.2 scrapers. For v0.1, the type badge renderer handles all 6 known values (each with a designated color/icon pair per §3 item 5) plus a fallback for unknown strings — no code change needed when new types are introduced.
 
-**OQ-4: `app/(app)/layout.tsx` coordination with T05**
-T05 owns `app/(app)/layout.tsx`. If T16 is implemented after T05 merges, T16 adds `<NotificationBell />` as a narrow edit inside the existing `rightSlot` composition. If implemented in parallel, coordinate to avoid merge conflict on that file.
+**OQ-4: `app/(app)/layout.tsx` coordination with T05 (resolved)**
+T05 owns `app/(app)/layout.tsx`. T16's change is a narrow additive edit: widening `rightSlot` from `<UserMenu />` to `<><NotificationBell /><UserMenu /></>`. T16 must branch from a commit that includes T05's final merged `layout.tsx`. See §3 item 4 for the full cross-story edit policy.
+
+**OQ-5: `architecture.md` §6 route name mismatch — defer to Phase 3 close**
+`docs/architecture.md` §6 lists the notifications API routes as `GET /api/alerts` and `POST /api/alerts/mark-read`. T16 uses `GET /api/notifications` and `POST /api/notifications/mark-read`. These are the correct paths (consistent with the `notifications` table name and T16's file ownership table). Fixing the architecture doc is out of scope for T16 implementation. **Action at Phase 3 close:** update `docs/architecture.md` §6 to replace `/api/alerts` → `/api/notifications` and `/api/alerts/mark-read` → `/api/notifications/mark-read`.
 
 ---
 

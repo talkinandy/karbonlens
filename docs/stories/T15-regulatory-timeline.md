@@ -2,7 +2,7 @@
 id: T15
 title: Regulatory timeline screen with real data
 phase: 3
-status: draft
+status: audited
 blocked_by: [T04, T10]
 blocks: []
 owner: agent
@@ -32,13 +32,15 @@ Key decisions locked before this spec was written:
 
 2. **Filter bar** (`components/regulatory/FilterBar.tsx`) — rendered client-side to maintain interactivity while page shell is a server component:
    - **Importance** multi-select pills: `critical`, `high`, `medium`, `low` (these four values are schema-enforced via T10's seed assertion; safe to hardcode for importance only).
-   - **Ministry** multi-select pills: `Presidential`, `OJK`, `Kemenhut`, `Kementerian LH`, `IDX` — use the DB values as source of truth; this list can be derived at build time from the same query or hardcoded from the known T10 set (5 values, stable for v0.1). Prefer deriving from DB for consistency.
+   - **Ministry** multi-select pills: derived dynamically from `SELECT DISTINCT ministry FROM regulatory_events ORDER BY 1` via `getDistinctMinistries()`. No hardcoded ministry list in FilterBar.tsx.
    - **Tags** multi-select pills: built dynamically from `SELECT DISTINCT unnest(tags) FROM regulatory_events ORDER BY 1`. Do not hardcode any tag string. Pills rendered alphabetically.
-   - **Language toggle** (`components/regulatory/LanguageToggle.tsx`): segmented control `EN | ID`. Reflected in URL param `?lang=id` (absence = EN default). Sticky within session via URL state.
+   - **Language toggle** (`components/regulatory/LanguageToggle.tsx`): segmented control `EN | ID`. Reflected in URL param `?lang=id` (absence = EN default). Sticky within session via URL state. Implement as `role="tablist"` with each button as `role="tab"` and `aria-selected` set appropriately.
+   - **Clear-filters link:** when any filter is active (any of importance, ministry, tag, lang differs from default), render an inline "× Clear all" link at the top of the filter bar that navigates to `/regulatory` (no params). This is distinct from the empty-state "Clear all filters" button; both must be present in their respective contexts.
+   - **Multi-select URL serialisation (locked):** all multi-select dimensions (importance, ministry, tag) use repeated query parameters — e.g. `?tag=forestry&tag=peatland`. Never comma-separated. Use `useSearchParams().getAll('tag')` (and equivalent for other dimensions) to read; pass repeated params when writing. Next.js `searchParams` (server prop) and `useSearchParams()` (client hook) both return `string | string[] | undefined` — normalise to array before use.
    - All active filters and language param live in the URL query string. The page renders with filter values parsed from `searchParams` (Next.js server component pattern). Changes push to the URL via `useRouter().push()` client-side.
 
-3. **Event card layout — vertical timeline** (`components/regulatory/TimelineCard.tsx`):
-   - **Year grouping rail** on the left: a vertical line with a year label (`2009`, `2016`, …, `2026`) that appears once per calendar year as the user scrolls down.
+3. **Event card layout — vertical timeline** (`components/regulatory/TimelineCard.tsx`): each card is rendered as an `<article>` element. The event date is wrapped in `<time dateTime="YYYY-MM-DD">` using the ISO-format date from the DB.
+   - **Year grouping rail** on the left: a vertical line with a year label (`2009`, `2016`, …, `2026`) that appears once per calendar year as the user scrolls down. If active filters eliminate all events from a given year, that year's rail label is suppressed — no orphan labels are rendered.
    - **Card contents** (in order):
      - Date formatted as `"26 Sep 2023"` (day month-abbr year).
      - Ministry badge — small pill in muted tone.
@@ -55,7 +57,7 @@ Key decisions locked before this spec was written:
    - **Upcoming treatment**: cards where `is_upcoming = TRUE` receive:
      - Dashed card border (`border-dashed border-2`).
      - A `"Forecast"` pill (amber background, dark text) in the card header alongside the date.
-     - The upcoming section is visually separated from historical events by a "Coming up" section header above the first upcoming card.
+     - The upcoming section is visually separated from historical events by a "Coming up" section header above the first upcoming card. If there are zero upcoming events (e.g. after a future seed update flips `is_upcoming` to FALSE), the "Coming up" header is suppressed entirely.
 
 4. **URL state** — all active filter values and `lang` param are reflected in the URL so links are shareable. Pattern: `/regulatory?importance=critical&importance=high&ministry=Kemenhut&tag=forestry&lang=id`.
 
@@ -210,7 +212,7 @@ No new env vars. No DB migrations. No schema changes.
 
 3. **Zero events matching current filters.** Render the empty state: "No regulations match your filters." + "Clear all filters" button that navigates to `/regulatory` (no params).
 
-4. **Tag values containing URL-encoding-sensitive characters** (spaces, slashes, ampersands). URL-encode tag values when writing to query params (`encodeURIComponent`). Decode with `decodeURIComponent` when reading from `searchParams`. SQL query uses parameterised Drizzle calls — no injection risk.
+4. **Tag values containing URL-encoding-sensitive characters** (spaces, slashes, ampersands). URL-encode tag values when writing to query params via `encodeURIComponent`. **Do NOT call `decodeURIComponent` when reading from Next.js `searchParams`.** Next.js already URL-decodes values in both the server-component `searchParams` prop and the `useSearchParams()` client hook — calling `decodeURIComponent` a second time will corrupt values containing a literal `%` character (double-decode bug). Trust Next.js to decode; pass the raw string directly to the Drizzle query. SQL query uses parameterised Drizzle calls — no injection risk.
 
 5. **`document_number` sentinel values** (`'N/A'`, `'IDX-LAUNCH-2026'`). The document-number pill logic must handle these gracefully: if `document_number` equals `'N/A'` or matches the pattern `/^[A-Z]+-[A-Z]+-\d{4}$/` (all-caps sentinel), omit the number from the pill and show only the `document_type`. Alternatively, show no pill at all for these rows — implementer's call, either is acceptable.
 

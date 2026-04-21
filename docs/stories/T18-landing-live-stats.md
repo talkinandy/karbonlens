@@ -2,7 +2,7 @@
 id: T18
 title: Landing page with live stats
 phase: 3
-status: draft
+status: audited
 blocked_by: [T11, T14]
 blocks: [T23]
 owner: ""
@@ -73,9 +73,11 @@ export type LandingStats = {
 
 Implementation details:
 
-- Execute **two** Drizzle queries in parallel (`Promise.all`) to minimise latency:
+- Execute **three to five** Drizzle queries in parallel (`Promise.all`) to minimise latency. The minimum required set is:
   1. Projects + scores + regulatory + alerts query (one CTE or joined query against `projects`, `project_scores`, `regulatory_events`, `satellite_alerts`).
   2. IDXCarbon query: `SELECT * FROM idx_monthly_snapshots ORDER BY period_month DESC LIMIT 2` (two rows to compute MoM delta). Also pulls `MAX(scraped_at)`.
+  3. Featured projects query: fetch slug, nameCanonical, developer, province, projectType, latestIntegrityScore, and registryNames for `FEATURED_SLUGS` (see §3.2).
+  Additional queries (e.g., a separate timestamp query for `registriesLastSynced` / `satelliteLastIngested`) may be added if the implementer finds it cleaner to separate concerns, keeping the total at no more than 5 parallel queries.
 - Drop to `sql` tag for `PERCENTILE_CONT` and any aggregates Drizzle cannot express natively.
 - Use `COALESCE(SUM(total_vcus_issued), 0)` and `COALESCE(SUM(total_vcus_available), 0)` — the generated column `total_vcus_available` cannot be summed via Drizzle's column reference; use `sql\`COALESCE(SUM(total_vcus_issued - total_vcus_retired), 0)\`` instead.
 - `momDeltaPct`: `((rows[0].avgPriceIdr - rows[1].avgPriceIdr) / rows[1].avgPriceIdr) * 100`, rounded to one decimal. Set to `null` if either value is `null` or if fewer than 2 rows exist.
@@ -101,6 +103,14 @@ function formatPeriod(d: string): string { ... }
 ```
 
 #### 3.2 Updated landing page — `app/(public)/page.tsx`
+
+**T03 static-number audit (required pre-implementation step):** before editing `app/(public)/page.tsx`, run:
+
+```bash
+grep -n "[0-9]" app/\(public\)/page.tsx
+```
+
+For every inline static number found in the JSX (e.g., `"214"`, `"1,842"`, `"47"`, `"Rp 4.7B"`), replace with the appropriate `{stats.*}` template variable (e.g., `{stats.projectCount}`, `{stats.gfwAlerts90d}`, `{stats.regulatoryEventCount}`, `{stats.latestValueIdr}`). Do not leave any hardcoded numbers in the rendered hero or stat row — they will diverge from DB state immediately after launch.
 
 Replace the static stat cards with live values. The page must declare:
 
@@ -132,7 +142,17 @@ Each card uses the existing `kl-card`, `kl-stat-label`, `kl-stat-value`, and `kl
 
 The stat row grid (`display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))`) accommodates the expanded card count without layout changes.
 
-The existing hero copy (headline, subtitle paragraph) and `<SignInButton>` placement are preserved exactly as-is from T05.
+**Hero CTA — conditional on auth state:** replace the unconditional `<SignInButton>` render from T05 with a conditional block:
+
+```tsx
+{session?.user ? (
+  <Link href="/projects">Open dashboard →</Link>
+) : (
+  <SignInButton />
+)}
+```
+
+Authenticated users arriving at `/` (e.g., bookmarking the root URL) see a direct link to `/projects` rather than a dead-end hero with no call to action. The `<Link>` uses the same visual treatment as the `<SignInButton>` (existing button/pill styles from T03). The `showSignIn` prop passed to `HeroSection.tsx` (§3.3) becomes `session` (the full session object or `null`), so `HeroSection` can render either branch without the page having to decide which element to pass.
 
 **Featured projects section** — replace `mockProjects.slice(0, 3)` with a static list of the three canonical public slugs. Create a small query in `getLandingStats` (or a separate helper, implementer's choice) that fetches only these three projects:
 
@@ -142,9 +162,22 @@ const FEATURED_SLUGS = ['katingan-peatland', 'sumatra-merang-peat', 'rimba-raya'
 
 For each project, fetch: `slug`, `nameCanonical`, `developer`, `province`, `projectType`, the latest `integrityScore` from `project_scores` (LEFT JOIN on `score_date = CURRENT_DATE`), and `registryNames` (aggregated from `registries`). Shape this into a `FeaturedProject[]` array.
 
-Each card links to `/projects/{slug}` via `<Link>`. Show: registry names as the section label, project name, developer + province subtitle, integrity score, and the first registry name as "Primary registry". The `kl-pill` status badge is omitted from the landing — it would require a raw Verra string which is too noisy for a marketing surface.
+Each card links to `/projects/{slug}` via `<Link>`. Show: registry names as the section label, project name, developer + province subtitle, integrity score badge, and the first registry name as "Primary registry" cross-reference. The `kl-pill` status badge is omitted from the landing — it would require a raw Verra string which is too noisy for a marketing surface.
 
-**Remove the mock import** — delete `import { mockProjects } from "@/lib/mock-data"` from `app/(public)/page.tsx`. The `mockProjects` export in `lib/mock-data.ts` may be deleted by T18 **only if** T11 has already landed and removed the last other consumer of that export. If T11 has not landed when T18 is implemented, leave `mockProjects` in `lib/mock-data.ts` (the export is harmless). Add a comment: `// mockProjects no longer used by landing (T18). Safe to delete when T11 lands.`
+**`totalVcusAvailable` is intentionally omitted from the hero-variant `FeaturedProject` card.** Rationale: the landing is an analyst-credibility surface, not a marketplace. Available-credit volume is a commercial metric that risks misleading casual visitors (large numbers imply liquidity that the product does not guarantee). The integrity score badge achieves the same "signal of quality" goal without financial implication. If Andy wants to surface availability figures here in v0.2, add `totalVcusAvailable` to the `FeaturedProject` type and card at that time.
+
+**Remove the mock import** — delete `import { mockProjects } from "@/lib/mock-data"` from `app/(public)/page.tsx`.
+
+Before deleting the `mockProjects` export from `lib/mock-data.ts`, the implementer **must** run the following grep gate:
+
+```bash
+grep -rn "mockProjects\|PUBLIC_PROJECT_SLUGS" app/ components/ lib/ --include="*.ts" --include="*.tsx"
+```
+
+Decision rules:
+- If `mockProjects` has **zero** matches outside `lib/mock-data.ts` itself → delete the `mockProjects` export from `lib/mock-data.ts`.
+- If `mockProjects` still has consumers (e.g., T11 has not yet landed) → do **not** delete. Add the comment `// mockProjects no longer used by landing (T18). Safe to delete when T11 lands.` at the export site and record remaining consumers in the implementation report.
+- For `PUBLIC_PROJECT_SLUGS` (a `ReadonlySet` derived from `mockProjects` in `lib/mock-data.ts`): check separately whether any file in `app/` or `components/` imports it. T05's middleware has its own hardcoded slug allowlist and does **not** import from `mock-data.ts`. If no consumer remains outside `lib/mock-data.ts`, the `PUBLIC_PROJECT_SLUGS` export may also be deleted alongside `mockProjects`. If consumers exist, retain it and log in the implementation report.
 
 #### 3.3 Component breakdown
 
@@ -171,7 +204,7 @@ Last synced: …    Last ingested: …     Last scraped: …
 
 Timestamps formatted as relative time ("3 days ago", "2 hours ago") using a simple local helper (`formatRelative`) — no external library. Fall back to "—" if null.
 
-**`components/landing/HeroSection.tsx`** — wraps the `<header>` with headline, subtitle, and `<SignInButton>`. Receives `showSignIn: boolean` (derived from `!session?.user`). Keeps the existing copy verbatim.
+**`components/landing/HeroSection.tsx`** — wraps the `<header>` with headline, subtitle, and the auth-conditional CTA. Receives `session: Session | null` (the full NextAuth session). Renders `<Link href="/projects">Open dashboard →</Link>` when `session?.user` is truthy; otherwise renders `<SignInButton>`. Keeps the existing headline and subtitle copy verbatim.
 
 #### 3.4 Cache strategy documentation
 
@@ -245,13 +278,14 @@ Then at least 1 match is found
  And none of the timestamp displays shows an error or stack trace
 ```
 
-**AC-6: Signed-in user stays on landing (no redirect)**
+**AC-6: Signed-in user stays on landing with dashboard CTA (no redirect)**
 ```
 Given a user has a valid session cookie
 When curl -b <session-cookie> -I https://karbonlens.netlify.app/
 Then the HTTP status is 200
  And the Location header is absent
  And the SignInButton is absent from the HTML (button hidden for authenticated users)
+ And the HTML contains a link with href="/projects" and text matching "Open dashboard"
 ```
 
 **AC-7: TypeScript and build pass**
@@ -352,9 +386,12 @@ T18 must not modify:
 ## 8. Definition of done
 
 - [ ] All 8 acceptance criteria pass (AC-1, AC-6 via `curl -I`; AC-2 to AC-5 via `curl | grep`; AC-7 via CLI; AC-8 simulated locally).
+- [ ] Pre-implementation grep gate run: `grep -rn "mockProjects\|PUBLIC_PROJECT_SLUGS" app/ components/ lib/ --include="*.ts" --include="*.tsx"` — result documented in implementation report.
 - [ ] `app/(public)/page.tsx` imports nothing from `lib/mock-data` (import line deleted).
+- [ ] No inline static numbers remain in hero/stat-row JSX (T03 static-number audit completed).
 - [ ] `export const revalidate = 3600` is present in `app/(public)/page.tsx`.
 - [ ] `lib/queries/landing-stats.ts` exists with the `getLandingStats()` export and cache-contract comment.
+- [ ] `HeroSection.tsx` renders `<Link href="/projects">Open dashboard →</Link>` for authenticated users and `<SignInButton>` for unauthenticated users (conditional CTA verified via AC-6).
 - [ ] All four `components/landing/*.tsx` files exist and are pure server components (no `'use client'`).
 - [ ] `npx tsc --noEmit` exits 0.
 - [ ] `npm run build` exits 0; build log shows `/` as ISR with revalidate=3600.
