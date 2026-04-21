@@ -21,7 +21,7 @@ Tasks are numbered for referencing, not for strict ordering. Parallel tasks are 
 
 | # | Task | Blocked by | Effort | Status |
 |---|---|---|---|---|
-| T01 | VPS foundation: PostGIS, users, backups | — | 2h | todo |
+| T01 | VPS foundation: PostGIS, users, backups | — | 2h | done |
 | T02 | Schema migration 001 (initial) | T01 | 1h | todo |
 | T03 | Next.js monorepo bootstrap + Netlify deploy | — | 3h | done |
 | T04 | Drizzle schema + DB client + env plumbing | T02, T03 | 2h | todo |
