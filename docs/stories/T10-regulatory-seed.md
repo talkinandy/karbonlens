@@ -2,7 +2,7 @@
 id: T10
 title: Seed regulatory events manually
 phase: 2
-status: draft
+status: audited
 blocked_by: [T02]
 blocks: [T15]
 owner: agent
@@ -48,7 +48,7 @@ The `document_number` column has no UNIQUE constraint in the schema (different m
    );
    ```
 
-   For the one row where `document_number = 'N/A'` (IDXCarbon launch day), the dedupe key is `(document_number, title)` instead of `(document_number, ministry)` — explicitly noted in a SQL comment.
+   For rows where `document_number` is a sentinel value (`'N/A'` for Row 5 IDXCarbon launch day, `'IDX-LAUNCH-2026'` for Row 10 forecast), the dedupe key switches to `(document_number, title, event_date)` instead of `(document_number, ministry)` — explicitly noted in a SQL comment on each row. Using a unique identifiable sentinel (not bare `'TBD'`) makes the row recognisable and prevents false matches if a second TBD-style row is ever added. When the real document number is known later, update via a new seed file (`regulatory_events_v2.sql`) or a manual `UPDATE`.
 
 2. **The 10 seed events.** Each row includes bilingual summaries (1–3 sentences each), `importance`, `tags[]`, `document_url` (NULL if no canonical public URL; see §7), and `is_upcoming`.
 
@@ -63,7 +63,7 @@ The `document_number` column has no UNIQUE constraint in the schema (different m
    | 7 | 2025-03-15 | Kementerian LH | Kepmen | 20/2025 | medium | FALSE |
    | 8 | 2025-04-22 | Presidential | Perpres | 110/2025 | critical | FALSE |
    | 9 | 2026-01-14 | Kemenhut | Permenhut | 6/2026 | critical | FALSE |
-   | 10 | 2026-07-01 | IDX | Launch | TBD | high | TRUE |
+   | 10 | 2026-07-01 | IDX | Launch | IDX-LAUNCH-2026 | high | TRUE |
 
    Full per-row detail (all values to be written verbatim into the SQL):
 
@@ -131,7 +131,8 @@ The `document_number` column has no UNIQUE constraint in the schema (different m
    - summary_id: `Mencabut moratorium empat tahun atas persetujuan kredit karbon kehutanan baru (berlaku sejak awal 2022), memungkinkan kembali proyek REDD+, gambut, dan konservasi untuk mendapatkan sertifikasi dan diperdagangkan di IDXCarbon. Dianggap sebagai pembukaan regulasi yang paling dibutuhkan untuk mengembangkan pasar karbon Indonesia pada 2026.`
 
    **Row 10 — IDXCarbon Full-Scale Launch (upcoming)**
-   - event_date: `2026-07-01` (forecast; use first of month as placeholder)
+   - event_date: `2026-07-01` (forecast placeholder — SQL DATE cannot hold "mid-2026"; use first of month; SQL comment: `/* forecast; update when announced */`)
+   - document_number: `'IDX-LAUNCH-2026'` (unique identifiable sentinel; replace with real number when announced; dedupe key is `(document_number, title, event_date)`)
    - title: `IDXCarbon Peluncuran Skala Penuh — Peserta Internasional`
    - tags: `ARRAY['idxcarbon','international','launch','upcoming']`
    - document_url: NULL
@@ -254,12 +255,25 @@ Then  every row has coherent prose — no Lorem Ipsum, no placeholder text, no S
 - **Blocks:** T15 (regulatory timeline screen reads from this table).
 - **File owned by this story:** `scrapers/seed/regulatory_events_v1.sql` — no other file may be created or modified.
 - **Parallel safety:** this story touches only the seed directory; no conflict risk with T06–T09.
+- **Tag vocabulary (cross-phase decision, locked):** T10 uses ad-hoc tags (the 18 proposed in §3 are the working set). T15 **must** build its filter UI dynamically via `SELECT DISTINCT unnest(tags) FROM regulatory_events` — no hardcoded filter list. This ensures any tags added via future seed files automatically appear in the T15 filter without a code change. T15 implementer: do not hardcode tag strings.
 
 ## 7. Edge cases & failure modes
 
-- **`document_number` collisions across ministries.** Two different regulations can share a number (e.g., two Perpres from different years). The dedupe predicate uses `(document_number, ministry)` as the compound key. Row #5 (IDXCarbon launch day) has `document_number = 'N/A'`; its dedupe key is `(document_number, title)` to avoid matching the forecast Row #10 (`document_number = 'TBD'`). Both are noted with inline SQL comments.
+- **`document_number` collisions across ministries.** Two different regulations can share a number (e.g., two Perpres from different years). The dedupe predicate uses `(document_number, ministry)` as the compound key. Row #5 (IDXCarbon launch day) has `document_number = 'N/A'`; Row #10 (forecast) has `document_number = 'IDX-LAUNCH-2026'`. Both sentinel rows switch their dedupe key to `(document_number, title, event_date)`. Each is annotated with an inline SQL comment explaining the sentinel value and the corrective action when the real number is known.
 
-- **Future-dated events.** Row #10 carries `is_upcoming = TRUE` and `event_date = '2026-07-01'` as a forecast placeholder. If the event date shifts, Andy updates the seed file and re-runs (idempotent update is not implemented in v0.1 — the row's date will only change if it is manually deleted first; note in §9).
+- **Future-dated events and is_upcoming semantics.** `is_upcoming = TRUE` means "not yet in effect as of the seed date; `event_date` may be forecast/approximate." Row #10 carries `is_upcoming = TRUE` and `event_date = '2026-07-01'` as a forecast placeholder (SQL DATE cannot hold "mid-2026"; first-of-month convention applies; annotated `/* forecast; update when announced */`). If the event date shifts, Andy deletes the row and re-runs the seed (idempotent insert-only; see OQ-4). T15 will render `is_upcoming = TRUE` rows with an "Upcoming" visual treatment and surface the "Exact date TBD" caveat from the row's `summary_en`/`summary_id`.
+
+- **`importance` value validation.** The `importance` column is `TEXT` with no `CHECK` constraint in the schema (known limitation; adding a constraint is out of scope for T10). To catch typos at apply time the seed file includes a self-validating assertion after all INSERTs:
+  ```sql
+  DO $$ BEGIN
+    ASSERT (
+      SELECT COUNT(*) FROM regulatory_events
+      WHERE importance NOT IN ('critical','high','medium','low')
+    ) = 0,
+    'T10 seed: importance value outside allowed set (critical|high|medium|low)';
+  END $$;
+  ```
+  If any row carries a misspelled importance value the entire transaction rolls back (because `--single-transaction` is used).
 
 - **Missing `document_url`.** Several older Perpres and newer Permenhut lack a canonical public URL at authoring time. These fields are inserted as `NULL`. A comment in the SQL flags each NULL URL for Andy's follow-up: `-- URL: not found at time of authoring; check peraturan.bpk.go.id`.
 
@@ -278,11 +292,11 @@ Then  every row has coherent prose — no Lorem Ipsum, no placeholder text, no S
 - [ ] CHANGELOG entry added under `[Unreleased]`: `T10 — Seed regulatory events manually`.
 - [ ] TASKS.md status flipped from `todo` → `done` for T10.
 - [ ] Story frontmatter `status` set to `done`.
-- [ ] Andy has reviewed and confirmed the 10 events and bilingual summaries before merge (§9).
+- [ ] **Andy reviews the seed SQL content (each row's facts: document numbers, dates, titles, summaries) at code-audit stage, not merge stage.** The code-auditor's report must include a fact-check section listing all 10 rows and explicitly requesting Andy's confirmation on each. The implementer writes SQL against the draft list; the code-auditor re-verifies facts and flags corrections; a fix round is applied if needed before merge.
 
 ## 9. Open questions
 
-1. **Confirm the exact 10 events.** The list in §3 is a plausible starting set derived from Andy's domain notes and `docs/TASKS.md` T10 context (design brief Screen 5). Andy should confirm: add, remove, or reorder any events before the implementer writes the final SQL. If the design brief Screen 5 lists a different set, that list takes precedence and this spec should be updated before implementation begins.
+1. **[OQ-1 — Andy fact-check at code-audit stage] Confirm/correct the 10-row draft list.** The list in §3 is a working draft derived from Andy's domain notes and `docs/TASKS.md` T10 context (design brief Screen 5). **Implementation proceeds on this draft; Andy's confirmation is not required before the SQL file is written.** At code-audit stage the code-auditor will produce a fact-check section covering every row (document number, date, title, bilingual summaries). Andy: please confirm or correct at that point — propose adding or removing rows as needed. If the design brief Screen 5 lists a different set of events, those corrections are applied in a code-audit fix round before merge.
 
 2. **Upcoming event semantics.** Should `is_upcoming = TRUE` apply only to events with a strictly future `event_date`, or also to regulations that have been signed/published but whose operational provisions have not yet taken effect? For v0.1 the spec uses strictly future dates only. If Andy wants "enacted but not yet in force" rows to be flagged upcoming, the implementer should add a second boolean column (out of scope for T10; note for v0.2).
 
