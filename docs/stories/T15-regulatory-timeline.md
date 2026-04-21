@@ -2,7 +2,7 @@
 id: T15
 title: Regulatory timeline screen with real data
 phase: 3
-status: audited
+status: done
 blocked_by: [T04, T10]
 blocks: []
 owner: agent
@@ -91,7 +91,7 @@ And the Location header redirects toward the sign-in flow
 Given a signed-in user
 When they navigate to /regulatory
 Then the response status is 200
-And the page renders exactly 10 event cards (all seeded events)
+And the page renders exactly 8 event cards (post-T10 fact-check)
 ```
 
 **AC-3: Importance filter**
@@ -107,7 +107,7 @@ And the count is >= 3 (matching T10 seed: Perpres 98/2021, POJK 14/2023, Perpres
 Given a signed-in user
 When they navigate to /regulatory?ministry=Kemenhut
 Then only cards whose ministry column = 'Kemenhut' are shown
-And the count is >= 2 (Permenhut 7/2024 and Permenhut 6/2026)
+And the count is >= 1 (only Permenhut 6/2026 remains; Permenhut 7/2024 removed in T10 fact-check b4d35e8)
 ```
 
 **AC-5: Tag filter**
@@ -115,7 +115,7 @@ And the count is >= 2 (Permenhut 7/2024 and Permenhut 6/2026)
 Given a signed-in user
 When they navigate to /regulatory?tag=forestry
 Then only cards whose tags array contains 'forestry' are shown
-And the count is >= 2 (Permenhut 7/2024 tags include 'forestry'; Permenhut 6/2026 tags include 'forestry')
+And the count is >= 1 (only Permenhut 6/2026 remains; Permenhut 7/2024 removed in T10 fact-check b4d35e8)
 ```
 
 **AC-6: Language toggle — Indonesian**
