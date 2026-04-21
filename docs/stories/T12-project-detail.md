@@ -2,7 +2,7 @@
 id: T12
 title: Project detail screen with real data
 phase: 3
-status: audited
+status: done
 blocked_by: [T04, T06, T07, T09]
 blocks: [T13]
 owner: unassigned
