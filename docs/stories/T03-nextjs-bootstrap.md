@@ -2,7 +2,7 @@
 id: T03
 title: Next.js 15 monorepo bootstrap + Netlify deploy
 phase: 1
-status: audited
+status: done
 blocked_by: []
 blocks: [T04, T11, T12, T13, T14, T15, T16, T17, T18, T22, T23]
 owner: tbd
