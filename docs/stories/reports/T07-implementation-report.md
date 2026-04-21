@@ -313,3 +313,88 @@ For the auditor:
 2. Review the three commits on `feature/T07-gfw-alerts-scraper`.
 3. Scrutinize the items in §7.
 4. Raise issues or greenlight Phase B.
+
+---
+
+## T07 follow-ups
+
+Appended 2026-04-19 after adversarial code audit + fix round 1.
+
+### Fix round 1 — commit `1440129`
+
+Audit verdict went FAIL -> PASS after a single 2-location surgical fix
+plus the F-2 pre-emption:
+
+1. **B-1 (blocking) — `ON CONFLICT ON CONSTRAINT` replaced with
+   column-list form.** Postgres does NOT treat expression-based unique
+   indexes as constraints for `ON CONFLICT ON CONSTRAINT <name>`; live
+   repro confirmed it raises `constraint "uq_sat_project_date_loc" ...
+   does not exist`. Both upserts (satellite_alerts at `fetch.py:~523`
+   and notifications at `fetch.py:~574`) now use
+   `ON CONFLICT (<cols-and-expressions>) DO NOTHING` with the exact
+   expressions (paren-wrapped) from migration 002. Dedupe re-verified
+   live: second insert with identical key returns `None`; EXPLAIN on
+   the notifications upsert reports
+   `Conflict Arbiter Indexes: uq_notifications_dedupe`.
+
+2. **F-2 (high, pre-empted) — stale-geostore fallback.** A new
+   `GfwGeostoreNotFound` sentinel is raised by `_get_with_retry` only
+   when the caller opts in via `raise_on_404=True` (currently only
+   `query_alerts`). In `process_project`, the catch block clears
+   `projects.gfw_geostore_id = NULL`, re-calls `register_geostore`,
+   persists the fresh id, and retries `query_alerts` once. If the
+   retry still 404s, logs `project_skipped_reregister_still_404` and
+   continues to the next project. This covers the D-2 scenario where
+   one or more of the 55 cached anonymous-POST geostore ids rejects
+   under Andy's real key — the scraper self-heals on the next run.
+
+### Phase B live-verification checklist (what Andy runs post-GFW-key)
+
+Once Andy adds a real `GFW_API_KEY` to
+`/root/.openclaw/workspace/karbonlens/.env.local`:
+
+- [ ] Smoke test one cached-geostore project:
+      `python -m scrapers.gfw.fetch --project-id <any-of-the-55>` —
+      expect `gfw_query_first_row_keys` log + alerts inserted (or a
+      legitimate zero-alerts-for-period result with no error).
+- [ ] Smoke test one uncached-geostore project (pick one of the 9
+      projects with `gfw_geostore_id IS NULL`) — expect
+      `project_geostore_registered` + alerts flow.
+- [ ] Full run: `python -m scrapers.gfw.fetch` — verify:
+      - AC-3: `SELECT COUNT(*) FROM projects WHERE gfw_geostore_id IS
+        NOT NULL;` = 64.
+      - AC-4: `SELECT COUNT(*) FROM satellite_alerts;` > 50.
+      - AC-5: `SELECT COUNT(*) FROM satellite_alerts sa JOIN projects
+        p ON p.id=sa.project_id WHERE p.slug LIKE 'katingan%';` > 0.
+      - AC-6: re-run dedupe — satellite_alerts count unchanged.
+      - AC-7: notifications fan-out — one row per opted-in user per
+        project with new alerts.
+- [ ] If any of the 55 stale ids trip the new fallback, confirm the
+      `project_geostore_stale_reregister` log fires and the row is
+      self-healed.
+- [ ] If `gfw_query_first_row_keys` shows column names that differ
+      from the spec (AC-7 OQ-2 in the story), tighten
+      `parse_alert_row` and commit a follow-up.
+
+### D-2 accepted as-is
+
+55 of 64 projects retain their anonymous-POST `gfw_geostore_id`. Audit
+D-2 CONDITIONAL ACCEPT verdict stands; the F-2 fallback provides the
+required mitigation so no manual `UPDATE projects SET
+gfw_geostore_id = NULL` is needed even if some ids turn out stale.
+
+### Open punchlist (non-blocking, post-merge)
+
+- **F-3 (MEDIUM):** 401 path exits 2 from inside the loop, skipping
+  the `run_complete` log line. Deferred — the `gfw_auth_failed` error
+  line is sufficient ops signal for v0.1. Tighten in v0.2.
+- **F-5 (LOW):** placeholder guard list is narrow (catches the
+  `.env.example` shape; other common placeholders like
+  `YOUR_KEY_HERE` would fire real calls). Tighten to a shape regex
+  post-Phase-B.
+- **F-6 (LOW):** `register_geostore` response-shape probe doesn't
+  handle `{"data": [...]}`. Phase B will reveal the actual shape;
+  tighten once confirmed.
+- **F-7 (LOW):** `_map_confidence` silently downgrades string labels
+  (e.g., `"high"`) to `"low"`. Tighten once GFW's actual payload
+  shape is known.
