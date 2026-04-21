@@ -250,4 +250,48 @@ Route (app)
 
 ---
 
+## T12 follow-ups
+
+Post-audit + post-merge observations, recorded at STAGE-5 (`feature/v0.1-impl`
+integration):
+
+- **B-2 — middleware → proxy.ts deprecation:** RESOLVED by T05.1 upstream.
+  T12's first commit `3b3de59` set `PUBLIC_PROJECT_SLUGS` to the three real DB
+  slugs inside `middleware.ts`. T05.1 subsequently (and independently) renamed
+  `middleware.ts` → `proxy.ts` and applied the same three slugs. At rebase the
+  duplicate commit was absorbed via `git rebase --skip` — T05.1 already carries
+  the public-slug change on the integration branch, so the net behaviour is
+  preserved while the file naming follows T05.1.
+
+- **C-1 — hardcoded `"v1"` in `ScoreCard.tsx:102`:** should import
+  `METHODOLOGY_VERSION` from `lib/score.ts` so the methodology-version caption
+  stays in sync with the scorer constant instead of a copy-pasted literal.
+
+- **C-2 — optional `error.tsx` boundary:** the route currently relies on the
+  global error boundary. A route-scoped `app/(app)/projects/[slug]/error.tsx`
+  would surface a friendlier empty state when the server query throws
+  (network/database), complementing the existing `not-found.tsx`.
+
+- **C-3 — `ProjectsTable.tsx` could consume `badgePillClass`:** now that the
+  `lib/display/status.ts` union exposes `badgePillClass` (see below), T11's
+  table can drop its inline `kl-pill--*` mapping and call the shared helper —
+  keeping all status-badge colour decisions in one file.
+
+- **`status.ts` union applied at merge time:** the rebase against
+  `feature/v0.1-impl` hit an add/add conflict on `lib/display/status.ts` (T11
+  had landed its version first). The conflict was resolved as a union: T11's
+  `displayStatus` (with canonical-enum + raw Verra-string fallback branches)
+  and the `DisplayStatus` type are kept as the primary export, and T12's
+  `badgePillClass(badge: DisplayStatus['badge']) → string` helper is appended.
+  Post-merge the file exports **all three**: `displayStatus`, the
+  `DisplayStatus` type, and `badgePillClass`.
+
+- **VCS/1899 (SMPP) verified scraper-correct:** the 43 issuances and 232
+  alerts for Sumatra Merang Peatland Project reflect what the scraper ingested
+  into the database; no hand-authored overrides. Spot-check against the Verra
+  public registry (`registry.verra.org/app/projectDetail/VCS/1899`) confirmed
+  alignment within the tolerance band for T12 v0.1.
+
+---
+
 *End of T12 implementation report.*
