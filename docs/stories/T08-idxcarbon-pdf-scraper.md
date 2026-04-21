@@ -2,7 +2,7 @@
 id: T08
 title: IDXCarbon monthly PDF scraper
 phase: 2
-status: audited
+status: done
 blocked_by: [T02]
 blocks: [T14, T18, T19]
 owner: agent
