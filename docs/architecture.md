@@ -306,6 +306,7 @@ CREATE TABLE project_match_queue (
 CREATE TABLE users (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email          TEXT UNIQUE NOT NULL,
+  email_verified TIMESTAMPTZ,          -- required by @auth/drizzle-adapter v5 (Drizzle field: emailVerified)
   name           TEXT,
   image          TEXT,
   organization   TEXT,
