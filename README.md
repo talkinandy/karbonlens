@@ -5,29 +5,61 @@
 
 A carbon-market intelligence terminal reconciling SRN-PPI, IDXCarbon, Verra, Gold Standard, Sentinel (RADD / VIIRS / NDVI), and JDIH into a single workspace for developers, corporates, banks, and regulators.
 
-## Run it
+## Quickstart (v0.1 — Next.js app)
 
-`index.html` is the entry. Serve the folder — no build step:
+Prerequisites: Node.js 20+ (tested on 22.x), npm 10+.
 
 ```sh
+# 1. Install dependencies
+npm install
+
+# 2. Copy env template and fill in real values
+cp .env.example .env.local
+# edit .env.local — DATABASE_URL and NEXTAUTH_SECRET are required; the rest
+# can stay as CHANGE_ME until T04/T05 wire them in.
+
+# 3. Start the dev server (Turbopack)
+npm run dev
+# open http://localhost:3000
+
+# 4. Production build (typecheck + compile)
+npm run build
+npm run start
+```
+
+### Routes (T03 scaffold, mock data)
+
+| Route                                  | Source                                    |
+| -------------------------------------- | ----------------------------------------- |
+| `/`                                    | `app/(public)/page.tsx` — landing         |
+| `/projects`                            | `app/(app)/projects/page.tsx`             |
+| `/projects/katingan-peatland`          | `app/(app)/projects/[slug]/page.tsx`      |
+| `/prices`                              | `app/(app)/prices/page.tsx`               |
+| `/regulatory`                          | `app/(app)/regulatory/page.tsx`           |
+| `/alerts`                              | `app/(app)/alerts/page.tsx`               |
+
+All pages currently read from `lib/mock-data.ts`. T11+ swaps the imports for Drizzle queries.
+
+## Legacy static prototype
+
+The original static HTML/JSX prototype lives under `legacy/prototype/` for design reference. It is not wired into the Next.js app. To view it:
+
+```sh
+cd legacy/prototype
 python -m http.server 8000
 # open http://localhost:8000
 ```
 
-Or open `index.html` directly in a modern browser. Fonts load from Google Fonts; React + Babel-standalone from unpkg.
-
 ## Screens
 
-Hash-based routing.
-
-| URL              | Screen |
-| ---------------- | ------ |
-| `#/`             | Landing — editorial split-hero, live satellite monitor, ticker, pipelines, featured projects, roles, methodology, closer |
-| `#/projects`     | Registry table — 214 indexed Indonesian carbon projects with filters |
-| `#/projects/:id` | Dossier — satellite MRV, score breakdown, VCU timeline, news & signals |
-| `#/prices`       | IDXCarbon snapshot — multi-series price chart, transactions table |
-| `#/regulatory`   | Policy timeline — Permenhut 6/2026, Perpres 110/2025, POJK, Kepmen |
-| `#/alerts`       | Inbox — reversal, price, regulatory, news, retirement, issuance |
+| URL                            | Screen |
+| ------------------------------ | ------ |
+| `/`                            | Landing — editorial hero, live satellite monitor (T13), featured projects |
+| `/projects`                    | Registry table — Indonesian carbon projects with filters |
+| `/projects/:slug`              | Dossier — satellite MRV, score breakdown, VCU timeline, news & signals |
+| `/prices`                      | IDXCarbon snapshot — multi-series price chart, transactions table |
+| `/regulatory`                  | Policy timeline — Permenhut 6/2026, Perpres 110/2025, POJK, Kepmen |
+| `/alerts`                      | Inbox — reversal, price, regulatory, news, retirement, issuance |
 
 ## Design
 
@@ -47,26 +79,24 @@ Restraint-first, editorial. No gradients, no drop-shadows, no emoji in product U
 
 **Elevation via 0.5px hairlines** (no shadows). Radii 8/12/16.
 
-## Satellite map
-
-`src/SatelliteMap.jsx` is the visual anchor, reused on landing hero and project detail. Togglable layers — base (True color / NDVI / Sentinel-1), overlays (boundary, graticule, RADD, GFW loss, VIIRS, community). Opacity slider, click any alert for a callout, pulsing RADD dots.
-
-## Files
+## Repository layout
 
 ```
-index.html         entry
-styles.css         1100 lines — source of truth for all styling
-data.js            window.KL_DATA — mock dataset
-src/
-├─ shared.jsx      router hook, TopNav, helpers, Pill, ScoreBadge, Tag
-├─ SatelliteMap.jsx
-├─ Landing.jsx
-├─ Projects.jsx
-├─ ProjectDetail.jsx
-├─ Prices.jsx
-├─ Regulatory.jsx
-├─ Alerts.jsx
-└─ App.jsx         hash router
+app/                     Next.js 15 App Router
+  (public)/              public routes (landing)
+  (app)/                 authenticated routes (T05 adds middleware)
+  api/                   API routes (T04+)
+  globals.css            Tailwind v4 + design tokens from legacy/prototype
+  layout.tsx             root layout (html, body, fonts)
+components/              shared React components
+  site-nav.tsx
+  ui/                    design-system primitives (T11+)
+  map/                   MapLibre wrappers (T13)
+lib/
+  mock-data.ts           seeded UI data; deleted in T11+
+scrapers/                Python scrapers (T06+)
+legacy/prototype/        original static HTML/CSS/JSX prototype
+docs/                    PRD, architecture, story specs
 ```
 
 ## Bilingual
