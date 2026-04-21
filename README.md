@@ -3,107 +3,135 @@
 > Indonesia's carbon market, in one terminal.
 > *Pasar karbon Indonesia dalam satu layar.*
 
-A carbon-market intelligence terminal reconciling SRN-PPI, IDXCarbon, Verra, Gold Standard, Sentinel (RADD / VIIRS / NDVI), and JDIH into a single workspace for developers, corporates, banks, and regulators.
+## What is KarbonLens?
 
-## Quickstart (v0.1 — Next.js app)
+KarbonLens is a carbon-market intelligence terminal that reconciles SRN-PPI, IDXCarbon, Verra, Gold Standard, Sentinel (RADD / VIIRS / NDVI), and JDIH into a single workspace for developers, corporates, banks, and regulators tracking the Indonesian voluntary carbon market. It surfaces project integrity scores, satellite-based reversal alerts, IDXCarbon price history, and the regulatory timeline — all derived from public data sources, updated automatically.
 
-Prerequisites: Node.js 20+ (tested on 22.x), npm 10+.
+## Status
+
+**v0.1 Phase 1 of 4 complete (2026-04-21).** Foundation stories T01–T05 are merged into `feature/v0.1-impl`. Phase 2 (data pipelines) starts next.
+
+- Sprint overview and task statuses: [`docs/TASKS.md`](docs/TASKS.md)
+- What shipped in each story: [`CHANGELOG.md`](CHANGELOG.md)
+- Phase 1 retrospective: [`docs/retros/phase-1.md`](docs/retros/phase-1.md)
+
+## Quickstart (local dev)
+
+**Prerequisites:**
+- Node 22+, npm 10+
+- PostgreSQL 16 + PostGIS 3 (see [`docs/runbooks/vps-setup.md`](docs/runbooks/vps-setup.md) for the install procedure used on the Hetzner box)
+- Google OAuth credentials — optional for Phase-A workflows; required for full sign-in flow (see [`docs/runbooks/google-oauth-setup.md`](docs/runbooks/google-oauth-setup.md))
 
 ```sh
 # 1. Install dependencies
 npm install
 
-# 2. Copy env template and fill in real values
+# 2. Copy env template
 cp .env.example .env.local
-# edit .env.local — DATABASE_URL and NEXTAUTH_SECRET are required; the rest
-# can stay as CHANGE_ME until T04/T05 wire them in.
+# Edit .env.local:
+#   DATABASE_URL=postgresql://karbonlens:<password>@localhost:5432/karbonlens
+#   NEXTAUTH_SECRET=<openssl rand -base64 32>
+#   NEXTAUTH_URL=http://localhost:3000
+# GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are optional until you need sign-in
 
 # 3. Start the dev server (Turbopack)
 npm run dev
-# open http://localhost:3000
+# → http://localhost:3000
+# Note: on the Hetzner VPS, port 3000 is occupied by Gitea — use :3001 instead.
 
-# 4. Production build (typecheck + compile)
-npm run build
-npm run start
+# 4. Health check
+curl http://localhost:3000/api/health
+# → {"ok":true,"db":"connected"}
 ```
 
-### Routes (T03 scaffold, mock data)
+### Routes (Phase 1 — mock data, auth wired)
 
-| Route                                  | Source                                    |
-| -------------------------------------- | ----------------------------------------- |
-| `/`                                    | `app/(public)/page.tsx` — landing         |
-| `/projects`                            | `app/(app)/projects/page.tsx`             |
-| `/projects/katingan-peatland`          | `app/(app)/projects/[slug]/page.tsx`      |
-| `/prices`                              | `app/(app)/prices/page.tsx`               |
-| `/regulatory`                          | `app/(app)/regulatory/page.tsx`           |
-| `/alerts`                              | `app/(app)/alerts/page.tsx`               |
+| Route | Source |
+|---|---|
+| `/` | `app/(public)/page.tsx` — landing |
+| `/projects` | `app/(app)/projects/page.tsx` |
+| `/projects/katingan-peatland` | `app/(app)/projects/[slug]/page.tsx` |
+| `/prices` | `app/(app)/prices/page.tsx` |
+| `/regulatory` | `app/(app)/regulatory/page.tsx` |
+| `/alerts` | `app/(app)/alerts/page.tsx` |
 
-All pages currently read from `lib/mock-data.ts`. T11+ swaps the imports for Drizzle queries.
+All pages currently read from `lib/mock-data.ts`. T11+ swaps the imports for Drizzle queries against live Postgres.
 
-## Legacy static prototype
+## Architecture
 
-The original static HTML/JSX prototype lives under `legacy/prototype/` for design reference. It is not wired into the Next.js app. To view it:
+Full details: [`docs/architecture.md`](docs/architecture.md)
 
-```sh
-cd legacy/prototype
-python -m http.server 8000
-# open http://localhost:8000
+- **Frontend:** Next.js 16 App Router, deployed on Netlify (deploy deferred — see below)
+- **Styling:** Tailwind v4 CSS-first with design tokens in `app/globals.css`
+- **Database:** PostgreSQL 16 + PostGIS on Hetzner CX32 VPS, Drizzle ORM for TypeScript schema
+- **Auth:** NextAuth v5 with Google OAuth provider, sessions in Postgres via `@auth/drizzle-adapter`
+- **Scrapers:** Python 3.12 in `scrapers/`, managed with `uv`, scheduled via cron (T06+)
+- **Schema:** 15 tables in `scrapers/migrations/001_init.sql` — projects, registries, issuances, retirements, IDXCarbon snapshots, satellite alerts, regulatory events, scores, auth tables, notifications
+- **Score methodology:** weighted composite of validation recency, reversal risk, community flags, transparency (v1 weights in `lib/schema.ts` comments; computation added in T09)
+
+## Repo layout
+
+```
+app/                     Next.js App Router
+  (public)/              public routes (landing)
+  (app)/                 protected routes (projects, prices, regulatory, alerts)
+  api/                   API routes
+  globals.css            Tailwind v4 + design tokens
+  layout.tsx             root layout (owns <html>, <body>, fonts)
+components/              shared React components
+  site-nav.tsx
+  auth/                  SignInButton, UserMenu, SignOutButton, OnboardingModal
+  ui/                    design-system primitives
+  map/                   MapLibre wrappers (T13)
+lib/
+  db.ts                  Drizzle singleton client
+  schema.ts              Drizzle schema (TypeScript, mirrors migration 001)
+  auth.ts                NextAuth config
+  mock-data.ts           seeded UI data; replaced in T11+
+scrapers/
+  migrations/            SQL migration files (001_init.sql)
+  (T06+)                 Python scrapers
+docs/                    PRD, architecture, story specs, runbooks, retros
+legacy/prototype/        original static HTML/CSS/JSX prototype (reference only)
 ```
 
-## Screens
+See [`docs/architecture.md`](docs/architecture.md) §2 for the full annotated layout.
 
-| URL                            | Screen |
-| ------------------------------ | ------ |
-| `/`                            | Landing — editorial hero, live satellite monitor (T13), featured projects |
-| `/projects`                    | Registry table — Indonesian carbon projects with filters |
-| `/projects/:slug`              | Dossier — satellite MRV, score breakdown, VCU timeline, news & signals |
-| `/prices`                      | IDXCarbon snapshot — multi-series price chart, transactions table |
-| `/regulatory`                  | Policy timeline — Permenhut 6/2026, Perpres 110/2025, POJK, Kepmen |
-| `/alerts`                      | Inbox — reversal, price, regulatory, news, retirement, issuance |
+## How work is organised
+
+Stories flow through a pipeline:
+
+1. **Spec** — story written in `docs/stories/T0X-<slug>.md` with Gherkin ACs
+2. **Spec audit** — auditor agent reviews the spec for contract gaps, then spec is locked
+3. **Implementation** — implementer agent writes code in an isolated git worktree
+4. **Code audit** — auditor reviews the diff against the spec ACs
+5. **Merge** — merge commit to `feature/v0.1-impl` after audit PASS
+
+Full pipeline doc: [`docs/stories/README.md`](docs/stories/README.md) (if present); story specs and reports live under `docs/stories/`.
+
+## Deploy
+
+v0.1 runs **local-dev only** on the Hetzner VPS. Netlify deploy is deferred pending a Postgres-connectivity strategy decision: connecting Netlify to the self-hosted Postgres requires either Tailscale, a VPS-side proxy, or migrating to a managed Postgres provider. This is tracked as open question **OQ-1** in the T04 implementation report (`docs/stories/reports/T04-implementation-report.md`).
 
 ## Design
 
 Restraint-first, editorial. No gradients, no drop-shadows, no emoji in product UI.
 
-**Type**
-- `Instrument Serif` — display (hero H1, section H2s, stat values)
-- `IBM Plex Sans` — body
-- `IBM Plex Mono` — eyebrows, uppercase labels, tabular values, coordinates
+- **Type:** Instrument Serif (display) · IBM Plex Sans (body) · IBM Plex Mono (labels, tabular values)
+- **Palette:** Base `#FAFAF7` · Brand teal `#0F6E56` · Text `#1A1A1A` / `#5F5E5A`
+- **Elevation:** 0.5 px hairlines only (no shadows)
 
-**Palette**
-- Base: `#FAFAF7` cream · Surface: `#FFFFFF` · Surface-2: `#F1EFE8`
-- Text: `#1A1A1A` / `#5F5E5A` / `#888780`
-- Brand accent (teal): `#0F6E56`
-- Semantic: info `#185FA5`, warning `#854F0B`, danger `#A32D2D`
-- Satellite viewer dark: bg `#0F1411`, toolbar `#161B18`, accent `#4FB89C`
+Indonesian regulatory and place-name terms are kept verbatim: Permenhut, Perpres, POJK, Kepmen, Padiatapa, SRN-PPI, IDXCarbon, BPDLH, etc.
 
-**Elevation via 0.5px hairlines** (no shadows). Radii 8/12/16.
+## Legacy static prototype
 
-## Repository layout
+The original static HTML/JSX prototype lives under `legacy/prototype/` for design reference.
 
-```
-app/                     Next.js 15 App Router
-  (public)/              public routes (landing)
-  (app)/                 authenticated routes (T05 adds middleware)
-  api/                   API routes (T04+)
-  globals.css            Tailwind v4 + design tokens from legacy/prototype
-  layout.tsx             root layout (html, body, fonts)
-components/              shared React components
-  site-nav.tsx
-  ui/                    design-system primitives (T11+)
-  map/                   MapLibre wrappers (T13)
-lib/
-  mock-data.ts           seeded UI data; deleted in T11+
-scrapers/                Python scrapers (T06+)
-legacy/prototype/        original static HTML/CSS/JSX prototype
-docs/                    PRD, architecture, story specs
+```sh
+cd legacy/prototype && python -m http.server 8000
+# → http://localhost:8000
 ```
 
-## Bilingual
+## License / contact
 
-Indonesian regulatory and place-name terms are kept verbatim — never translated:
-Permenhut, Perpres, POJK, Kepmen, Padiatapa, Nesting, Mitra Pendamping, PBPH, Hutan Adat, Hutan Hak, SRN-PPI, SRUK, SPE-GRK, IDXCarbon, BPDLH.
-
-## License
-
-Prototype — internal use.
+Prototype — internal use. Contact: andy@fmg.co.id.
