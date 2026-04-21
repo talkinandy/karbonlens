@@ -1,11 +1,13 @@
 import { SiteNav } from "@/components/site-nav";
+import { UserMenu } from "@/components/auth/UserMenu";
 
 /**
  * Public route group layout — segment layout only.
  *
  * MUST NOT include <html> or <body>: those live in the root layout at
- * `app/layout.tsx`. This layout simply wraps public-facing pages with the
- * shared site nav.
+ * `app/layout.tsx`. This layout wraps public-facing pages with the shared
+ * site nav; T05 slots in the UserMenu (which renders a SignInButton for
+ * anonymous visitors and the user's avatar + sign-out when signed in).
  */
 export default function PublicLayout({
   children,
@@ -14,7 +16,7 @@ export default function PublicLayout({
 }) {
   return (
     <>
-      <SiteNav />
+      <SiteNav rightSlot={<UserMenu />} />
       {children}
     </>
   );
