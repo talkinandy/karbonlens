@@ -1,9 +1,12 @@
 import Link from "next/link";
 // TODO T11+: replace with db query
 import { mockProjects } from "@/lib/mock-data";
+import { auth } from "@/lib/auth";
+import { SignInButton } from "@/components/auth/SignInButton";
 
-export default function LandingPage() {
+export default async function LandingPage() {
   const featured = mockProjects.slice(0, 3);
+  const session = await auth();
 
   return (
     <main className="kl-page">
@@ -17,6 +20,11 @@ export default function LandingPage() {
             Satellite MRV, prices, reversal alerts, and regulatory tracking —
             unified across Verra, SRN-PPI, Gold Standard, and IDXCarbon.
           </p>
+          {session?.user ? null : (
+            <div style={{ marginTop: 20 }}>
+              <SignInButton />
+            </div>
+          )}
         </div>
       </header>
 
