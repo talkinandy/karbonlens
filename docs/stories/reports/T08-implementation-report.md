@@ -218,3 +218,37 @@ ls /var/lib/karbonlens/pdf-archive/*.pdf | wc -l  # 10
    modifications to `scrapers/pyproject.toml`, `lib/`, `app/`,
    `middleware.ts`, `CHANGELOG.md`, `TASKS.md`, other stories, or
    migrations.
+
+## T08 follow-ups (code audit non-blockers)
+
+The code audit (2026-04-19) returned CONDITIONAL PASS → PASS after the
+stub reconciliation fix (commit `6d9ae60`). The four non-blocking items
+remain as Phase-2 tracking:
+
+1. **AC-2 environmental cap.** IDXCarbon's `data-monthly` listing
+   currently exposes only 10 months (Jun 2025 – Mar 2026), not the ≥24
+   implied by the PRD. Confirmed independently by auditor via
+   `curl https://idxcarbon.co.id/data-monthly` + grep. No scraper bug.
+   **Action:** propose a spec amendment in the Phase-2 retro to re-phrase
+   AC-2 as "≥ N where N = count currently exposed by IDXCarbon's
+   data-monthly index, ≥1". Optionally, open an out-of-band task to
+   request historical (2023-2024) PDFs from IDXCarbon and ingest via
+   `--only-month` — no code change required.
+2. **Old-format regex branch unexercised.** The 2023-2024 format parser
+   (`_parse_old_format`) is kept for forward-compat as a cheap
+   insurance policy (~30 LOC regex + 12-line function) and as the
+   fallback for any PDF the `_looks_like_new_format` heuristic
+   misclassifies. Will become live-tested if flag 1's historical PDFs
+   land.
+3. **2-second polite pacing (vs 5s in spec §9).** Accepted as
+   implemented per the implementation brief. 10 × 2s = 20s total
+   spacing; no 429s observed on backfill. Revisit if production logs
+   surface rate-limit responses.
+4. **Stub-reconciliation procedure.** This story pioneered the
+   "stub-then-reconcile" pattern for v0.1 parallel scraper stories: T08
+   shipped with in-tree stubs of `scrapers/common/*` so it could run
+   before T06 (the canonical owner) landed, then rebased on T06 and
+   adapted `fetch_monthly.py` to the canonical API in a single fix
+   commit. Useful template for any future cross-story shared-helper
+   situation; worth a short note in `docs/architecture.md` or a
+   retrospective pattern doc if we do this again.
