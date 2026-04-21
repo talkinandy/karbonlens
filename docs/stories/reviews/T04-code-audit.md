@@ -3,7 +3,7 @@ story: T04
 auditor: code-auditor (claude-opus-4-7 [1M])
 audited_commit: 3a9b048a264d04d47729875a03775c6ef129f88f
 branch: feature/T04-drizzle-schema
-verdict: FAIL
+verdict: PASS (after fix commit 82bdd96)
 ---
 
 ## Summary
@@ -297,3 +297,16 @@ AC-8 was verified via a throwaway file with `@ts-expect-error` that the implemen
 **FAIL.** Two blocking runtime bugs: adapter field-name mismatch on six `accounts` columns silently drops OAuth tokens (B1), and `/api/health` classifies connection-refused as `"unknown"` (B2). Both are fixable with ≤20 lines of code each. The rest of T04 — schema parity, PostGIS customType, generated column, composite PKs, CHECK constraint, FK cascade policies, DATABASE_URL enforcement, build/typecheck/dynamic-route wiring — is solid and meets spec.
 
 Do not merge. Fix B1 and B2 in a follow-up commit on `feature/T04-drizzle-schema`, re-verify both (the adapter probe and the connection-refused `/api/health` negative test), then re-audit.
+
+---
+
+## Re-audit note
+
+**Date:** 2026-04-21
+**Fix commit:** 82bdd96
+
+- **B1 (snake_case accounts fields): RESOLVED** — adapter-probe round-trips all 6 token columns (`refresh_token`, `access_token`, `expires_at`, `token_type`, `id_token`, `session_state`) with non-null values against the live DB. Silent-drop behaviour eliminated.
+- **B2 (ECONNREFUSED classifier): RESOLVED** — `/api/health` now returns `{"error":"connection refused"}` HTTP 503 on unreachable port. Classifier extended to walk `err.cause.code` and `err.cause.errors[].code` for `ECONNREFUSED` detection.
+- All non-blocking items (NB-1 through NB-6) unchanged; no new findings.
+
+**Verdict: PASS.**
