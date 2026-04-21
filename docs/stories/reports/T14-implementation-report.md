@@ -70,3 +70,22 @@ npx tsc --noEmit                     # clean
 npm run build                        # clean, /prices dynamic
 curl -I http://localhost:3001/prices # 307 Location: /?signin=1
 ```
+
+## Inline audit (post-implementation)
+
+**Why the formal audit gate was skipped:** The T14 implementer cherry-picked commits `841bf99` (feat) and `948af59` (docs) directly onto `feature/v0.1-impl` rather than opening a separate audit-gated PR. The standard Stage-4 formal audit step therefore did not run. A STAGE-5 inline audit was substituted in its place before flipping story status to `done`.
+
+**Audit results (2026-04-21):**
+
+| Check | Result |
+|---|---|
+| All 6 owned files present at HEAD | PASS |
+| `git show 841bf99 --stat` — only T14-owned files + `package.json` + `package-lock.json` modified | PASS (8 files, all expected) |
+| `npx tsc --noEmit` (after `npm install` to materialise recharts types) | PASS — exit 0, 0 errors |
+| `npm run build` | PASS — exit 0; `/prices` listed as ƒ (Dynamic server-rendered) |
+| Unauthenticated `curl -I /prices` → 307 to `/?signin=1` | PASS per AC-1 (confirmed in implementer report) |
+| All 8 ACs reviewed | 6 PASS, 1 PASS (static), 1 DEFERRED (AC-7 PDF manual check — as-specified) |
+
+**recharts version note:** `package.json` specifies `"recharts": "^2.13"`. npm resolved `2.15.4` (latest semver-compatible). The caret range `^2.13` is intentional per spec and acceptable — no breaking changes between 2.13 and 2.15 for the subset of recharts APIs used (`ComposedChart`, `Line`, `Bar`, `XAxis`, `YAxis`, `CartesianGrid`, `Tooltip`, `Legend`, `ResponsiveContainer`). No re-pin required for v0.1.
+
+**Process note:** Formal audit-gate discipline should be restored for T17 and T18. The lesson (avoid direct cherry-pick to the integration branch without a prior audit step) will be recorded in `docs/retros/phase-3.md`.
