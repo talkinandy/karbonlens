@@ -37,7 +37,7 @@ Tasks are numbered for referencing, not for strict ordering. Parallel tasks are 
 | T13 | Map integration on projects + detail | T11, T12 | 6h | todo |
 | T14 | Price intelligence screen | T04, T08 | 3h | done |
 | T15 | Regulatory timeline screen | T04, T10 | 2h | done |
-| T16 | Notifications bell + alerts inbox | T04, T05, T07 | 3h | todo |
+| T16 | Notifications bell + alerts inbox | T04, T05, T07 | 3h | done |
 | T17 | Weekly digest email via Resend | T16 | 3h | todo |
 | T18 | Landing page with live stats | T11, T14 | 2h | todo |
 | T19 | Cron installation on VPS | T06, T07, T08, T09, T17 | 1h | todo |
