@@ -2,7 +2,7 @@
 id: T06
 title: Verra scraper — fetch, parse, and upsert Indonesian VCS projects
 phase: 2
-status: audited
+status: done
 blocked_by: [T02]
 blocks: [T07, T09, T11, T12, T13, T19, T21]
 owner: spec-writer agent
