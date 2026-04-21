@@ -1,26 +1,319 @@
+/*
+ * KarbonLens — globals.css
+ *
+ * Tailwind v4 was scaffolded by create-next-app (package "@tailwindcss/postcss"
+ * at ^4 in devDependencies). v4 uses a CSS-first config: design tokens live in
+ * @theme blocks below and in :root custom properties (no tailwind.config.ts).
+ *
+ * Design tokens are extracted verbatim from legacy/prototype/styles.css :root {}
+ * and represent the v0.1 design source of truth until the design brief lands.
+ */
+
 @import "tailwindcss";
 
+@theme {
+  --color-bg: #fafaf7;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1efe8;
+
+  --color-text: #1a1a1a;
+  --color-text-2: #5f5e5a;
+  --color-text-3: #888780;
+
+  --color-info-bg: #e6f1fb;
+  --color-info-fg: #185fa5;
+  --color-success-bg: #e1f5ee;
+  --color-success-fg: #0f6e56;
+  --color-warning-bg: #faeeda;
+  --color-warning-fg: #854f0b;
+  --color-danger-bg: #fcebeb;
+  --color-danger-fg: #a32d2d;
+
+  --color-chart-blue: #378add;
+  --color-chart-teal: #1d9e75;
+  --color-chart-coral: #d85a30;
+  --color-chart-amber: #ba7517;
+  --color-chart-red: #e24b4a;
+
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-border-strong: rgba(0, 0, 0, 0.14);
+
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --font-sans: var(--font-plex-sans), -apple-system, BlinkMacSystemFont, "Inter",
+    "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+  --font-serif: var(--font-instrument-serif), Georgia, serif;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Backgrounds */
+  --bg: #fafaf7;
+  --surface: #ffffff;
+  --surface-2: #f1efe8;
+
+  /* Borders */
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.14);
+
+  /* Text */
+  --text: #1a1a1a;
+  --text-2: #5f5e5a;
+  --text-3: #888780;
+
+  /* Semantic */
+  --info-bg: #e6f1fb;
+  --info-fg: #185fa5;
+  --success-bg: #e1f5ee;
+  --success-fg: #0f6e56;
+  --warning-bg: #faeeda;
+  --warning-fg: #854f0b;
+  --danger-bg: #fcebeb;
+  --danger-fg: #a32d2d;
+
+  /* Chart */
+  --chart-blue: #378add;
+  --chart-teal: #1d9e75;
+  --chart-coral: #d85a30;
+  --chart-amber: #ba7517;
+  --chart-red: #e24b4a;
+
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-plex-sans), -apple-system, BlinkMacSystemFont, "Inter",
+    "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Shell primitives mapped to the legacy prototype — T11+ will replace with
+ * proper component library. For T03 they give each page a recognisable shell. */
+
+.kl-topnav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  height: 52px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+}
+
+.kl-topnav-inner {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.kl-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kl-brand-mark {
+  width: 24px;
+  height: 24px;
+  background: var(--info-bg);
+  color: var(--info-fg);
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.kl-brand-word {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.1px;
+}
+
+.kl-nav-links {
+  display: flex;
+  gap: 2px;
+  margin-left: 8px;
+  flex: 1;
+}
+
+.kl-nav-link {
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.kl-nav-link:hover {
+  background: var(--surface-2);
+}
+
+.kl-nav-link.active {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.kl-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 24px 60px;
+}
+
+.kl-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.kl-page-title {
+  font-family: var(--font-instrument-serif), Georgia, serif;
+  font-size: 30px;
+  font-weight: 400;
+  margin: 0 0 4px;
+  letter-spacing: -0.4px;
+  line-height: 1.2;
+}
+
+.kl-page-subtitle {
+  font-size: 13px;
+  color: var(--text-2);
+  margin: 0;
+}
+
+.kl-section-label {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.kl-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.kl-stat-value {
+  font-family: var(--font-instrument-serif), Georgia, serif;
+  font-size: 28px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.kl-stat-label {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.kl-stat-delta {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 4px;
+}
+
+.kl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.kl-table th {
+  text-align: left;
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-2);
+  font-weight: 500;
+  padding: 10px 12px;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.kl-table td {
+  padding: 12px;
+  border-bottom: 0.5px solid var(--border);
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+
+.kl-pill {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.kl-pill--info {
+  background: var(--info-bg);
+  color: var(--info-fg);
+}
+
+.kl-pill--success {
+  background: var(--success-bg);
+  color: var(--success-fg);
+}
+
+.kl-pill--warning {
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+}
+
+.kl-pill--danger {
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+}
+
+.kl-pill--neutral {
+  background: var(--surface-2);
+  color: var(--text-2);
 }
