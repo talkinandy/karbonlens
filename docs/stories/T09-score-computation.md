@@ -2,7 +2,7 @@
 id: T09
 title: Score computation daily job
 phase: 2
-status: audited
+status: done
 blocked_by: [T06, T07]
 blocks: [T12, T18]
 owner: unassigned
