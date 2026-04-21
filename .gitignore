@@ -52,3 +52,7 @@ next-env.d.ts
 .vscode/
 .idea/
 .claude/
+
+# drizzle introspect output — config is committed, generated artifacts are not
+/drizzle/*
+!/drizzle/.gitkeep
