@@ -21,19 +21,39 @@ function classifyDbError(err: unknown): 'connection refused' | 'auth failed' | '
   // Drizzle wraps driver errors as DrizzleQueryError with the original
   // postgres.js error on `.cause`. Walk the chain so we classify the root
   // cause, not the generic "Failed query: ..." wrapper message.
-  const messages: string[] = [];
+  //
+  // postgres.js wraps ECONNREFUSED inside an AggregateError whose `.message`
+  // is empty; the code lives on `err.cause.code` and/or `err.cause.errors[].code`.
+  // So we must inspect `.code` fields alongside messages — the previous
+  // message-only walk missed this case (audit B2, 2026-04-21).
+  const signals: string[] = [];
   let current: unknown = err;
-  for (let i = 0; i < 5 && current; i++) {
-    const m = (current as { message?: unknown })?.message;
-    if (typeof m === 'string') messages.push(m.toLowerCase());
-    current = (current as { cause?: unknown })?.cause;
+  for (let i = 0; i < 6 && current; i++) {
+    const c = current as {
+      message?: unknown;
+      code?: unknown;
+      errors?: unknown;
+      cause?: unknown;
+    };
+    if (typeof c.message === 'string') signals.push(c.message.toLowerCase());
+    if (typeof c.code === 'string') signals.push(c.code.toLowerCase());
+    if (Array.isArray(c.errors)) {
+      for (const e of c.errors) {
+        const sub = e as { code?: unknown; message?: unknown };
+        if (typeof sub?.code === 'string') signals.push(sub.code.toLowerCase());
+        if (typeof sub?.message === 'string') signals.push(sub.message.toLowerCase());
+      }
+    }
+    current = c.cause;
   }
-  const msg = messages.join(' | ');
-  if (msg.includes('econnrefused')) return 'connection refused';
-  if (msg.includes('connection') && (msg.includes('refused') || msg.includes('reset'))) {
+  const signal = signals.join(' | ');
+  if (signal.includes('econnrefused') || signal.includes('econnreset')) {
     return 'connection refused';
   }
-  if (msg.includes('password') || msg.includes('authentication')) return 'auth failed';
+  if (signal.includes('connection') && (signal.includes('refused') || signal.includes('reset'))) {
+    return 'connection refused';
+  }
+  if (signal.includes('password') || signal.includes('authentication')) return 'auth failed';
   return 'unknown';
 }
 

@@ -290,24 +290,29 @@ export const users = pgTable('users', {
 });
 
 // ─── accounts (NextAuth) ─────────────────────────────────────────────────────
-// Field-name contract with @auth/drizzle-adapter v5: userId, providerAccountId
-// (camelCase JS keys, snake_case SQL columns). See T04 §5.
+// Field-name contract with @auth/drizzle-adapter v1.11.2 (auditor-confirmed
+// 2026-04-21): the adapter calls `client.insert(accountsTable).values({...})`
+// using a MIX of conventions — `userId` and `providerAccountId` are camelCase,
+// but the six OAuth-token fields below are snake_case JS keys. Drizzle's
+// `insert.values()` silently drops unknown keys, so a camelCase mismatch on
+// these six would cause OAuth tokens to persist as NULL. Authoritative source:
+// `node_modules/@auth/drizzle-adapter/lib/pg.js` lines 22-28.
 export const accounts = pgTable('accounts', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
   type: text('type').notNull(),
   provider: text('provider').notNull(),
   providerAccountId: text('provider_account_id').notNull(),
-  refreshToken: text('refresh_token'),
-  accessToken: text('access_token'),
+  refresh_token: text('refresh_token'),
+  access_token: text('access_token'),
   // expires_at is a Unix timestamp in seconds. Safe as JS Number until year
-  // 285,428,751. If @auth/drizzle-adapter v5 ever requires BigInt mode, switch
+  // 285,428,751. If @auth/drizzle-adapter ever requires BigInt mode, switch
   // to { mode: 'bigint' } and verify against the installed adapter source.
-  expiresAt: bigint('expires_at', { mode: 'number' }),
-  tokenType: text('token_type'),
+  expires_at: bigint('expires_at', { mode: 'number' }),
+  token_type: text('token_type'),
   scope: text('scope'),
-  idToken: text('id_token'),
-  sessionState: text('session_state'),
+  id_token: text('id_token'),
+  session_state: text('session_state'),
   // UNIQUE(provider, provider_account_id) — DB-enforced via SQL DDL.
 });
 

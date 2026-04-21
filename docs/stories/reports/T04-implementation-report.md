@@ -187,3 +187,37 @@ Route (app)
 - **AC-7** (`drizzle-kit introspect` advisory round-trip) not run; config is wired.
 - **`lib/auth.ts`** intentionally absent — T05 owns it.
 - **`middleware.ts`** intentionally absent — T05 owns it.
+
+---
+
+## Fix round 1 (response to code audit verdict FAIL)
+
+Code-auditor verdict 2026-04-21: **FAIL** on commit `3a9b048`. Two blocking findings (see `docs/stories/reviews/T04-code-audit.md`):
+
+- **B1** — `@auth/drizzle-adapter` v1.11.2 reads `accounts.{refresh_token, access_token, expires_at, token_type, id_token, session_state}` by **snake_case** JS keys. T04 declared them in camelCase (following the spec). Drizzle's `insert.values()` silently drops unknown keys, so the adapter would have written NULL for all six.
+- **B2** — `/api/health` classifier returned `"unknown"` for ECONNREFUSED. postgres.js puts `ECONNREFUSED` on `err.cause.code` and `err.cause.errors[].code`, never in a message string. The classifier only walked `.message` fields.
+
+### Files changed in this fix round
+
+| File | Change |
+|---|---|
+| `lib/schema.ts` | Renamed 6 `accounts` JS keys to snake_case (`refresh_token`, `access_token`, `expires_at`, `token_type`, `id_token`, `session_state`); updated contract comment citing auditor confirmation and adapter source (`@auth/drizzle-adapter/lib/pg.js`). |
+| `app/api/health/route.ts` | `classifyDbError` now collects `.code`, `.errors[].code`, `.errors[].message` alongside `.message` at each `.cause` step; depth cap lifted from 5 → 6 with circular-cause protection preserved; matches on `econnrefused`/`econnreset` tokens before the message-substring fallback. |
+| `docs/stories/T04-drizzle-schema-db-client.md` | §5 adapter field-name table: added 6 token-field rows with snake_case JS keys + auditor-confirmed correction note citing adapter source. |
+| `docs/stories/T02-schema-migration-001.md` | §6 adapter field-name mapping: corrected the 6 token fields camelCase → snake_case + same correction note. |
+
+`docs/architecture.md` untouched (SQL columns were always snake_case — never wrong). `.env.example` untouched. CHANGELOG.md untouched — Stage 5 owns that after re-audit.
+
+### Re-verification
+
+`npx tsc --noEmit` and `npm run build` both exit 0 post-fix; build output still marks `/api/health` as ƒ (Dynamic); 8/8 static pages generated.
+
+**Adapter-probe** (pure snake_case values mirroring adapter v1.11.2's `linkAccount` insert, live against local Postgres, followed by cleanup via `eq(accounts.id, ...)`): all 6 token columns round-trip non-null — `refresh_token`, `access_token`, `expires_at` (1800000000), `token_type` (Bearer), `id_token`, `session_state`. Scope, userId, providerAccountId also verified. Cleanup deleted both probe rows.
+
+**/api/health scenarios** — independently logged by each dev server (see Next.js request log lines `GET /api/health <status> in Xms`):
+
+- Positive (port 3070, working DATABASE_URL): server log `GET /api/health 200`; body `{"ok":true,"db":"connected"}`.
+- Auth-failed (port 3071, `postgresql://karbonlens:wrongpass@localhost:5432/...`): server log `GET /api/health 503`; body `{"ok":false,"db":"error","error":"auth failed"}`.
+- Connection-refused (port 3072, `postgresql://karbonlens:x@localhost:9999/...`) — the test failing at audit time: server log `GET /api/health 503`; body `{"ok":false,"db":"error","error":"connection refused"}`.
+
+Both B1 (adapter-probe round-trip) and B2 (connection-refused classification) now pass. Sanitisation envelope intact: no DATABASE_URL, stack trace, or credential material in 503 bodies.
