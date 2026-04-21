@@ -27,7 +27,7 @@ Tasks are numbered for referencing, not for strict ordering. Parallel tasks are 
 | T04 | Drizzle schema + DB client + env plumbing | T02, T03 | 2h | done |
 | T05 | NextAuth.js with Google OAuth | T04 | 2h | done (phase A) — Phase B (live OAuth round-trip) awaits Andy's GCP credentials |
 | T06 | Verra scraper: fetch + parse + upsert | T02 | 6h | done |
-| T07 | GFW alerts scraper: geostore + query + upsert | T02, T06 | 4h | todo |
+| T07 | GFW alerts scraper: geostore + query + upsert | T02, T06 | 4h | done (phase A) — Phase B (live API) pending Andy's GFW_API_KEY |
 | T08 | IDXCarbon monthly PDF scraper | T02 | 4h | done — 10 months; IDXCarbon source caps AC-2 |
 | T09 | Score computation daily job | T06, T07 | 2h | todo |
 | T10 | Seed regulatory events manually | T02 | 1h | done (pending Andy fact-check rows 6-10) |
