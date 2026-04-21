@@ -226,3 +226,13 @@ Two mechanical notes:
 
 - **F1** — `/root/.openclaw/workspace/karbonlens-worktrees/…` is not readable by the `postgres` OS user. Future migrations should be staged via `/tmp` or `/opt/karbonlens/migrations/` on the real VPS (the spec already prescribes `/opt/karbonlens/migrations/`). Noted only because this implementation applied via `/tmp` on the dev box.
 - **F2** — No explicit sequences exist (every primary key uses `gen_random_uuid()`), so `GRANT ALL ON ALL SEQUENCES` is currently a no-op. If a future table uses `BIGSERIAL`/`IDENTITY`, the grant is already in place — no action needed, but worth noting so a reviewer doesn't think it's dead code.
+
+---
+
+## T02 follow-ups (non-blocking audit findings)
+
+The code-audit (`docs/stories/reviews/T02-code-audit.md`) returned verdict **PASS** with 0 blocking findings and 2 hygiene items. Neither requires action before merging; both are flagged for the ops-hygiene backlog and should be revisited if least-privilege becomes a concern in v0.2.
+
+- **N-01 — Redundant blanket GRANTs.** `GRANT ALL ON ALL TABLES IN SCHEMA public TO karbonlens;` and `GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO karbonlens;` at the tail of `001_init.sql` are redundant once ownership is transferred (the owner already has full rights on its own tables). They were added as a safety net (see §F2 above). Future migrations can drop these two lines without loss. Flag for ops-hygiene backlog; revisit if least-privilege becomes a concern in v0.2.
+
+- **N-02 — `GRANT CREATE ON SCHEMA public TO karbonlens`.** The spec's §5 ownership template shows only `GRANT USAGE`; the implementation added `GRANT CREATE` as well. This is correct for future migrations (karbonlens needs CREATE to add new tables/indexes when running migrations as itself), but it diverges from the literal spec §5 template. Not a defect — documented so the delta is on record. Flag for ops-hygiene backlog; revisit if least-privilege becomes a concern in v0.2.
