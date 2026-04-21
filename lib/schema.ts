@@ -34,6 +34,13 @@ import {
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
+// Canonical `ScoreComponents` type is defined in `./score` (T09). The former
+// inline placeholder that used to live just above `projectScores` has been
+// replaced by this import — the comment at that site explicitly anticipated
+// the handoff.
+import type { ScoreComponents } from './score';
+export type { ScoreComponents };
+
 // ─── PostGIS custom type ─────────────────────────────────────────────────────
 // `geography(Point, 4326)` columns: centroid on projects, location on
 // satellite_alerts. Bare SELECT returns raw WKB hex (a string). Consumers that
@@ -222,20 +229,8 @@ export const regulatoryEvents = pgTable('regulatory_events', {
 });
 
 // ─── project_scores (composite PK) ───────────────────────────────────────────
-// Known component shape. If/when `lib/score.ts` lands with a canonical
-// ScoreComponents interface, swap this in. For now an inline shape mirrors the
-// columns one level up in the row — keeps type safety without forcing a
-// cross-file dependency that T04 has no reason to create.
-export type ScoreComponents = {
-  integrity?: number;
-  validationRecency?: number;
-  reversal?: number;
-  community?: number;
-  transparency?: number;
-  notes?: string;
-  [key: string]: unknown;
-};
-
+// `ScoreComponents` is imported from `./score` (T09 canonical definition) at
+// the top of this file and re-exported for external consumers.
 export const projectScores = pgTable(
   'project_scores',
   {
