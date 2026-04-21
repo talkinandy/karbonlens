@@ -2,7 +2,7 @@
 id: T02
 title: Create schema migration 001 (initial tables)
 phase: 1
-status: audited
+status: done
 blocked_by: [T01]
 blocks: [T04, T06, T07, T08, T09, T10, T21]
 owner: spec-writer agent
