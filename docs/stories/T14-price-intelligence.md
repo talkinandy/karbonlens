@@ -2,7 +2,7 @@
 id: T14
 title: Price intelligence screen with real data
 phase: 3
-status: audited
+status: done
 blocked_by: [T04, T08]
 blocks: [T18]
 owner: ""
