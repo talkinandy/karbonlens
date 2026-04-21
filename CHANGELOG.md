@@ -20,5 +20,6 @@ Entries land here as individual user stories (T01–T23) complete against accept
 ### Changed
 
 ### Fixed
+- **T05 Google provider auto-discovery fix** ([fa51104]) — `providers: [Google]` with no args relied on Auth.js v5 auto-detection from `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` env vars, but the runbook and `.env.example` use `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`. Result: `client_id=undefined` in the OAuth authorization URL and `invalid_client` from Google on every sign-in attempt. Fixed by passing `clientId` / `clientSecret` explicitly to the `Google(...)` provider. T05 Phase B verified end-to-end on 2026-04-21: user + account + session rows populate correctly; `accounts.access_token` and `accounts.id_token` persist under snake_case JS keys (live validation of T04's adapter-field-name fix). Known residuals: `users.email_verified` not populated by the default adapter mapping; `accounts.refresh_token` empty because the Google provider isn't configured with `access_type=offline`. Neither blocks v0.1; tracked for v0.2.
 
 ---

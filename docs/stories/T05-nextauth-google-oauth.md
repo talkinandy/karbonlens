@@ -2,7 +2,7 @@
 id: T05
 title: NextAuth.js v5 with Google OAuth
 phase: 1
-status: done-phase-a
+status: done
 blocked_by: [T04]
 blocks: [T16, T17, T18, T21]
 owner: implementer-agent
