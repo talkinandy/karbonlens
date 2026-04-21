@@ -47,7 +47,7 @@ Tasks are numbered for referencing, not for strict ordering. Parallel tasks are 
 
 **Total estimated effort:** ~62 hours of focused engineering. Aim for 4–6h/day → roughly 2 weeks calendar, leaves 3+ weeks buffer before end-of-May target.
 
-> **Phase 1 complete as of 2026-04-21.** T01–T04 fully done; T05 Phase A done (Phase B — live OAuth round-trip — deferred pending Andy's GCP credentials). Ready for Phase 2.
+> **Phase 1 + 2 complete as of 2026-04-21.** T01–T05 fully done (T05 Phase B live-verified 2026-04-21). T06–T10 done with three deferred items: T07 Phase B (pending Andy's GFW_API_KEY — populates satellite_alerts + unblocks T09 AC-5 re-verify); T10 rows 6–10 fact-check (pending Andy). Ready for Phase 3.
 
 ---
 
