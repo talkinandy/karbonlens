@@ -1,6 +1,7 @@
 import { SiteNav } from "@/components/site-nav";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { OnboardingGate } from "@/components/auth/OnboardingGate";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 /**
  * Authenticated route group layout — segment layout only.
@@ -18,7 +19,7 @@ export default function AppLayout({
 }) {
   return (
     <>
-      <SiteNav rightSlot={<UserMenu />} />
+      <SiteNav rightSlot={<><NotificationBell /><UserMenu /></>} />
       {children}
       {/* Server component — decides whether to render the modal */}
       <OnboardingGate />
