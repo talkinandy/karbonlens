@@ -2,7 +2,7 @@
 id: T06
 title: Verra scraper — fetch, parse, and upsert Indonesian VCS projects
 phase: 2
-status: draft
+status: audited
 blocked_by: [T02]
 blocks: [T07, T09, T11, T12, T13, T19, T21]
 owner: spec-writer agent
@@ -42,7 +42,7 @@ Initialize the Python project in `scrapers/`. `uv` is confirmed present on the V
 ```bash
 cd scrapers
 uv init --no-workspace   # creates pyproject.toml + .python-version
-uv add "psycopg[binary]>=3" httpx beautifulsoup4 lxml structlog python-dotenv
+uv add "psycopg[binary]>=3.1" httpx beautifulsoup4 lxml shapely pyproj pdfplumber structlog python-dotenv
 uv add --dev ruff
 ```
 
@@ -50,7 +50,9 @@ uv add --dev ruff
 
 Commit `pyproject.toml`, `uv.lock`, and `.python-version`. Add `scrapers/.venv/` to `.gitignore` (root `.gitignore` already likely has `.venv`; confirm).
 
-**`pyproject.toml` must include:**
+**T06 owns `scrapers/pyproject.toml` and initiates it with ALL Phase 2 runtime dependencies pre-declared.** T07 and T08 do NOT touch `pyproject.toml` — they consume deps already present. This eliminates merge conflicts when T07/T08 are developed in parallel worktrees.
+
+**`pyproject.toml` canonical initial state:**
 
 ```toml
 [project]
@@ -58,13 +60,23 @@ name = "karbonlens-scrapers"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "psycopg[binary]>=3",
+    "psycopg[binary]>=3.1",
     "httpx>=0.27",
     "beautifulsoup4>=4.12",
     "lxml>=5",
+    "shapely>=2",
+    "pyproj>=3.6",
+    "pdfplumber>=0.11",
     "structlog>=24",
     "python-dotenv>=1",
 ]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.5"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.ruff]
 line-length = 100
@@ -73,6 +85,8 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
 ```
+
+Pre-declaring `shapely>=2`, `pyproj>=3.6` (needed by T07 — GFW geostore), and `pdfplumber>=0.11` (needed by T08 — IDXCarbon PDF) ensures T07 and T08 implementers never need to run `uv add` and never modify files owned by T06. Exact pinned versions are resolved by `uv` at lock time; the constraints above are minimums.
 
 #### 3.2 `scrapers/common/` helpers
 
@@ -95,14 +109,15 @@ import os
 load_dotenv(".env.local", override=True)
 load_dotenv(".env", override=False)
 
-DATABASE_URL: str = os.environ.get("DATABASE_URL") or _raise("DATABASE_URL is required")
+_DATABASE_URL = os.environ.get("DATABASE_URL")
+if not _DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is required")
+DATABASE_URL: str = _DATABASE_URL
+
 SCRAPER_USER_AGENT: str = os.environ.get(
     "SCRAPER_USER_AGENT", "KarbonLens/0.1 (+https://karbonlens.id)"
 )
 SCRAPER_LOG_DIR: str = os.environ.get("SCRAPER_LOG_DIR", "/var/log/karbonlens")
-
-def _raise(msg: str) -> str:
-    raise RuntimeError(msg)
 ```
 
 **`scrapers/common/db.py`**
@@ -111,21 +126,49 @@ Provides a context manager that yields a psycopg connection with autocommit disa
 
 Exposes:
 - `get_connection()` — context manager returning `psycopg.Connection`. Caller is responsible for `conn.commit()` / `conn.rollback()`.
-- `execute(conn, sql, params=None)` — thin wrapper calling `conn.execute()` that logs the SQL at DEBUG level before execution.
+- `execute(conn, sql, params=None)` — thin wrapper calling `conn.execute()` that logs the SQL at DEBUG level before execution. Returns the cursor.
+- `execute_with_retry(conn, sql, params=None, *, retries=3)` — calls `execute()` with up to `retries` attempts on `psycopg.OperationalError` (transient connection drops). Raises on final failure.
 
 ```python
 # scrapers/common/db.py
 from contextlib import contextmanager
+import time
 import psycopg
+import structlog
 from .config import DATABASE_URL
+
+log = structlog.get_logger(__name__)
 
 @contextmanager
 def get_connection():
+    """Open a psycopg connection. Caller commits/rolls back explicitly."""
     with psycopg.connect(DATABASE_URL) as conn:
         yield conn
+
+def execute(conn: psycopg.Connection, sql: str, params=None):
+    """Log SQL at DEBUG level, then execute. Returns the cursor."""
+    log.debug("sql", query=sql[:200], params=params)
+    cur = conn.execute(sql, params)
+    return cur
+
+def execute_with_retry(
+    conn: psycopg.Connection,
+    sql: str,
+    params=None,
+    *,
+    retries: int = 3,
+):
+    """execute() with exponential-backoff retry on OperationalError."""
+    for attempt in range(retries):
+        try:
+            return execute(conn, sql, params)
+        except psycopg.OperationalError:
+            if attempt == retries - 1:
+                raise
+            time.sleep(2 ** attempt)
 ```
 
-Do not use a module-level singleton connection. Each scraper run should open and close one connection.
+Do not use a module-level singleton connection. Each scraper run should open and close one connection. T07, T08, and T09 import `get_connection`, `execute`, and `execute_with_retry` from this module — do not rename them.
 
 **`scrapers/common/logging.py`**
 
@@ -149,7 +192,7 @@ The final JSON line per scraper run must include at minimum:
 }
 ```
 
-**`scrapers/common/scraper_runs.py`** — create the file but leave it as a stub with a `# TODO: T-later — persist run metadata to scraper_runs table` comment. Do not implement in T06.
+<!-- scraper_runs.py stub removed: no scraper_runs table exists in migration 001 and no Phase 2 story owns its creation. See §9 OQ-4. -->
 
 #### 3.3 `scrapers/verra/` — core scraper
 
@@ -170,13 +213,14 @@ A static Python dict of hand-curated centroids for flagship Indonesian carbon pr
 
 KNOWN_CENTROIDS: dict[str, tuple[float, float]] = {
     # (latitude, longitude) — WGS84
+    # NOTE (OQ-1): Andy reviews and corrects this list at code-audit stage.
+    # Coordinates are best-guess from public PDDs; accuracy ±5–20 km.
     "VCS1477": (-1.8500,  112.9500),   # Katingan Mentaya (Central Kalimantan)
     "VCS612":  (-2.7000,  112.3000),   # Rimba Raya Biodiversity Reserve (C. Kalimantan)
     "VCS1350": (-3.1500,  104.8500),   # Merang Peatland (South Sumatra)
     "VCS944":  (-2.9500,  104.7500),   # Sumatera Merang (South Sumatra)
     "VCS2562": (-5.5000,  134.5000),   # Cendrawasih Aru (Maluku)
     "VCS1764": (-0.5000,  116.5000),   # Berau Forest Carbon (East Kalimantan)
-    "VCS1764": (-0.5000,  116.5000),   # (duplicate key guard — remove before finalising)
     "VCS1392": (-1.2500,  116.0000),   # East Kalimantan Forest (Berau region)
     "VCS2250": (-0.8000,  113.5000),   # Rimba Karbon (Central Kalimantan)
     "VCS2571": (-2.3000,  115.0000),   # Katingan Watershed extension
@@ -338,6 +382,8 @@ If the generated slug already exists for a different project, append `-2`, `-3`,
 
 **Entity resolution:**
 
+> **Note on threshold divergence:** `docs/architecture.md` §5.1 references a single 0.85 threshold. T06 uses a two-threshold system (auto-merge >0.95, review queue 0.70–0.95) which is more nuanced and is canonical for all Phase 2 scrapers. Andy should update `architecture.md` §5.1 when T06 is marked done. Until then, treat this spec as the authoritative source for entity-resolution thresholds.
+
 Before any insert, query the `projects` table for a fuzzy name match using `pg_trgm`:
 
 ```sql
@@ -353,8 +399,10 @@ Decision table:
 | `sim` value | Action |
 |---|---|
 | `> 0.95` | Skip insert. Call `_update_project_metadata(existing_id, ...)` to bump `updated_at`, refresh `total_vcus_issued`, `total_vcus_retired`. |
-| `0.70 < sim <= 0.95` | Insert a row into `project_match_queue` (`candidate_a_id = existing.id`, `candidate_b_id = NULL` since we haven't inserted the new one yet, `similarity = sim`, `match_reason = 'name_fuzzy'`, `status = 'pending'`). Do NOT insert a new project. Log `{"event": "ambiguous_match", "existing": ..., "candidate": ..., "sim": sim}`. |
-| `< 0.70` or no match | Insert new project row. |
+| `0.70 < sim <= 0.95` | **Insert the incoming Verra project first** as a new row into `projects` (using the normal insert path). Then insert into `project_match_queue` with `candidate_a_id = existing_project.id`, `candidate_b_id = newly_inserted.id`, `similarity = sim`, `match_reason = 'name_fuzzy'`, `status = 'pending'`. Log `{"event": "ambiguous_match", "existing_id": ..., "new_id": ..., "sim": sim}`. The T21 admin UI will later merge or reject by comparing both candidates side by side. **Do not discard the incoming project data.** |
+| `< 0.70` or no match | Insert new project row (normal path). |
+
+The `candidate_b_id = NULL` pattern is explicitly prohibited. A queue row without a resolvable `candidate_b` gives the T21 reviewer nothing to act on, and the incoming project data is silently lost across weekly reruns.
 
 This logic runs even on `--dry-run`; in dry-run mode log the decision but skip all DB writes.
 
@@ -382,7 +430,7 @@ DO UPDATE SET
 
 **Upsert `issuances`:**
 
-Issuances dedupe on `(project_id, vintage_year, issuance_date)`. There is no unique constraint on this triple in migration 001; the scraper must check before inserting (or migration 001 may have one by the time T06 is implemented — check `001_init.sql` at implementation time). Preferred pattern:
+Issuances dedupe on `(project_id, vintage_year, issuance_date, registry_name)`. Migration 001 has no unique constraint on this tuple. **T07 owns migration 002** which adds a unique index on `issuances` (among other indexes). Until migration 002 is merged, T06 uses the `WHERE NOT EXISTS` pattern:
 
 ```sql
 INSERT INTO issuances (project_id, registry_name, vintage_year, credits, issuance_date,
@@ -391,13 +439,16 @@ SELECT %(project_id)s, 'Verra', %(vintage_year)s, %(credits)s, %(issuance_date)s
        %(serial_start)s, %(serial_end)s, %(raw_payload)s
 WHERE NOT EXISTS (
     SELECT 1 FROM issuances
-    WHERE project_id = %(project_id)s
-      AND vintage_year = %(vintage_year)s
+    WHERE project_id    = %(project_id)s
+      AND vintage_year  = %(vintage_year)s
       AND issuance_date = %(issuance_date)s
+      AND registry_name = 'Verra'
 );
 ```
 
-Alternatively add a unique index on `(project_id, vintage_year, issuance_date)` and use `ON CONFLICT DO NOTHING`. Either approach is acceptable; prefer the `WHERE NOT EXISTS` pattern to avoid requiring a schema change.
+After migration 002 merges, the scraper can be updated to use `ON CONFLICT ON CONSTRAINT` instead. For v0.1, the `WHERE NOT EXISTS` approach is canonical and correct.
+
+**NOTE:** Concurrent scraper runs (two cron fires within the same minute) could produce a race on the `WHERE NOT EXISTS` check. The weekly cron cadence makes this extremely unlikely on a single VPS, but if it occurs the second insert simply produces a duplicate row that the next idempotency run will detect via the `sim > 0.95` entity-resolution path. A `BEGIN; SELECT ... FOR UPDATE; INSERT; COMMIT` lock pattern is not required for v0.1 given the low race probability.
 
 **Structured logging per project:**
 
@@ -459,7 +510,9 @@ cd "$REPO"
 
 echo "--- $(date --iso-8601=seconds) verra scraper start ---" >> "$LOG"
 "$VENV_PYTHON" -m scrapers.verra.fetch >> "$LOG" 2>&1
-echo "--- $(date --iso-8601=seconds) verra scraper end (exit $?) ---" >> "$LOG"
+SCRAPER_EXIT=$?
+echo "--- $(date --iso-8601=seconds) verra scraper end (exit $SCRAPER_EXIT) ---" >> "$LOG"
+exit $SCRAPER_EXIT
 ```
 
 Make executable: `chmod +x scrapers/scripts/run_weekly_verra.sh`.
@@ -483,7 +536,7 @@ Create this file if it does not already exist. Its content codifies the conventi
 - Cron installation — T19
 - Entity-resolution admin UI — T21 (this story only populates `project_match_queue`)
 - Any frontend changes
-- `scraper_runs` table persistence (reserved for a later story; `common/scraper_runs.py` stub only)
+- `scraper_runs` table and `common/scraper_runs.py` — no `scraper_runs` table exists in migration 001; no Phase 2 story owns its creation (see §9 OQ-4)
 - Retirement data scraping (schema exists; Verra retirements are a v0.2 priority)
 
 ---
@@ -504,14 +557,17 @@ And   no rows are added to projects, registries, or issuances
 Given an empty database (first run after T02 migration)
 When  python -m scrapers.verra.fetch
 Then  the process exits with code 0
-And   SELECT COUNT(*) FROM projects WHERE country='ID'; returns >= 30
+And   SELECT COUNT(*) FROM projects WHERE country='ID'; returns >= 40
 ```
+(≥40 matches PRD §4 success criterion and architecture §5.1 "~40 Indonesian VCS projects at v0.1 launch."
+Verra alone is expected to yield ≥40 active Indonesian projects. If the live count is 38–39,
+Andy may accept at code-audit stage; document the actual Verra count in the implementation report.)
 
 **AC-3: Full run populates registries table**
 ```
 Given AC-2 has completed
 When  SELECT COUNT(*) FROM registries WHERE registry_name='Verra';
-Then  the result is >= 30
+Then  the result is >= 40
 And   every row has a non-null external_id matching 'VCS\d+' pattern
 ```
 
@@ -614,14 +670,13 @@ SCRAPER_LOG_DIR=/var/log/karbonlens
 **Files owned by this story** (parallel implementers must not touch these):
 
 ```
-scrapers/pyproject.toml
+scrapers/pyproject.toml              ← T06 owns; pre-declares ALL Phase 2 deps
 scrapers/uv.lock
 scrapers/.python-version
 scrapers/common/__init__.py
 scrapers/common/config.py
 scrapers/common/db.py
 scrapers/common/logging.py
-scrapers/common/scraper_runs.py       ← stub only
 scrapers/verra/__init__.py
 scrapers/verra/fetch.py
 scrapers/verra/known_centroids.py
@@ -666,6 +721,9 @@ If the DB does not have PostGIS installed, `ST_SetSRID(ST_MakePoint(...), 4326)`
 **E9: `project_match_queue` non-zero on first run**
 If AC-7 fails (non-zero pending queue on first fill), it indicates a bug in the similarity threshold logic. The implementer should add a debug log that prints the actual similarity score for every match candidate so the threshold can be tuned. Do not raise the 0.70 floor above 0.95 to mask the issue.
 
+**E10: Concurrent scraper runs (race on `WHERE NOT EXISTS`)**
+Two cron fires within seconds of each other (e.g. system clock drift or a manual re-run during an in-flight cron) could both pass the `WHERE NOT EXISTS` check and produce duplicate issuance rows. The weekly cadence and single-VPS setup make this extremely unlikely for v0.1. The chosen mitigation is documentation only: the log's `records_in` / `records_inserted` counts will diverge from reality, and the next weekly run's idempotency check (entity resolution `sim > 0.95`) will catch the duplicate project rows. Duplicate issuance rows will need a one-time `DELETE` if migration 002's unique index subsequently fails to apply. If Andy wants a stronger guarantee, a `SELECT pg_advisory_lock(hashtext('verra_scraper'))` at the top of the run provides a process-level mutex. Not required for v0.1.
+
 ---
 
 ## 8. Definition of done
@@ -683,11 +741,13 @@ If AC-7 fails (non-zero pending queue on first fill), it indicates a bug in the 
 
 ## 9. Open questions
 
-**OQ-1 (blocking for known_centroids.py):** The list of flagship VCS projects in `known_centroids.KNOWN_CENTROIDS` is currently seeded with these 10 projects (Katingan/VCS1477, Rimba Raya/VCS612, Merang Peatland/VCS1350, Sumatera Merang/VCS944, Cendrawasih Aru/VCS2562, Berau Forest Carbon/VCS1764, and four others — see `known_centroids.py` spec above). Andy should confirm or replace this list, and verify the VCS IDs and approximate centroid coordinates, from his domain expertise and any project documents he has access to. The implementer should treat the spec list as a placeholder and not spend time verifying coordinates independently.
+**OQ-1 (non-blocking — Andy reviews at code-audit stage):** The `KNOWN_CENTROIDS` dict in `known_centroids.py` is a best-guess seed of 10 projects (VCS1477, VCS612, VCS1350, VCS944, VCS2562, VCS1764, VCS1392, VCS2250, VCS2571, VCS2316). Duplicate key VCS1764 has been removed (was a spec bug). The implementer proceeds with this list; Andy corrects VCS IDs and/or coordinates at merge time. This is no longer a pre-implementation gate.
 
 **OQ-2 (non-blocking):** Andy's preference for scraper user-agent string on Verra requests. The architecture doc §7 already specifies `"KarbonLens/0.1 (+https://karbonlens.id)"`. If Andy wants a different polite UA (e.g. including a contact email), update `SCRAPER_USER_AGENT` in `.env.example` before deployment. The spec defaults to the value already in the architecture doc.
 
-**OQ-3 (non-blocking):** Whether a unique index on `issuances(project_id, vintage_year, issuance_date)` should be added to migration 001 (or a new migration 001b). Adding it enables a cleaner `ON CONFLICT DO NOTHING` pattern instead of the `WHERE NOT EXISTS` subquery approach. Since migration 001 is already applied to the live DB, this would require a new `002_` migration or an `ALTER TABLE` addendum. Andy to decide whether to amend migration 001 (requires re-applying on the VPS) or tolerate the `WHERE NOT EXISTS` approach for v0.1.
+**OQ-3 (non-blocking — resolved for v0.1):** The `WHERE NOT EXISTS` pattern is canonical for v0.1 issuance deduplication. Migration 002 (owned by T07) adds a unique index on `issuances`; after it merges, the scraper can be updated to use `ON CONFLICT ON CONSTRAINT`. No action needed before T06 implementation starts.
+
+**OQ-4 (non-blocking — future story):** The `scraper_runs` table referenced in `docs/architecture.md` §4 convention 4 does not exist in migration 001 and has no owner in Phase 2 (T06–T10). The `common/scraper_runs.py` stub has been removed from T06 scope to avoid dead-code accumulation. Andy should assign a `scraper_runs` migration to a Phase 3 story or a dedicated `T-later` task before the feature is needed. Structured logging (§3.2 `common/logging.py`) is a sufficient run-record mechanism for v0.1.
 
 ---
 

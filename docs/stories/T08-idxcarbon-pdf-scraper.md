@@ -2,7 +2,7 @@
 id: T08
 title: IDXCarbon monthly PDF scraper
 phase: 2
-status: draft
+status: audited
 blocked_by: [T02]
 blocks: [T14, T18, T19]
 owner: agent
@@ -33,7 +33,7 @@ Per architecture §4, scrapers must fail loudly, be idempotent, and preserve raw
 
 ### In scope
 
-1. **`pdfplumber` dependency** — append to `scrapers/pyproject.toml` via `uv add pdfplumber`. If T06's `pyproject.toml` already exists, append to it. If it does not exist, create `scrapers/pyproject.toml` with the minimum required deps (`pdfplumber`, `psycopg[binary]`, `httpx`, `structlog`, `python-dotenv`) plus `ruff` as a dev dep. Coordinate in §9 to avoid double-initialisation with T06.
+1. **`pdfplumber` dependency** — T06 owns `scrapers/pyproject.toml` and pre-declares `pdfplumber`. T08 does **not** touch `pyproject.toml`. The implementer must confirm T06 has landed (and therefore `pdfplumber` is already declared) before running any import. If for some reason T06 has not landed, raise the dependency in the T06 story rather than creating a parallel `pyproject.toml`.
 
 2. **`scrapers/idxcarbon/fetch_monthly.py`** — main entry point.
    - Invoked as `python -m scrapers.idxcarbon.fetch_monthly`.
@@ -42,22 +42,31 @@ Per architecture §4, scrapers must fail loudly, be idempotent, and preserve raw
      - `--only-month YYYY-MM` — process a single month and exit.
      - `--dry-run` — list available months and indicate which would be inserted; exit 0 without writing anything.
    - Behaviour:
-     1. Fetch `https://idxcarbon.co.id/data-monthly` HTML with a 30-second timeout, User-Agent `KarbonLens/0.1 (+https://karbonlens.id)`.
+     1. Fetch `https://idxcarbon.co.id/data-monthly` HTML with a 30-second timeout, User-Agent `"KarbonLens-scraper/0.1 (+https://karbonlens.netlify.app)"`.
      2. Parse the page to extract PDF URLs. Each link points to a monthly report; extract the period as `YYYY-MM` from the filename (e.g. `monthly-report-2026-01.pdf`) or from surrounding link text (e.g. "Monthly Report January 2026" or "Laporan Januari 2026") using the static Indonesian/English month-name mapping defined in `parse_pdf.py`.
      3. Iterate over discovered PDFs, filtered by `--from-month` / `--only-month` if provided.
-     4. For each PDF: query `idx_monthly_snapshots` by `period_month` — **if row exists, skip** (idempotence; log "skipped already-ingested YYYY-MM").
-     5. Download PDF to `/var/lib/karbonlens/pdf-archive/YYYY-MM.pdf`. Overwrite on re-download only if the file is absent; otherwise reuse cached copy.
-     6. Call `parse_pdf.parse(pdf_path)` → structured dict.
-     7. On `ParseError`: log at ERROR level including the period, reason, and first 500 chars of the page text that failed; **continue to next month** — do not halt the run.
-     8. On successful parse: `INSERT INTO idx_monthly_snapshots (...) ON CONFLICT (period_month) DO NOTHING`.
-     9. Emit a structured JSON log summary: `{scraper, started_at, finished_at, months_discovered, months_skipped, months_inserted, months_failed, errors}`.
+     4. For each PDF: **always re-download** to `/var/lib/karbonlens/pdf-archive/YYYY-MM.pdf` (overwrite any existing cached file). PDFs are small (~1 MB/month); re-downloading is cheap and ensures corrected PDFs from IDXCarbon are always ingested. Do not skip based on file presence.
+     5. Call `parse_pdf.parse(pdf_path)` → structured dict.
+     6. On `ParseError`: log at ERROR level including the period, reason, and first 500 chars of the page text that failed; **continue to next month** — do not halt the run.
+     7. On successful parse: `INSERT INTO idx_monthly_snapshots (...) ON CONFLICT (period_month) DO UPDATE SET total_volume_tco2e = EXCLUDED.total_volume_tco2e, total_value_idr = EXCLUDED.total_value_idr, total_transactions = EXCLUDED.total_transactions, trading_days = EXCLUDED.trading_days, registered_participants = EXCLUDED.registered_participants, registered_projects = EXCLUDED.registered_projects, available_units = EXCLUDED.available_units, retired_units = EXCLUDED.retired_units, avg_price_idr = EXCLUDED.avg_price_idr, raw_report_url = EXCLUDED.raw_report_url, raw_payload = EXCLUDED.raw_payload, scraped_at = NOW()`. This satisfies the architecture §4 idempotence contract — "idempotent" means the same source data produces the same DB state, not "immutable"; updating from upstream corrections is idempotent per source-of-truth semantics.
+     8. Emit a structured JSON log summary: `{scraper, started_at, finished_at, months_discovered, months_skipped, months_inserted, months_updated, months_failed, errors}`.
+     _Note: `months_skipped` in the summary refers only to months filtered out by `--from-month` / `--only-month` flags. Every discovered month within the range is always re-downloaded and upserted._
 
 3. **`scrapers/idxcarbon/parse_pdf.py`** — PDF parser.
    - Public interface: `parse(pdf_path: Path) -> dict` — returns a dict whose keys match `idx_monthly_snapshots` columns (excluding `id` and `scraped_at`).
    - Opens the PDF with `pdfplumber`, extracts full text page-by-page, concatenates.
    - Defines `ParseError(Exception)` with attributes `page_text: str` and `reason: str`. Caller catches this and logs.
-   - **Mandatory fields** (raise `ParseError` if missing): `period_month`, `total_volume_tco2e`.
-   - **Non-mandatory fields** (insert NULL if missing, do not raise): `trading_days`, `registered_participants`.
+   - **`extract_field` helper** — signature: `extract_field(text: str, pattern: re.Pattern) -> int | None`. Returns `None` when the regex produces no match at all; returns the parsed integer (which may be `0`) when the regex matches and the captured group normalises to zero. The caller **must** distinguish these two cases:
+     ```python
+     vol = extract_field(page_text, VOLUME_PATTERN)
+     if vol is None:
+         raise ParseError('total_volume_tco2e',
+                          f'regex produced no match on page {page_num}: {page_text[:200]!r}')
+     # vol == 0 is valid (month with zero trading); do NOT truthiness-check (if not vol)
+     ```
+     A matched value of `0` is a valid, insertable result (rare but possible — e.g. a month where the exchange had no trading activity). Do **not** use `if not vol` or `if vol is None or vol == 0`.
+   - **Mandatory fields** (raise `ParseError` if `extract_field` returns `None`): `period_month`, `total_volume_tco2e`.
+   - **Non-mandatory fields** (insert NULL if `extract_field` returns `None`, do not raise): `trading_days`, `registered_participants`. This is a deliberate v0.1 scoping call: `period_month` and `total_volume_tco2e` are the minimum viable row; all other NULLs are acceptable and do not violate the "fail loudly" principle in architecture §4.
    - **Regex strategy — two format families:**
      - **Old format (Sept 2023 – Dec 2024):** Inline text like `"Total Volume: 117.234,56 tCO2e"` and `"Total Nilai: Rp 4.700.000.000"`. Numbers use Indonesian decimal notation (period as thousands separator, comma as decimal separator).
      - **New format (Jan 2025+):** Summary table with column headers `Volume`, `Nilai`, `Transaksi`, `Peserta`, `Proyek`. Parser must detect which format is active by probing for the table-header string before choosing a regex branch.
@@ -68,7 +77,8 @@ Per architecture §4, scrapers must fail loudly, be idempotent, and preserve raw
      Juli→07, Agustus→08, September→09, Oktober→10, November→11, Desember→12
      ```
    - **Number normalisation helper:** strip `Rp`, spaces, and period-as-thousands-sep; replace comma-as-decimal with dot; return `Decimal`.
-   - Returns dict keys: `period_month` (date), `total_volume_tco2e`, `total_value_idr`, `total_transactions`, `trading_days`, `registered_participants`, `registered_projects`, `available_units`, `retired_units`, `avg_price_idr`, `raw_report_url`, `raw_payload` (full structured extract as a JSON-serialisable dict including all regex match groups and raw text).
+   - **`avg_price_idr` — DERIVED field:** compute as `total_value_idr / total_volume_tco2e` (zero-guard: set to `NULL` if `total_volume_tco2e` is `0` or `NULL`). If the PDF also publishes `avg_price_idr` directly, prefer the derived value for audit-trail clarity (the raw inputs are both stored in `raw_payload`). This resolves OQ-5.
+   - Returns dict keys: `period_month` (date), `total_volume_tco2e`, `total_value_idr`, `total_transactions`, `trading_days`, `registered_participants`, `registered_projects`, `available_units`, `retired_units`, `avg_price_idr` (derived; see above), `raw_report_url`, `raw_payload` (full structured extract as a JSON-serialisable dict including all regex match groups and raw text).
 
 4. **Historical backfill** — handled by running `python -m scrapers.idxcarbon.fetch_monthly --from-month 2023-09` (no dedicated separate script required). The `fetch_monthly.py` entry point covers backfill when run with default `--from-month 2023-09`. Document this in the module docstring.
 
@@ -116,20 +126,24 @@ And   SELECT COUNT(*) FROM idx_monthly_snapshots; returns >= 24
 ```
 _(Sept 2023 → March 2026 = 31 months; threshold 24 guards against a few unavailable older reports.)_
 
-**AC-3: Latest month and January 2026 have sensible values**
+**AC-3: Latest month and January 2026 have sensible non-null values**
 ```
 Given AC-2 has run
 When  SELECT total_volume_tco2e, total_value_idr, avg_price_idr
       FROM idx_monthly_snapshots
       WHERE period_month = '2026-01-01';
-Then  total_volume_tco2e is approximately 117000 (+/- 5%)
-And   total_value_idr is approximately 4700000000 (+/- 5%)
-And   avg_price_idr is between 30000 and 100000
+Then  total_volume_tco2e IS NOT NULL
+And   total_volume_tco2e > 0
+And   total_value_idr IS NOT NULL
+And   total_value_idr > 0
+And   avg_price_idr IS NOT NULL
+And   avg_price_idr > 0
 And   for the latest IDXCarbon-published month at run time,
         total_volume_tco2e IS NOT NULL
 And   total_value_idr IS NOT NULL
 And   avg_price_idr IS NOT NULL
 ```
+_Note: specific numeric bounds are not asserted here because IDXCarbon may revise published figures. "Sensible non-null" is the pass condition. AC-7 covers a plausible range check for avg_price_idr._
 
 **AC-4: PDF archive count matches DB row count**
 ```
@@ -144,10 +158,10 @@ Then  the count equals
 Given AC-2 has run (N rows in DB, N PDFs on disk)
 When  python -m scrapers.idxcarbon.fetch_monthly --from-month 2023-09
 Then  the process exits 0
-And   the structured log shows months_inserted = 0, months_skipped = N
-And   SELECT COUNT(*) FROM idx_monthly_snapshots; is unchanged
-And   no new files appear in /var/lib/karbonlens/pdf-archive/
+And   SELECT COUNT(*) FROM idx_monthly_snapshots; is unchanged (still N rows)
+And   all field values for unchanged months are identical to the pre-run values
 ```
+_Note: because T08 always re-downloads and uses `ON CONFLICT DO UPDATE`, re-running against the same upstream PDFs is idempotent by value — the upsert overwrites each row with the same data it already holds. `months_updated = N`, `months_inserted = 0`. This is the architecture §4 idempotence contract._
 
 **AC-6: ParseError is logged and run continues (future verification)**
 ```
@@ -206,7 +220,7 @@ Then  exit code is 0 with no errors
 - T19 — Cron installation wires up `run_monthly_idxcarbon.sh`.
 
 **Parallel tasks (no conflict expected):**
-- T06 — Verra scraper. Both tasks touch `scrapers/pyproject.toml` and `scrapers/common/`. Coordinate so only one task initialises the Python project. If T06 lands first, T08 only appends `pdfplumber` to the existing pyproject and reuses `common/db.py`, `common/config.py`, `common/logging.py`. If T08 lands first, it bootstraps those files using the structure specified in T06's task block. **Do not let both tasks create `scrapers/pyproject.toml` independently** — coordinate via the open question in §9.
+- T06 — Verra scraper. T06 owns `scrapers/pyproject.toml` and `scrapers/common/`. T08 must land after T06 and reuses `common/db.py`, `common/config.py`, `common/logging.py` read-only. No file conflict.
 - T07 — No shared files.
 
 **Files owned by this story** (implementer must not touch other files without noting a deviation):
@@ -214,12 +228,17 @@ Then  exit code is 0 with no errors
 - `scrapers/idxcarbon/fetch_monthly.py` (new)
 - `scrapers/idxcarbon/parse_pdf.py` (new)
 - `scrapers/scripts/run_monthly_idxcarbon.sh` (new)
-- `scrapers/pyproject.toml` — append `pdfplumber` dep only; if file does not exist, create with full content (see §3.1)
 
-**Files T08 may read but not modify (owned by T06 if it lands first):**
+**Files T08 must NOT touch (owned by T06):**
+- `scrapers/pyproject.toml` — T06 owns this file and pre-declares `pdfplumber`. T08 does not modify it.
 - `scrapers/common/db.py`
 - `scrapers/common/config.py`
 - `scrapers/common/logging.py`
+
+**Downstream consumers of `idx_monthly_snapshots` (schema-stability notice):**
+- T14 (price intelligence screen) queries this table for volume and price history.
+- T18 (landing page live stats) queries this table for the latest IDXCarbon volume and price.
+Any schema change to `idx_monthly_snapshots` introduced during T08 implementation must be backwards-compatible with these consumers. Coordinate with T14 and T18 owners before adding or renaming columns.
 
 ## 7. Edge cases & failure modes
 
@@ -236,7 +255,7 @@ Then  exit code is 0 with no errors
 | Period parsed from filename vs link text disagreement | Prefer filename-derived period; fall back to link-text-derived period. Log the source used. |
 | `/var/lib/karbonlens/pdf-archive` not writable | Python `PermissionError` propagates; log at CRITICAL level; exit non-zero. This indicates a T01 setup issue. |
 | Disk pressure | Unlikely at v0.1 scale (<31 PDFs, each <1 MB, total <31 MB). Not a concern. |
-| `period_month` conflict on INSERT | `ON CONFLICT (period_month) DO NOTHING` — silent skip, counted in `months_skipped` in the log summary. |
+| `period_month` conflict on INSERT | `ON CONFLICT (period_month) DO UPDATE SET ...` — values are overwritten with the freshly parsed data; row count is unchanged. Counted in `months_updated` in the log summary. This ensures corrected PDFs are always ingested. |
 | `--only-month` for a month not on the IDXCarbon listing page | Log INFO "not found on listing page"; exit 0. |
 | Number format edge case: value printed as "0" or "-" for a month with no trading | Parse as 0 for numeric fields. `total_volume_tco2e = 0` is valid and should not raise `ParseError`. |
 
@@ -250,15 +269,15 @@ Then  exit code is 0 with no errors
 
 ## 9. Open questions
 
-1. **T06 coordination on `scrapers/pyproject.toml`:** Which story initialises the Python project? If T06 lands first (likely, as it is earlier in the sprint), T08 implementer should run `uv add pdfplumber` against the existing venv and not recreate `pyproject.toml`. If T08 lands first, it bootstraps the full file. Andy should confirm expected landing order before implementation begins, or the implementer should check for the file's existence and branch accordingly.
+1. **T06 coordination on `scrapers/pyproject.toml`: RESOLVED** — T06 owns `pyproject.toml` and pre-declares `pdfplumber`. T08 does not touch this file. T08 must land after T06. No open question remains.
 
-2. **IDXCarbon rate limiting:** No published rate limit found for `idxcarbon.co.id`. Use a conservative 5-second inter-request delay (per architecture §4 guidance for IDXCarbon). If the site returns 429 or begins blocking during backfill, reduce parallelism to a 10-second delay or add a Retry-After-aware backoff. The UA string `KarbonLens/0.1 (+https://karbonlens.id)` should be sent on all requests.
+2. **IDXCarbon rate limiting:** No published rate limit found for `idxcarbon.co.id`. Use a conservative 5-second inter-request delay (per architecture §4 guidance for IDXCarbon). If the site returns 429 or begins blocking during backfill, reduce parallelism to a 10-second delay or add a Retry-After-aware backoff. The UA string `"KarbonLens-scraper/0.1 (+https://karbonlens.netlify.app)"` must be sent on all requests — it is respectful and identifiable.
 
 3. **"Latest available month" definition:** IDXCarbon typically publishes with ~1-week lag after month-end. The cron job runs on the 1st of each month; the previous month's report may not yet be available. The scraper should treat "not found on listing page" as a soft miss (log, skip, no error) so cron re-runs silently until the report appears. Andy to confirm if a retry-on-first-of-month cadence is sufficient or if a mid-month second attempt is needed.
 
 4. **S3 / object-store archival:** v0.1 uses local filesystem (`/var/lib/karbonlens/pdf-archive`). If the VPS is rebuilt, PDFs would need to be restored from backup. A Hetzner Object Storage bucket would make the archive portable and durable. Flag as v0.2 consideration — no action required now.
 
-5. **avg_price_idr computation:** The PDF may report a weighted average directly, or it may need to be derived as `total_value_idr / total_volume_tco2e`. If the PDF provides a direct avg_price figure, use it; otherwise derive it. If derivation is used and either input is zero/null, set `avg_price_idr = NULL` rather than divide-by-zero. Implementer to confirm after inspecting a real PDF.
+5. **avg_price_idr computation: RESOLVED** — always derive as `total_value_idr / total_volume_tco2e`, with a zero-guard (`NULL` when `total_volume_tco2e` is 0 or NULL). Even if the PDF publishes an avg_price figure directly, the derived value is preferred for audit-trail clarity. Both raw inputs are stored in `raw_payload`. No open question remains.
 
 ## 10. References
 
