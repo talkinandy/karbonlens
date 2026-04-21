@@ -2,7 +2,7 @@
 id: T04
 title: Drizzle schema + DB client + env plumbing
 phase: 1
-status: audited
+status: done
 blocked_by: [T02, T03]
 blocks: [T05, T09, T11, T12, T14, T15, T16]
 owner: implementer-agent
