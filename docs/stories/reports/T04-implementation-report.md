@@ -221,3 +221,18 @@ Code-auditor verdict 2026-04-21: **FAIL** on commit `3a9b048`. Two blocking find
 - Connection-refused (port 3072, `postgresql://karbonlens:x@localhost:9999/...`) — the test failing at audit time: server log `GET /api/health 503`; body `{"ok":false,"db":"error","error":"connection refused"}`.
 
 Both B1 (adapter-probe round-trip) and B2 (connection-refused classification) now pass. Sanitisation envelope intact: no DATABASE_URL, stack trace, or credential material in 503 bodies.
+
+---
+
+## T04 follow-ups (non-blocking audit findings)
+
+The following non-blocking items were flagged by the code auditor (see `docs/stories/reviews/T04-code-audit.md` §Non-blocking findings). None block T04 merge; each is assigned to the most natural downstream story.
+
+| # | Finding | Action | Picked up by |
+|---|---|---|---|
+| NB-1 | T02 §6 and T04 §5 adapter field tables had camelCase for the 6 token fields — spec bug. | Both tables corrected in fix commit 82bdd96. | Closed (done in fix round 1). |
+| NB-2 | Health classifier `ECONNRESET` / timeout branch is now redundant after `.code` walk; safe to leave as defence-in-depth. | No action required. | N/A |
+| NB-3 | `drizzle-kit introspect` (AC-7 advisory) not run. | Advisory only; config is wired for future runs. | Backlog / dev workflow. |
+| NB-4 | `customType` shape `{ data: string; notNull: false }` enables nullable geography insert for `satellite_alerts.location`. | Verified correct. No action. | T07 (GFW alerts scraper) should confirm at integration time. |
+| NB-5 | Dev server port cosmetic (`localhost:3001` vs `:3000` in spec AC-1). | No action. Port is incidental. | N/A |
+| NB-6 | Generated-column insert-exclusion proof was manual/ephemeral. | `generatedAlwaysAs()` behaviour is well-established in Drizzle upstream. | T09 (score job) can add a compile-time assertion if desired. |
