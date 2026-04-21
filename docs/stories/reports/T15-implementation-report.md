@@ -86,3 +86,13 @@ grep -E 'forestry|peatland|idxcarbon|…' components/regulatory/FilterBar.tsx
 ```
 
 Live-DB verification of distinct counts is deferred to reviewer (implementer worktree has no DATABASE_URL).
+
+## T15 follow-ups
+
+Non-blocking items to revisit in a future visual-QA or polish pass:
+
+1. **TimelineCard left-stripe vs dashed border (visual polish).** `TimelineCard` applies the importance left stripe via an inline `borderLeft` style. For upcoming cards the component also spreads `borderStyle: 'dashed'` onto the card element. This spread overwrites the left side of the border to `2px dashed`, reducing the stripe from a solid 4px stripe to a 2px dashed line on upcoming cards only. Functional and not blocking (the "Forecast" pill + section header already provide the upcoming signal), but a future visual-QA pass should decouple the stripe element from the card border (e.g., use a `::before` pseudo-element or a sibling `<div>` for the stripe) so dashed + stripe coexist correctly.
+
+2. **AC count adjustments (post-T10 fact-check).** AC-2, AC-4, and AC-5 spec text was written against the pre-fact-check 10-row seed. Story frontmatter and AC text now updated to reflect the 8-row post-fact-check state (see T10 commit b4d35e8). No code changes required — filter mechanics verified correct.
+
+3. **`dynamic` export and disabled "Subscribe" placeholder — intentional additions.** `export const dynamic = 'force-dynamic'` on `page.tsx` is belt-and-braces for Next.js 16 (the `searchParams` read already forces dynamic rendering; the explicit export makes the intent clear and survives future refactors that might remove a `searchParams` usage). The disabled "Subscribe — coming soon" pill is explicitly permitted by the spec (§3 non-goal 7: "Subscribe button wiring — render as placeholder / disabled for v0.1") and matches the out-of-scope list in T15 story §3.
