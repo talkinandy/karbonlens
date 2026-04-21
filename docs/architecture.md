@@ -645,4 +645,20 @@ These do not block v0.1 but should be revisited:
 
 ---
 
+---
+
+## 13. Implementation notes — shipped state (as of 2026-04-21)
+
+Deltas between what the architecture specified and what Phase 1 actually shipped. §1–§12 above remain the forward-looking reference; this section records divergences.
+
+- **Next.js version:** §1 diagram labels "Next.js 15"; shipped Next.js 16 (App Router semantics unchanged, per T03 implementation report). No functional impact.
+- **Tailwind version:** §2 repo layout references `tailwind.config.ts`; that file does not exist. Tailwind v4 uses CSS-first `@theme` blocks in `app/globals.css`. There is no `tailwind.config.ts`.
+- **Drizzle adapter field-name contract:** after T04's post-audit fix, the `accounts` table Drizzle definition uses snake_case JS keys (`refresh_token`, `access_token`, `expires_at`, `token_type`, `id_token`, `session_state`) because `@auth/drizzle-adapter` v1.11.2 reads them by those exact names. `users.emailVerified` stays camelCase (adapter expects that). SQL column names in §3 are all snake_case and are unchanged.
+- **Adapter table binding:** NextAuth is configured with an explicit table map (`usersTable`, `accountsTable`, `sessionsTable`, `verificationTokensTable`). The adapter's auto-detect looks for singular names (`user`, `account`, …); our plural schema names (`users`, `accounts`, …) require the explicit map.
+- **Route group layouts:** `app/(public)/layout.tsx` and `app/(app)/layout.tsx` are passthrough wrappers (no `<html>` / `<body>`). Root `app/layout.tsx` owns the document shell, fonts, and providers.
+- **Table ownership:** all 15 tables in migration 001 are owned by the `karbonlens` Postgres role (not `postgres`), so future `ALTER TABLE` migrations applied by the scraper user succeed without superuser escalation.
+- **Netlify deploy:** deferred. v0.1 runs local-only on the Hetzner box. Connectivity strategy (Tailscale / VPS proxy / managed Postgres migration) is undecided. Tracked as **OQ-1** in `docs/stories/reports/T04-implementation-report.md`.
+- **pg_hba.conf ordering:** scram-sha-256 rule for the karbonlens role was inserted BEFORE any catch-all trust lines (first-match-wins). The runbook (`docs/runbooks/vps-setup.md`) documents this ordering requirement. Non-issue on a fresh host; documented for multi-tenant safety.
+- **`users.email_verified`:** §3 DDL shows `email_verified TIMESTAMPTZ` — this is correct and matches what shipped. No change needed.
+
 *End of architecture doc. Paired with `PRD.md` (strategy) and `TASKS.md` (tactics).*
