@@ -129,27 +129,53 @@ ss -tlnp | grep 5432
 
 pg_hba.conf is first-match wins. These lines must appear BEFORE any `trust` line covering 127.0.0.1/::1, otherwise `trust` takes precedence and the generated password is never validated.
 
+On a multi-tenant Hetzner box the default Debian `pg_hba.conf` already contains broad `host all all 127.0.0.1/32 trust` and `host all all ::1/128 trust` lines for local development. We must *insert* our scram-sha-256 lines BEFORE those — a plain `echo >>` appends to the end of the file, where first-match-wins means the `trust` line fires first and the generated password is never checked. Use `awk` to insert before the matching `host all all ... trust` line:
+
 ```bash
 PGHBA=/etc/postgresql/16/main/pg_hba.conf
 
-# IPv4 loopback
-LINE='host    karbonlens    karbonlens    127.0.0.1/32    scram-sha-256'
-grep -qxF "$LINE" "$PGHBA" || echo "$LINE" | sudo tee -a "$PGHBA"
+LINE4='host    karbonlens      karbonlens      127.0.0.1/32            scram-sha-256'
+LINE6='host    karbonlens      karbonlens      ::1/128                 scram-sha-256'
 
-# IPv6 loopback
-LINE6='host    karbonlens    karbonlens    ::1/128         scram-sha-256'
-grep -qxF "$LINE6" "$PGHBA" || echo "$LINE6" | sudo tee -a "$PGHBA"
+# Insert IPv4 scram line before the first "host all all 127.0.0.1/32 trust" line
+if ! grep -qxF "$LINE4" "$PGHBA"; then
+  awk -v ins="$LINE4" '
+    !done && /^host[[:space:]]+all[[:space:]]+all[[:space:]]+127\.0\.0\.1\/32[[:space:]]+trust/ {
+      print ins; done=1
+    }
+    { print }
+  ' "$PGHBA" > "$PGHBA.tmp" && sudo mv "$PGHBA.tmp" "$PGHBA"
+  sudo chown root:postgres "$PGHBA"
+  sudo chmod 640 "$PGHBA"
+fi
 
-# Remove any trust entry that would apply to the karbonlens user on TCP loopback
-# (Leaves peer auth for the postgres superuser on Unix socket intact)
+# Insert IPv6 scram line before the first "host all all ::1/128 trust" line
+if ! grep -qxF "$LINE6" "$PGHBA"; then
+  awk -v ins="$LINE6" '
+    !done && /^host[[:space:]]+all[[:space:]]+all[[:space:]]+::1\/128[[:space:]]+trust/ {
+      print ins; done=1
+    }
+    { print }
+  ' "$PGHBA" > "$PGHBA.tmp" && sudo mv "$PGHBA.tmp" "$PGHBA"
+  sudo chown root:postgres "$PGHBA"
+  sudo chmod 640 "$PGHBA"
+fi
+
+# Defensive: remove any explicit trust entry for the karbonlens user on TCP loopback
+# (Leaves peer auth for the postgres superuser on Unix socket intact and leaves
+# the multi-tenant `host all all ... trust` lines alone — those belong to other tenants.)
 sudo sed -i '/^host[[:space:]]\+karbonlens[[:space:]]\+karbonlens[[:space:]]\+127\.0\.0\.1\/32[[:space:]]\+trust/d' "$PGHBA"
 sudo sed -i '/^host[[:space:]]\+karbonlens[[:space:]]\+karbonlens[[:space:]]\+::1\/128[[:space:]]\+trust/d' "$PGHBA"
 
 # Reload so changes take effect without a full restart
 sudo systemctl reload postgresql
 
-# Verify
-grep karbonlens "$PGHBA"
+# Verify: the karbonlens scram lines should appear BEFORE any host-all-all-trust line
+grep -nE "karbonlens|^host" "$PGHBA"
+
+# Bonus sanity check: a wrong password must now be rejected (scram enforced, not trust)
+PGPASSWORD="wrong-password-test" psql -U karbonlens -h 127.0.0.1 -d karbonlens -c "SELECT 1;" 2>&1
+# Expected: "FATAL:  password authentication failed for user \"karbonlens\"" — exit 2
 ```
 
 ---
