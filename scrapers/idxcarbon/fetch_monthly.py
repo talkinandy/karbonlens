@@ -37,15 +37,14 @@ import argparse
 import json
 import sys
 import time
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import httpx
 from bs4 import BeautifulSoup
 from psycopg.types.json import Json
-
 from scrapers.common import config, db
-from scrapers.common.logging import get_logger
+from scrapers.common.logging import configure_logging, get_logger
 from scrapers.idxcarbon import parse_pdf
 
 # ---------------------------------------------------------------------------
@@ -56,9 +55,12 @@ LISTING_URL = "https://idxcarbon.co.id/data-monthly"
 USER_AGENT = "KarbonLens-scraper/0.1 (+https://karbonlens.netlify.app)"
 HTTP_TIMEOUT = 30.0
 PDF_ARCHIVE_DIR = Path("/var/lib/karbonlens/pdf-archive")
-POLITE_DELAY_SECONDS = 2.0  # between PDF downloads (implementation-brief override of spec §9 5-sec guidance)
+# between PDF downloads (implementation-brief override of spec §9 5-sec guidance)
+POLITE_DELAY_SECONDS = 2.0
 DEFAULT_FROM_MONTH = date(2023, 9, 1)
 
+# Module-level logger used only for import-time plumbing. The real scraper
+# log binding is created inside `main()` once `configure_logging()` has run.
 LOG = get_logger("idxcarbon")
 
 
@@ -174,7 +176,14 @@ def archive_path(period: date) -> Path:
 
 
 def download_pdf(client: httpx.Client, url: str, dest: Path) -> None:
-    """Download ``url`` to ``dest``. Always overwrites (spec §3.2)."""
+    """Download ``url`` to ``dest``. Always overwrites (spec §3.2).
+
+    Unlinks any existing file before writing so that PDFs originally created
+    by a different OS user (e.g. root during manual testing) can be replaced
+    cleanly when cron runs as the `karbonlens` user. `Path.write_bytes` opens
+    the existing inode with `mode='wb'` which would EACCES on a root-owned
+    644 file; unlink-then-write side-steps that entirely.
+    """
     resp = client.get(url, follow_redirects=True)
     resp.raise_for_status()
     content_type = resp.headers.get("content-type", "")
@@ -183,6 +192,7 @@ def download_pdf(client: httpx.Client, url: str, dest: Path) -> None:
             f"expected application/pdf from {url}, got {content_type!r}"
         )
     dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.unlink(missing_ok=True)
     dest.write_bytes(resp.content)
 
 
@@ -284,7 +294,7 @@ def _filter_listing(
 
 
 def _run(args: argparse.Namespace) -> int:
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     summary: dict[str, object] = {
         "scraper": "idxcarbon",
         "started_at": started_at.isoformat(),
@@ -316,17 +326,14 @@ def _run(args: argparse.Namespace) -> int:
 
         if args.dry_run:
             # Need DB to tell "would insert" vs "already in DB"; but read-only
-            conn = db.get_connection()
-            try:
+            with db.get_connection() as conn:
                 existing = existing_periods(conn)
-            finally:
-                conn.close()
             for entry in to_process:
                 period: date = entry["period_month"]  # type: ignore[assignment]
                 status = "already in DB" if period in existing else "would insert"
                 print(f"{period.isoformat()}  {status}  ({entry['pdf_url']})")
             LOG.info("dry_run_complete", months_listed=len(to_process))
-            summary["finished_at"] = datetime.now(timezone.utc).isoformat()
+            summary["finished_at"] = datetime.now(UTC).isoformat()
             print(json.dumps({"summary": summary}, default=str))
             return 0
 
@@ -336,8 +343,7 @@ def _run(args: argparse.Namespace) -> int:
                 only_month=args.only_month.isoformat(),
             )
 
-        conn = db.get_connection()
-        try:
+        with db.get_connection() as conn:
             for index, entry in enumerate(to_process):
                 period = entry["period_month"]  # type: ignore[assignment]
                 url = entry["pdf_url"]  # type: ignore[assignment]
@@ -435,10 +441,8 @@ def _run(args: argparse.Namespace) -> int:
                 # Polite pacing between downloads.
                 if index < len(to_process) - 1:
                     time.sleep(POLITE_DELAY_SECONDS)
-        finally:
-            conn.close()
 
-    summary["finished_at"] = datetime.now(timezone.utc).isoformat()
+    summary["finished_at"] = datetime.now(UTC).isoformat()
     LOG.info("run_complete", **{k: v for k, v in summary.items() if k != "errors"})
     # Emit the full structured summary on stdout as a single JSON line so
     # post-run assertions / dashboards can parse it.
@@ -447,6 +451,7 @@ def _run(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_logging("idxcarbon")
     config.load_env()
     parser = _build_argparser()
     args = parser.parse_args(argv)
