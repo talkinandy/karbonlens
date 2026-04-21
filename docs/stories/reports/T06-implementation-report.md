@@ -367,3 +367,69 @@ No other files touched.
    `pip install`s the wheel would import `from verra import fetch`. For the cron
    use case this is fine; for any future import-from-application-code use case it
    should be reorganised.
+
+## T06 follow-ups (code-audit non-blockers)
+
+These items were identified during the PASS-WITH-FIXES code audit (2026-04-19) and are
+recorded here for traceability. None blocked the merge.
+
+### SF-3 status-map gaps (must fix before T11/T12)
+
+18 of 64 Indonesian Verra projects are currently stored as `status=suspended` when they
+are actually in active verification (e.g. Katingan is "Verification approval requested",
+which is mid-cycle — not suspended). The root cause is that `STATUS_MAP` in
+`scrapers/verra/fetch.py` covers only 4 of the 11 distinct Verra status strings observed
+in the live dataset.
+
+**Required additions to `STATUS_MAP`:**
+```python
+"Registration requested": "pipeline",
+"Registration and verification approval requested": "pipeline",
+"Verification approval requested": "active",
+"Late to verify": "flagged",  # Andy's call: active may be more accurate
+"Units Transferred from Approved GHG Program": "flagged",
+```
+
+**Action:** File follow-up story T06.1 or fold into T09's opening commit. Must land before
+T11/T12 frontend goes live — the project explorer will show Katingan as suspended otherwise.
+Re-running the scraper after the fix is sufficient (the upsert is idempotent; only the
+`status` column will flip for the 18 affected rows).
+
+### SF-1 validation_date semantics (T09 calibration note)
+
+Verra's `/uiapi/resource/resourceSummary/{id}` endpoint exposes `PROJECT_REGISTRATION_DATE`
+(the VCS registry registration date), not the original PDD validation date. Katingan's
+`validation_date` in the DB is `2020-04-06` — the date of its Verra v4 re-registration —
+not the 2015 date when the PDD was validated.
+
+**Downstream impact for T09:** `validation_recency_score` will treat Katingan as a
+"fresh 2020 project" rather than a "2015 project." T09 author must either:
+- Accept `validation_date` as "registry age" and document this semantic shift in T09's
+  scoring rubric, OR
+- Add a manually-curated overlay table of true PDD validation dates for the flagship 10
+  projects before T09's first scored run.
+
+Cross-reference: T09 implementer should read §SF-1 in `docs/stories/reviews/T06-code-audit.md`
+before calibrating `validation_recency_score`.
+
+### SF-2 two queued match-queue pairs (pre-resolved, audit trail)
+
+The code audit confirmed that both `project_match_queue` pending entries at merge time
+represented legitimately distinct projects (two different wastewater-methane mills; two
+serially-numbered cookstove programs from the same developer). The entity-resolution
+threshold logic was working correctly — it correctly flagged near-but-not-identical names
+for human review.
+
+**Pre-resolution action (performed by T06 STAGE-5 docs/merge agent, 2026-04-19):**
+Both rows were set to `status='rejected'` with `resolved_by='T06-code-audit (pre-merge)'`
+so the T21 admin UI starts clean. `SELECT COUNT(*) FROM project_match_queue WHERE
+status='pending'` → 0 confirmed.
+
+### AC-6 validation_date nuance (methodology page note)
+
+The Katingan project detail card (T12) and the methodology documentation page should note
+that `validation_date` reflects the Verra Registry registration date, not the original PDD
+validation date. Katingan was PDD-validated circa 2015 but re-registered under VCS v4 on
+2020-04-06; the latter is what the scraper stores. This is the most accurate date the
+Verra public API exposes without PDF parsing. A future v0.2 task may add a
+`pdd_validation_date` overlay column populated from the `documentGroups` PDF URLs.
