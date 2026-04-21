@@ -9,12 +9,20 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/alerts", label: "Alerts" },
 ];
 
+type Props = {
+  /**
+   * Optional right-aligned slot for auth widgets (UserMenu / SignInButton).
+   * When unset, the v0.1 preview pill is shown — preserves the T03 shell
+   * for pages that don't surface auth (e.g. the public landing on first paint).
+   */
+  rightSlot?: React.ReactNode;
+};
+
 /**
  * Top navigation shell shared by `(public)` and `(app)` layouts.
- * Static for T03; T05 will layer a UserMenu / OnboardingModal into the
- * `(app)` layout alongside this component.
+ * T03 defines the shell; T05 layers a `rightSlot` for auth widgets.
  */
-export function SiteNav() {
+export function SiteNav({ rightSlot }: Props = {}) {
   return (
     <nav className="kl-topnav">
       <div className="kl-topnav-inner">
@@ -29,13 +37,16 @@ export function SiteNav() {
             </Link>
           ))}
         </div>
-        <span
-          className="kl-pill kl-pill--info"
-          style={{ marginLeft: "auto" }}
-          aria-label="v0.1 preview"
-        >
-          v0.1
-        </span>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+          {rightSlot ?? (
+            <span
+              className="kl-pill kl-pill--info"
+              aria-label="v0.1 preview"
+            >
+              v0.1
+            </span>
+          )}
+        </div>
       </div>
     </nav>
   );
