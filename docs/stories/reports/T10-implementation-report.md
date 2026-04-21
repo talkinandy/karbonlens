@@ -169,3 +169,33 @@ The `importance` values for rows 6 and 7 in the spec's §3 table are `medium` (n
 
 - `scrapers/seed/regulatory_events_v1.sql` — seed file (only file created by this story, per spec §3 scope)
 - `docs/stories/reports/T10-implementation-report.md` — this file
+
+---
+
+## T10 follow-ups (fact-check + code audit)
+
+**Code audit verdict:** PASS-WITH-FIXES. 0 blocking findings. Post-audit fix commits applied to `feature/v0.1-impl` on 2026-04-19.
+
+### Fix commits applied
+
+1. **Row 1 name correction** (`fix(T10): row 1 name Dewan Nasional; row 6 tag mrvb->mrv`): SQL seed corrected `'Badan Pengendalian Perubahan Iklim (DNPI)'` → `'Dewan Nasional Perubahan Iklim (DNPI)'`. Live DB patched via `UPDATE regulatory_events SET title = REPLACE(...)`. Verification: `SELECT COUNT(*) WHERE title ILIKE 'Dewan Nasional%'` → 1.
+
+2. **Row 6 tag typo** (same commit): SQL seed corrected `'mrvb'` → `'mrv'` in row 6 tags array. Live DB patched via `UPDATE regulatory_events SET tags = array_replace(tags, 'mrvb', 'mrv')`. Verification: `SELECT COUNT(*) WHERE 'mrvb' = ANY(tags)` → 0.
+
+### Rows awaiting Andy confirmation
+
+The following rows contain post-knowledge-cutoff data that the auditor could not independently verify. Code is correct; fact-correctness is pending:
+
+| # | Document | What needs confirmation |
+|---|---|---|
+| 6 | Permenhut 7/2024 | Document number, date (2024-07-08), and that this is the operative SRN-PPI forestry operationalization regulation |
+| 7 | Kepmen LH 20/2025 | Document number, date (2025-03-15), and that DRAM/DPP refers to the correct portal acronym expansions under KLH |
+| 8 | Perpres 110/2025 | Document number, date (2025-04-22), and that this Perpres specifically re-opened international Article 6 carbon credit trade (CRITICAL row) |
+| 9 | Permenhut 6/2026 | Document number, date (2026-01-14), that the moratorium started "early 2022", and that this lifts it (CRITICAL row) |
+| 10 | IDX-LAUNCH-2026 | Forecast date (2026-07-01, forecast as-of 2026-04-21) — confirm mid-2026 remains the expected timeframe as of today |
+
+### Row 10 forecast annotation
+
+When Andy confirms: add `/* forecast as of 2026-04-21; update when OJK announces */` to the event_date line in a v2 seed or UPDATE statement.
+
+**Status: `done-pending-factcheck` — code-correct; fact-correct pending Andy sign-off on rows 6–10.**
