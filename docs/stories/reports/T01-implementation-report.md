@@ -247,3 +247,10 @@ Mode `600`, owned by `root:root`, contents: `DB_PASS=<32-char>`, `DATABASE_URL=p
 4. **Unattended-upgrade / redis-server recovery.** We SIGKILLed three 6-day-wedged system processes (`unattended-upgrade`, child `dpkg`, stuck `redis-server`) to unblock the dpkg lock. `dpkg --configure -a` then healed the state cleanly. Redis came back active. If any other tenant reports data loss: redis had been `deactivating (stop-sigterm)` / `Error trying to save the DB, can't exit.` since 2026-04-15 — the state was already lost before we touched anything.
 5. **Listen_addresses verification is correct.** Two `ss` entries (`127.0.0.1:5432` and `[::1]:5432`) is expected behaviour when `listen_addresses = 'localhost'` on Linux — `localhost` resolves to both loopback families. Neither entry is `0.0.0.0` nor a public IP.
 6. **No repo commits made.** Per brief — orchestrator commits after the audit. Working tree currently has two tracked-file changes: `docs/runbooks/vps-setup.md` (rewritten section 7) and `docs/stories/reports/T01-implementation-report.md` (this file, new).
+
+---
+
+## T01 follow-ups (non-blocking audit findings)
+
+- **Finding 1 (F1)** — Runbook `awk` insertion pattern silently no-ops on a clean Postgres host where no `host all all 127.0.0.1/32 trust` line exists; the karbonlens scram rule is never written in that case. Recommended fix is a fallback-append branch (see `docs/stories/reviews/T01-code-audit.md` §Finding 1). Flag for ops backlog — address in a dedicated runbook polish pass before the next fresh-host provisioning.
+- **Finding 2 (F2)** — PostGIS, pgcrypto, and pg_trgm extensions are owned by the `postgres` superuser (installed via `sudo -u postgres psql`); the `karbonlens` role can use them via default `public` grants but cannot drop or alter them. T02 schema DDL must not attempt extension-level DDL as the `karbonlens` role. No action for T01; noted for T02 implementer and flagged for ops backlog if `public` schema grants are ever tightened.
