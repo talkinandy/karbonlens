@@ -29,7 +29,7 @@ Tasks are numbered for referencing, not for strict ordering. Parallel tasks are 
 | T06 | Verra scraper: fetch + parse + upsert | T02 | 6h | done |
 | T07 | GFW alerts scraper: geostore + query + upsert | T02, T06 | 4h | done (phase A) — Phase B (live API) pending Andy's GFW_API_KEY |
 | T08 | IDXCarbon monthly PDF scraper | T02 | 4h | done — 10 months; IDXCarbon source caps AC-2 |
-| T09 | Score computation daily job | T06, T07 | 2h | todo |
+| T09 | Score computation daily job | T06, T07 | 2h | done (AC-5 environmental-conditional; re-verify after T07 Phase B) |
 | T10 | Seed regulatory events manually | T02 | 1h | done (pending Andy fact-check rows 6-10) |
 | T11 | Projects explorer screen (table + filters) | T04, T06 | 4h | todo |
 | T12 | Project detail screen | T04, T06, T07, T09 | 4h | todo |
