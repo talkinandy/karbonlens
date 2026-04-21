@@ -2,7 +2,7 @@
 id: T07
 title: GFW alerts scraper — geostore + query + upsert
 phase: 2
-status: done-phase-a
+status: done
 blocked_by: [T02, T06]
 blocks: [T09, T12, T13, T16]
 owner: spec-writer agent

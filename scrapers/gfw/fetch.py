@@ -320,6 +320,10 @@ def register_geostore(
     """
     headers = {
         "x-api-key": api_key,
+        # GFW validates the key against the domain allowlist using the Origin
+        # header. Our key is registered for localhost + karbonlens.netlify.app;
+        # localhost is the safe default for scraper-side calls.
+        "Origin": "http://localhost",
         "Content-Type": "application/json",
         "Accept": "application/json",
         "User-Agent": config_module.SCRAPER_USER_AGENT,
@@ -362,6 +366,8 @@ def query_alerts(
     """
     headers = {
         "x-api-key": api_key,
+        # GFW API-key auth requires an Origin matching the key's domain allowlist.
+        "Origin": "http://localhost",
         "Accept": "application/json",
         "User-Agent": config_module.SCRAPER_USER_AGENT,
     }
