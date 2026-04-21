@@ -35,7 +35,7 @@ SELECT
     'Presidential',
     'Perpres',
     '46/2008',
-    'Badan Pengendalian Perubahan Iklim (DNPI)',
+    'Dewan Nasional Perubahan Iklim (DNPI)',
     'https://peraturan.bpk.go.id/Details/41295/perpres-no-46-tahun-2008',
     'Established the Dewan Nasional Perubahan Iklim (DNPI), Indonesia''s first formal national body for coordinating climate-change policy and reporting. Set the institutional foundation for all subsequent carbon-market regulation.',
     'Membentuk Dewan Nasional Perubahan Iklim (DNPI), lembaga nasional pertama yang bertugas mengkoordinasikan kebijakan dan pelaporan perubahan iklim. Menjadi landasan kelembagaan bagi seluruh regulasi pasar karbon berikutnya.',
@@ -174,7 +174,7 @@ SELECT
     'Operationalised the SRN-PPI national carbon registry for the forestry sector, setting out the procedures for project registration, issuance of carbon units, and data reporting obligations. Required all forest-carbon projects to list through SRN-PPI as a condition for trading on IDXCarbon.',
     'Mengoperasionalkan registri karbon nasional SRN-PPI untuk sektor kehutanan, mengatur tata cara pendaftaran proyek, penerbitan unit karbon, dan kewajiban pelaporan data. Mewajibkan seluruh proyek karbon hutan mendaftar melalui SRN-PPI sebagai syarat untuk diperdagangkan di IDXCarbon.',
     'medium',
-    ARRAY['srn-ppi','registry','forestry','mrvb'],
+    ARRAY['srn-ppi','registry','forestry','mrv'],
     FALSE
 WHERE NOT EXISTS (
     SELECT 1 FROM regulatory_events
