@@ -95,3 +95,13 @@ Single atomic commit on `feature/T16-notifications-bell` adding all new files + 
 
 - **HTTP-layer authed ACs not exercised via live cookie.** Live session-cookie extraction was declined by the sandbox (correct policy — impersonation is out-of-bounds). The authed ACs (2, 3, 4, 5, 6, 7) were verified instead by replaying the same SQL the route handlers / RSC emit (using `ANDY_ID` directly against the live DB) and by `npm run build` confirming the code compiles. Full end-to-end cookie-authed verification should happen in a browser session during QA.
 - **No new tests committed.** Project does not yet have a Vitest/Jest harness (consistent with earlier phases). AC evidence is live-DB + build; this matches the pattern in T09/T10 reports.
+
+## T16 follow-ups
+
+Non-blocking findings from the code audit (CONDITIONAL PASS, 0 blocking, 5 non-blocking):
+
+- **F1:** `{ids:"notastring", all:true}` accepted silently — bad `ids` is ignored when `all:true` is set. Harden to reject mixed payloads (should 400 if both fields present simultaneously).
+- **F2:** Pagination cursor uses `created_at` only, not `(created_at, id)` tuple — tie-on-same-timestamp could skip/duplicate rows. Low probability at 60 rows; follow-up when volume grows.
+- **F3:** `KNOWN_TYPES` whitelist silently drops unknown `?type=` values — consider returning 400 for unrecognised type params instead of silently ignoring.
+- **F4:** Row-click does NOT mark-read (spec-compliant per AC wording; flagged because intuitive UX would mark-read on click). Revisit in T17/UX polish pass.
+- **F5:** AC-7 slug test used real DB slug; caller prompt had placeholder — implementer correctly substituted the real slug. No code change needed; noted for future prompt hygiene.
