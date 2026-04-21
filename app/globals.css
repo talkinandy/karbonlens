@@ -492,15 +492,83 @@ button {
   color: var(--text-2);
 }
 
+/* ===== T12 — Project detail: score bars ===== */
+.score-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+.score-row-label {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.score-row-value {
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.score-track {
+  grid-column: 1 / -1;
+  height: 5px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.score-fill { height: 100%; border-radius: 3px; }
+.score-fill.success { background: var(--success-fg); }
+.score-fill.info { background: var(--info-fg); }
+.score-fill.warning { background: var(--warning-fg); }
+
+/* ===== T12 — Project detail: map placeholder ===== */
+.kl-map-placeholder {
+  min-height: 280px;
+  background: var(--surface-2);
+  border: 0.5px dashed var(--border);
+  border-radius: var(--radius-lg);
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+/* ===== T12 — Project detail: skeleton (T12 version — supersedes earlier) ===== */
+
 .kl-skeleton {
   background: linear-gradient(
     90deg,
     var(--surface-2) 0%,
-    var(--border) 50%,
+    color-mix(in srgb, var(--surface-2) 60%, var(--border)) 50%,
     var(--surface-2) 100%
   );
   background-size: 200% 100%;
-  border-radius: 4px;
+  animation: kl-skeleton-pulse 1.4s ease-in-out infinite;
+  border-radius: var(--radius-lg);
+}
+
+@keyframes kl-skeleton-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.kl-muted {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.kl-link {
+  color: var(--info-fg);
+  text-decoration: underline;
+}
+
+.kl-link:hover { opacity: 0.85; }
+
+.kl-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
 }
 
 /* T16 — notification type badges. Six distinct background colors + icons

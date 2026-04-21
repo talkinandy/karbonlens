@@ -2,7 +2,9 @@
  * lib/display/status.ts — Shared status badge mapping for T11 and T12.
  *
  * Ownership: T11 (creating owner). T12 consumes the same helper for its hero
- * badge so the two pages stay visually consistent.
+ * badge so the two pages stay visually consistent, and contributes the
+ * `badgePillClass` helper that maps a badge variant to a `.kl-pill--*` CSS
+ * utility class.
  *
  * Input: the raw `projects.status` column — which currently holds the internal
  * canonical enum (`active`/`pipeline`/`suspended`/`flagged`) in v0.1. The
@@ -11,8 +13,9 @@
  * column with raw Verra values, this file is the *only* place that needs
  * updating. See T11 §3.5 / OQ-1.
  *
- * Output: a `{ label, badge }` pair where `badge` is one of the five CSS
- * categories used by `.kl-pill--*` in `app/globals.css`.
+ * Output: `displayStatus` returns a `{ label, badge }` pair where `badge` is
+ * one of the five CSS categories used by `.kl-pill--*` in `app/globals.css`.
+ * `badgePillClass` returns the full utility-class suffix (e.g. `kl-pill--success`).
  */
 
 export type StatusBadge =
@@ -67,5 +70,26 @@ export function displayStatus(raw: string | null): DisplayStatus {
 
     default:
       return { label: raw, badge: 'unknown' };
+  }
+}
+
+/**
+ * Pill class suffix for a badge variant. The `.kl-pill` base class plus this
+ * suffix gives the full utility class name (e.g. `kl-pill kl-pill--success`).
+ *
+ * Contributed by T12; consumed by both T11's `ProjectsTable` and T12's hero.
+ */
+export function badgePillClass(badge: DisplayStatus['badge']): string {
+  switch (badge) {
+    case 'active':
+      return 'kl-pill--success';
+    case 'pipeline':
+      return 'kl-pill--info';
+    case 'suspended':
+      return 'kl-pill--danger';
+    case 'flagged':
+      return 'kl-pill--warning';
+    default:
+      return 'kl-pill--neutral';
   }
 }
