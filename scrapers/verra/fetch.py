@@ -217,7 +217,8 @@ def _fetch_get(
 # ----------------------------------------------------------------------------
 
 
-_HECTARES_RE = re.compile(r"([0-9][0-9,\.]*)\s*(hectares|ha)", re.IGNORECASE)
+_HECTARES_RE = re.compile(r"([0-9][0-9,\.]*)\s*(hectares|ha)\b", re.IGNORECASE)
+_DESC_HECTARES_RE = re.compile(r"([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{4,})\s*hectares", re.IGNORECASE)
 
 
 def _parse_hectares(raw: str | None) -> float | None:
@@ -438,7 +439,10 @@ def normalise_project(list_row: dict, detail: dict | None) -> VerraProject | Non
     vcs_id = f"VCS{numeric_id}"
 
     name = (detail or {}).get("resourceName") or list_row.get("resourceName") or ""
+    # Full description used for hectares heuristic parsing below; only the
+    # first 500 chars get stored on the projects row.
     description = (detail or {}).get("description")
+    description_full = description or ""
 
     # Province / attributes live on detail.attributes[]
     province = None
@@ -473,6 +477,19 @@ def normalise_project(list_row: dict, detail: dict | None) -> VerraProject | Non
         or None
     )
     hectares = _parse_hectares(_extract_attr(vcs_ps_attrs, "PROJECT_ACREAGE"))
+    # Verra sometimes publishes inconsistent acreage numbers between the
+    # description (often the authoritative PDD value, e.g. "149,800 hectares"
+    # for Katingan) and the PROJECT_ACREAGE attribute (which for some rows is
+    # missing a zero, e.g. "14980 Hectares"). Prefer the description-parsed
+    # value when it exists and is >=2x the attribute (heuristic: they agree
+    # within 2x, else description wins). This handles the known Verra data
+    # bug without clobbering cases where PROJECT_ACREAGE is correct.
+    if description_full:
+        desc_match = _DESC_HECTARES_RE.search(description_full)
+        if desc_match:
+            desc_hectares = _parse_hectares(desc_match.group(0))
+            if desc_hectares and (hectares is None or desc_hectares >= 2 * hectares):
+                hectares = desc_hectares
     validation_date_raw = _extract_attr(vcs_ps_attrs, "PROJECT_REGISTRATION_DATE") or list_row.get(
         "projectRegistrationDate"
     )
@@ -547,12 +564,17 @@ def upsert_project(conn: psycopg.Connection, p: VerraProject) -> tuple[str, str]
     # pick the first free variant.
     slug = _unique_slug(conn, base_slug)
 
+    # The Verra list row reports `country` as a full name ("Indonesia") rather
+    # than an ISO-2 code. The projects.country column is CHAR(2) and v0.1 only
+    # ingests Indonesian projects, so hard-code "ID" here. A future
+    # multi-country scraper should maintain a name -> ISO-2 map.
+    country_code = "ID"
     centroid_sql = "NULL"
     params: list = [
         slug,
         p.name,
         p.developer,
-        p.country[:2].upper() if p.country else "ID",
+        country_code,
         p.province,
         p.project_type,
         p.methodology,
@@ -609,23 +631,40 @@ def upsert_project(conn: psycopg.Connection, p: VerraProject) -> tuple[str, str]
 def update_existing_project_metadata(
     conn: psycopg.Connection, existing_id: str, p: VerraProject
 ) -> None:
-    """Refresh totals + updated_at on the already-resolved row."""
+    """Refresh totals + updated_at on the already-resolved row.
+
+    Only fields that Verra is authoritative for are overwritten; everything
+    else is kept via COALESCE so a manual override on the row survives.
+    """
     execute_with_retry(
         conn,
         """
         UPDATE projects SET
             total_vcus_issued  = %s,
             total_vcus_retired = %s,
+            country            = 'ID',
+            hectares           = COALESCE(%s, hectares),
+            province           = COALESCE(%s, province),
+            developer          = COALESCE(%s, developer),
+            project_type       = COALESCE(%s, project_type),
+            methodology        = COALESCE(%s, methodology),
             updated_at         = NOW(),
             status             = COALESCE(%s, status),
-            validation_date    = COALESCE(%s, validation_date)
+            validation_date    = COALESCE(%s, validation_date),
+            first_issuance_date = COALESCE(%s, first_issuance_date)
         WHERE id = %s
         """,
         (
             p.total_vcus_issued,
             p.total_vcus_retired,
+            p.hectares,
+            p.province,
+            p.developer,
+            p.project_type,
+            p.methodology,
             p.status_db,
             p.validation_date,
+            p.first_issuance_date,
             existing_id,
         ),
     )
