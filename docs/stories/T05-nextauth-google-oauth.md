@@ -2,7 +2,7 @@
 id: T05
 title: NextAuth.js v5 with Google OAuth
 phase: 1
-status: audited
+status: done-phase-a
 blocked_by: [T04]
 blocks: [T16, T17, T18, T21]
 owner: implementer-agent
@@ -400,3 +400,24 @@ The middleware in-body check uses `katingan-peatland` as the baseline public slu
 ## Appendix A — Runbook
 
 Runbook extracted to `docs/runbooks/google-oauth-setup.md` during spec revision.
+
+---
+
+## Post-merge Phase B verification
+
+**Status:** Phase A complete (code correctness, build, typecheck, middleware redirects, API boundary). Phase B deferred — requires Andy's real Google Cloud Platform OAuth credentials in `.env.local`.
+
+**How to proceed:** Follow `docs/runbooks/google-oauth-setup.md` to provision a GCP OAuth client, then populate `.env.local` with `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET` (`openssl rand -base64 32`), `NEXTAUTH_URL=http://localhost:3000`, and a real `DATABASE_URL`. Restart `npm run dev`, then run the 8 ACs below.
+
+### ACs requiring live GCP credentials
+
+| AC | Gherkin summary | Verification command / action |
+|---|---|---|
+| AC-1 | Google OAuth round-trip completes without `?error=` | Open `http://localhost:3000`, click "Sign in with Google", complete consent screen, confirm name/avatar in top nav. |
+| AC-2 | User row created on first login | `psql $DATABASE_URL -c "SELECT email, name, email_digest_opt_in, persona FROM users WHERE email='<my-email>';"` → 1 row, `email_digest_opt_in = t`, `persona IS NULL`. |
+| AC-3 | Account row linked (exercises T04 snake_case fix) | `SELECT provider, provider_account_id, access_token IS NOT NULL FROM accounts WHERE user_id = (SELECT id FROM users WHERE email='<my-email>');` → `google`, non-null id, `access_token IS NOT NULL = t`. |
+| AC-4 | Session row exists and `expires > NOW()` | `SELECT expires FROM sessions WHERE user_id = (SELECT id FROM users WHERE email='<my-email>');` → future timestamp. |
+| AC-5 | Onboarding modal appears after first login (`persona IS NULL`) | Navigate to any `(app)` page — modal overlay must be visible with persona select + organisation input. |
+| AC-6 | Onboarding submission persists to DB | Select persona = 'researcher', enter organization = 'ACME Corp', click Submit. `SELECT persona, organization FROM users WHERE email='<my-email>';` → `('researcher','ACME Corp')`. |
+| AC-9 | Authenticated access to `/prices` returns 200 | While carrying the authjs session cookie, `curl -I http://localhost:3000/prices` → 200. |
+| AC-10 | Sign-out clears session and re-gates `/prices` | Click "Sign out" → avatar gone; `SELECT * FROM sessions WHERE user_id=... AND expires > NOW()` returns 0 rows; `/prices` redirects to `/?signin=1`. |
