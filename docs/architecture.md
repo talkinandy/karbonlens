@@ -661,4 +661,29 @@ Deltas between what the architecture specified and what Phase 1 actually shipped
 - **pg_hba.conf ordering:** scram-sha-256 rule for the karbonlens role was inserted BEFORE any catch-all trust lines (first-match-wins). The runbook (`docs/runbooks/vps-setup.md`) documents this ordering requirement. Non-issue on a fresh host; documented for multi-tenant safety.
 - **`users.email_verified`:** §3 DDL shows `email_verified TIMESTAMPTZ` — this is correct and matches what shipped. No change needed.
 
+### Phase 2 shipped state (as of 2026-04-21)
+
+Deltas introduced by T06–T10. Section §1–§12 remain forward-looking; §13 Phase 1 block and this block record divergences.
+
+- **Migration 002 (T07):** adds `projects.gfw_geostore_id TEXT` plus three expression-based unique indexes: `uq_sat_project_date_loc` on `satellite_alerts`, `uq_issuances_dedupe` on `issuances`, and `uq_notifications_dedupe` on `notifications`. **Critical gotcha:** `ON CONFLICT ON CONSTRAINT <name>` fails against expression-based unique indexes because they are not named constraints. All three scrapers must use the column-list form `ON CONFLICT (col_a, col_b, ...)` instead. See `docs/scraper-patterns.md` §ON-CONFLICT for the worked pattern.
+
+- **T06 Verra — OData, not HTML (§5.1 update):** §5.1 above describes the registry as "stable HTML scraping." This is outdated. The registry SPA is an Angular app; the documented search URLs return a Next-shell only. T06 reverse-engineered the internal OData endpoints: `/uiapi/resource/resource/search` (project list), `/uiapi/resource/resourceSummary/{id}` (project detail), `/uiapi/asset/asset/search` (issuances). These endpoints are anonymous-accessible but undocumented. Treat them as fragile — a Verra SPA upgrade may change paths without notice.
+
+- **T07 GFW geostore cache:** GFW's `/geostore` POST endpoint accepts anonymous (keyless) requests in practice, even though the query endpoint requires a key. This allowed 55 of 64 project buffers to be pre-registered without a key. The remaining 9 will be registered when Phase B runs with `GFW_API_KEY`. Phase B then queries all 64 for integrated alerts.
+
+- **T08 IDXCarbon archive cap:** The listing page at `idxcarbon.co.id/data-monthly` exposes only the 10 most recent months (currently Jun 2025 – Mar 2026). The PRD's ≥24-month AC-2 threshold is environmentally unreachable until IDXCarbon expands their archive. Future monthly cron runs will pick up new months as they publish. Historical months pre-Jun 2025 are not recoverable from the current public listing.
+
+- **T09 scoring caveats:**
+  - `validation_date` in the DB equals Verra's `registration_date`, not the PDD validation date. The API does not expose the PDD date. Scores using validation recency reflect registration age, which is a reasonable proxy.
+  - `transparency_score` floors at 55 for most projects because T06 writes raw Verra status strings (e.g. "Registered") rather than the canonical enum (`active`). T09's transparency sub-score filter checks `status='active'` — the mismatch causes all non-overridden projects to land in the single-registry path. T06.1 will normalize the status field before T11 frontend lands.
+  - Community overrides: 1 of 3 hardcoded slugs matches T06's actual slug output. The other 2 (`rimba-raya`, `cendrawasih-aru`) need Andy to confirm they match the slugified names in the `projects` table.
+  - Score range: min=56, max=86, median=74 across 64 projects.
+
+- **T10 regulatory seed:** 10 events loaded. Rows 1–5 confirmed clean; rows 6–10 (Permenhut 7/2024, Kepmen LH 20/2025, Perpres 110/2025, Permenhut 6/2026, IDX 2026-07-01 forecast) await Andy's verification of document numbers and dates.
+
+- **Current table counts (live DB, 2026-04-21):**
+  - projects=64, registries=64, issuances=307, satellite_alerts=0 (Phase B pending)
+  - idx_monthly_snapshots=10, regulatory_events=10, project_scores=64
+  - projects with gfw_geostore_id=55, users=1 (Andy's Google account), sessions=1, accounts=1
+
 *End of architecture doc. Paired with `PRD.md` (strategy) and `TASKS.md` (tactics).*
