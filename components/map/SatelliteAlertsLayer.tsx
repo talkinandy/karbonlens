@@ -19,6 +19,7 @@
  */
 
 import { useEffect } from 'react';
+import type * as GeoJSON from 'geojson';
 import maplibregl from 'maplibre-gl';
 import { useMapContext } from './MapLibreBase';
 import type {

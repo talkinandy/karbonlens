@@ -7,6 +7,8 @@
  * Ownership: T13.
  */
 
+import type * as GeoJSON from 'geojson';
+
 /**
  * Maximum alert points rendered per project detail map. See `map-geojson.ts`
  * for rationale. Exported here (not from `map-geojson.ts`) so client
