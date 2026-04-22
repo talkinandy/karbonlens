@@ -1,10 +1,11 @@
 /**
  * app/(public)/page.tsx — public landing (T18).
  *
- * ISR cache: `revalidate = 3600` means Next.js serves the cached HTML for up
- * to one hour, triggering a single background regeneration on the first visit
- * in each 60-minute window. See `lib/queries/landing-stats.ts` for the
- * canonical cache-contract comment.
+ * Route is dynamic because auth() reads the session cookie to branch the hero
+ * CTA ("Open dashboard →" vs <SignInButton>). The ISR path would require
+ * splitting the stats section into a client island that hydrates post-auth;
+ * deferred to v0.2 if landing page load time becomes a concern.
+ * See T18 spec §3.2 for the trade-off rationale.
  *
  * All hero numbers are live from the DB. The DB-down fallback returns a
  * zeroed `LandingStats`, which this page renders as "—" plus a banner.
@@ -20,9 +21,7 @@ import { StatCard } from '@/components/landing/StatCard';
 import { FeaturedProjects } from '@/components/landing/FeaturedProjects';
 import { DataSources } from '@/components/landing/DataSources';
 
-// ISR: landing stats are refreshed in the background at most once per hour.
-// v0.2: drop to 900 if operators want tighter freshness.
-export const revalidate = 3600;
+// Route is dynamic because auth() reads session cookie. See T18 spec §3.2 for the tradeoff.
 
 export default async function LandingPage() {
   const [stats, session] = await Promise.all([getLandingStats(), auth()]);
@@ -44,7 +43,7 @@ export default async function LandingPage() {
           }}
         >
           We couldn&apos;t reach the database to load live stats. Showing
-          zeroed placeholders — ISR will retry on the next revalidation.
+          zeroed placeholders — refresh the page to retry.
         </div>
       ) : null}
 

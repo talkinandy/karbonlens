@@ -2,7 +2,7 @@
  * components/landing/HeroSection.tsx — T18 landing hero.
  *
  * Server component. Renders the T03 headline/subtitle verbatim, plus an
- * auth-conditional CTA: authenticated users see "Go to dashboard →"; anon
+ * auth-conditional CTA: authenticated users see "Open dashboard →"; anon
  * visitors see the <SignInButton>. The `session` prop is the full NextAuth
  * session object (or null) so the component can branch internally — the
  * parent page does not have to pick which element to pass.
@@ -34,7 +34,7 @@ export function HeroSection({ session }: HeroSectionProps) {
         <div style={{ marginTop: 20 }}>
           {session?.user ? (
             <Link href="/projects" className="kl-btn kl-btn--primary">
-              Go to dashboard →
+              Open dashboard →
             </Link>
           ) : (
             <SignInButton />
