@@ -99,3 +99,13 @@ DB aggregates extended in `lib/queries/landing-stats.ts` and a new
 - IntersectionObserver defer for the hero map — noted as a v0.2 follow-up
   in spec N-1; not required unless AC-11's 3-second Fast 3G target is
   missed in production.
+
+## T25 follow-ups
+
+Non-blocking findings accepted at code-audit (PASS, 0 blocking, 5 non-blocking):
+
+1. `/og-image.png` returns 404 until T26 lands — T26 ships the social-preview image asset; accepted.
+2. `/methodology` returns 404 until T24 lands — T24 ships the methodology page; accepted.
+3. Permenhut CTA uses `?focus=permenhut-6-2026` query param — the `/regulatory` page currently ignores this param (no 404, no scroll effect). Filter enhancement is a v0.2 follow-up.
+4. Map skeleton div is `aria-hidden`; the visible caption covers the semantic gap pre-hydration. No screen-reader regression; accepted.
+5. Score buckets on featured project cards render as plain text (no teal/blue/amber/red colour ring). Not required by spec §3.4; visual polish deferred to a later sprint.
