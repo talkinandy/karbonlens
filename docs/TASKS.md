@@ -47,6 +47,7 @@ Tasks are numbered for referencing, not for strict ordering. Parallel tasks are 
 | T23 | Replace static prototype with live Next.js build | T11, T12, T14, T15, T16, T18 | 2h | todo |
 | T25 | Landing redesign with satellite map visual | — | 4h | done |
 | T26 | Social preview (OG + Twitter) | — | 2.5h | done |
+| T24 | Fix dead links + /methodology page | — | 1.5h | done |
 
 **Total estimated effort:** ~62 hours of focused engineering. Aim for 4–6h/day → roughly 2 weeks calendar, leaves 3+ weeks buffer before end-of-May target.
 
