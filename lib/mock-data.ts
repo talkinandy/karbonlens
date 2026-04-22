@@ -1,147 +1,17 @@
 /**
  * KarbonLens — mock data for T03 bootstrap.
  *
- * This module is the sole source of seeded UI data for the six screens
- * during T03 (no database, no auth). Each screen imports from here with
- * a `// TODO T11+: replace with db query` comment at the import site.
+ * T18: `mockProjects` and `PUBLIC_PROJECT_SLUGS` were deleted. The landing
+ * page (the last consumer) switched to live `getLandingStats` in T18, and
+ * the middleware in `proxy.ts` has its own hardcoded (real-DB-slug) allow
+ * list reconciled during T05.1. The remaining exports below are still used
+ * by scaffolded pages that have not yet landed their live query (prices
+ * stats strip, regulatory fallback list, alerts empty state). They will be
+ * removed as those stories finish cutting over.
  *
- * When T11+ lands real data:
- *   1. Delete this file.
- *   2. Replace every `import { mockX } from "@/lib/mock-data"` with the
- *      matching Drizzle query from `lib/db.ts`.
- *
- * Slug discipline: the three slugs declared in `mockProjects`
- * (`katingan-peatland`, `sumatra-merang-peat`, `rimba-raya`) are the canonical
- * public slugs. T05 hardcodes these exact strings in its middleware negative
- * lookahead. Do not change them without coordinating with T05.
+ * Canonical featured slugs now live in `lib/queries/landing-stats.ts`
+ * (`FEATURED_SLUGS`).
  */
-
-export type ScoreBreakdown = {
-  validation: number;
-  reversal: number;
-  community: number;
-  transparency: number;
-};
-
-export type IssuancePoint = {
-  year: number;
-  value: number; // million VCUs
-};
-
-export type ProjectStatus = "active" | "pipeline" | "suspended" | "flagged";
-
-export type MockProject = {
-  slug: string;
-  name: string;
-  shortName: string;
-  developer: string;
-  type: string;
-  subtype?: string;
-  province: string;
-  provinceShort: string;
-  hectares: number;
-  centroid?: [number, number];
-  status: ProjectStatus;
-  score: number;
-  breakdown?: ScoreBreakdown;
-  issued?: string;
-  retired?: string;
-  available: string;
-  availableSort: number;
-  lastVintage?: number;
-  registries: string[];
-  registriesShort: string;
-  issuances?: IssuancePoint[];
-};
-
-export const mockProjects: MockProject[] = [
-  {
-    slug: "katingan-peatland",
-    name: "Katingan Peatland Restoration",
-    shortName: "Katingan Peatland",
-    developer: "Rimba Makmur Utama",
-    type: "REDD+",
-    subtype: "Peatland",
-    province: "Central Kalimantan",
-    provinceShort: "C. Kalimantan",
-    hectares: 149800,
-    centroid: [-1.8, 113.2],
-    status: "active",
-    score: 82,
-    breakdown: { validation: 90, reversal: 72, community: 85, transparency: 80 },
-    issued: "32.5M",
-    retired: "28.9M",
-    available: "3.6M",
-    availableSort: 3_600_000,
-    lastVintage: 2020,
-    registries: ["Verra", "SRN-PPI"],
-    registriesShort: "V · SRN",
-    issuances: [
-      { year: 2017, value: 5.8 },
-      { year: 2018, value: 7.9 },
-      { year: 2019, value: 9.5 },
-      { year: 2020, value: 8.7 },
-    ],
-  },
-  {
-    slug: "sumatra-merang-peat",
-    name: "Sumatra Merang Peatland Project",
-    shortName: "Sumatra Merang",
-    developer: "Forest Carbon",
-    type: "REDD+",
-    subtype: "Peatland",
-    province: "South Sumatra",
-    provinceShort: "S. Sumatra",
-    hectares: 22900,
-    status: "active",
-    score: 74,
-    breakdown: { validation: 80, reversal: 62, community: 78, transparency: 75 },
-    issued: "8.4M",
-    retired: "7.2M",
-    available: "1.2M",
-    availableSort: 1_200_000,
-    lastVintage: 2021,
-    registries: ["Verra", "SRN-PPI"],
-    registriesShort: "V · SRN",
-    issuances: [
-      { year: 2018, value: 1.6 },
-      { year: 2019, value: 2.0 },
-      { year: 2020, value: 2.4 },
-      { year: 2021, value: 2.4 },
-    ],
-  },
-  {
-    slug: "rimba-raya",
-    name: "Rimba Raya Conservation",
-    shortName: "Rimba Raya",
-    developer: "PT Rimba Raya",
-    type: "REDD+",
-    province: "Central Kalimantan",
-    provinceShort: "C. Kalimantan",
-    hectares: 36000,
-    status: "flagged",
-    score: 58,
-    breakdown: { validation: 60, reversal: 42, community: 55, transparency: 70 },
-    issued: "18.9M",
-    retired: "14.8M",
-    available: "4.1M",
-    availableSort: 4_100_000,
-    lastVintage: 2022,
-    registries: ["Verra"],
-    registriesShort: "V",
-    issuances: [
-      { year: 2019, value: 3.4 },
-      { year: 2020, value: 3.9 },
-      { year: 2021, value: 4.3 },
-      { year: 2022, value: 4.8 },
-    ],
-  },
-];
-
-/** Public slug allow-list. Kept in sync with `mockProjects`; T05 mirrors this. */
-export const PUBLIC_PROJECT_SLUGS: ReadonlySet<string> = new Set(
-  mockProjects.map((p) => p.slug),
-);
 
 export type PricePoint = {
   month: string;
