@@ -1,92 +1,101 @@
-import Link from "next/link";
-// TODO T11+: replace with db query
-import { mockProjects } from "@/lib/mock-data";
-import { auth } from "@/lib/auth";
-import { SignInButton } from "@/components/auth/SignInButton";
+/**
+ * app/(public)/page.tsx — public landing (T18).
+ *
+ * Route is dynamic because auth() reads the session cookie to branch the hero
+ * CTA ("Open dashboard →" vs <SignInButton>). The ISR path would require
+ * splitting the stats section into a client island that hydrates post-auth;
+ * deferred to v0.2 if landing page load time becomes a concern.
+ * See T18 spec §3.2 for the trade-off rationale.
+ *
+ * All hero numbers are live from the DB. The DB-down fallback returns a
+ * zeroed `LandingStats`, which this page renders as "—" plus a banner.
+ */
+
+import { auth } from '@/lib/auth';
+import {
+  getLandingStats,
+  isLikelyDbDown,
+} from '@/lib/queries/landing-stats';
+import { HeroSection } from '@/components/landing/HeroSection';
+import { StatCard } from '@/components/landing/StatCard';
+import { FeaturedProjects } from '@/components/landing/FeaturedProjects';
+import { DataSources } from '@/components/landing/DataSources';
+
+// Route is dynamic because auth() reads session cookie. See T18 spec §3.2 for the tradeoff.
 
 export default async function LandingPage() {
-  const featured = mockProjects.slice(0, 3);
-  const session = await auth();
+  const [stats, session] = await Promise.all([getLandingStats(), auth()]);
+  const dbDown = isLikelyDbDown(stats);
 
   return (
     <main className="kl-page">
-      <header className="kl-page-header">
-        <div>
-          <p className="kl-section-label">KarbonLens · v0.1 preview</p>
-          <h1 className="kl-page-title" style={{ fontSize: 48, maxWidth: 720 }}>
-            Indonesia&apos;s carbon market, in one terminal.
-          </h1>
-          <p className="kl-page-subtitle" style={{ maxWidth: 560, marginTop: 12 }}>
-            Satellite MRV, prices, reversal alerts, and regulatory tracking —
-            unified across Verra, SRN-PPI, Gold Standard, and IDXCarbon.
-          </p>
-          {session?.user ? null : (
-            <div style={{ marginTop: 20 }}>
-              <SignInButton />
-            </div>
-          )}
-        </div>
-      </header>
+      <HeroSection session={session} />
 
-      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 40 }}>
-        <div className="kl-card">
-          <p className="kl-stat-label">Indexed projects</p>
-          <p className="kl-stat-value tnum">214</p>
-          <p className="kl-stat-delta">Verra · SRN-PPI · Gold Standard · IDXCarbon</p>
+      {dbDown ? (
+        <div
+          className="kl-card"
+          role="status"
+          style={{
+            background: 'var(--warning-bg)',
+            color: 'var(--warning-fg)',
+            border: 'none',
+            marginBottom: 24,
+          }}
+        >
+          We couldn&apos;t reach the database to load live stats. Showing
+          zeroed placeholders — refresh the page to retry.
         </div>
-        <div className="kl-card">
-          <p className="kl-stat-label">Satellite alerts (30d)</p>
-          <p className="kl-stat-value tnum">1,842</p>
-          <p className="kl-stat-delta">RADD · GLAD · VIIRS</p>
-        </div>
-        <div className="kl-card">
-          <p className="kl-stat-label">Tracked regulations</p>
-          <p className="kl-stat-value tnum">47</p>
-          <p className="kl-stat-delta">Permenhut · Perpres · POJK · Kepmen</p>
-        </div>
-        <div className="kl-card">
-          <p className="kl-stat-label">Monthly IDXCarbon value</p>
-          <p className="kl-stat-value tnum">Rp 4.7B</p>
-          <p className="kl-stat-delta">Jan 2026, ↓ 36% vs Dec</p>
-        </div>
+      ) : null}
+
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: 16,
+          marginBottom: 40,
+        }}
+      >
+        <StatCard
+          label="Indonesian projects tracked"
+          value={stats.projectCount}
+          sublabel="Verra · SRN-PPI · Gold Standard · IDXCarbon"
+        />
+        <StatCard label="Credits issued" value={stats.totalVcusIssued} />
+        <StatCard
+          label="Credits available"
+          value={stats.totalVcusAvailable}
+        />
+        <StatCard
+          label="IDXCarbon avg price"
+          value={stats.latestAvgPriceIdr}
+          sublabel={stats.latestPeriod}
+          trend={
+            stats.momDeltaPct === null ? null : { pct: stats.momDeltaPct }
+          }
+        />
+        <StatCard
+          label="IDXCarbon volume"
+          value={stats.latestVolumeTco2e}
+          sublabel={stats.latestValueIdr ?? undefined}
+        />
+        <StatCard
+          label="Median integrity score"
+          value={stats.medianIntegrityScore}
+        />
+        <StatCard
+          label="GFW alerts (90d)"
+          value={stats.gfwAlerts90d}
+          sublabel={`${stats.regulatoryEventCount} tracked regulations`}
+        />
       </section>
 
-      <section>
-        <p className="kl-section-label">Featured projects</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-          {featured.map((p) => (
-            <Link
-              key={p.slug}
-              href={`/projects/${p.slug}`}
-              className="kl-card"
-              style={{ display: "block" }}
-            >
-              <p className="kl-stat-label">{p.registriesShort}</p>
-              <p style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif", fontSize: 22, margin: "8px 0 4px" }}>
-                {p.name}
-              </p>
-              <p className="kl-page-subtitle">
-                {p.developer} · {p.province}
-              </p>
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16, gap: 8 }}>
-                <div>
-                  <p className="kl-stat-label">Integrity score</p>
-                  <p className="kl-stat-value tnum" style={{ fontSize: 20 }}>{p.score}</p>
-                </div>
-                <div>
-                  <p className="kl-stat-label">Available</p>
-                  <p className="kl-stat-value tnum" style={{ fontSize: 20 }}>{p.available}</p>
-                </div>
-              </div>
-              <p style={{ marginTop: 16 }}>
-                <span className={`kl-pill kl-pill--${p.status === "flagged" ? "danger" : p.status === "pipeline" ? "warning" : "success"}`}>
-                  {p.status}
-                </span>
-              </p>
-            </Link>
-          ))}
-        </div>
-      </section>
+      <FeaturedProjects projects={stats.featuredProjects} />
+
+      <DataSources
+        registriesLastSynced={stats.registriesLastSynced}
+        satelliteLastIngested={stats.satelliteLastIngested}
+        idxLastScraped={stats.idxLastScraped}
+      />
     </main>
   );
 }
