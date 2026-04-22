@@ -7,6 +7,11 @@
  * rendered as relative strings ("3 days ago") using a small local helper —
  * no external dependency. Null values fall back to "—" so the page never
  * shows errors.
+ *
+ * @deprecated Superseded by `components/landing/DataFreshness.tsx` (T25).
+ *   Kept in place to avoid breaking any stray references; the landing page
+ *   no longer imports this file. Remove after confirming no external
+ *   consumers (v0.2).
  */
 
 export type DataSourcesProps = {
