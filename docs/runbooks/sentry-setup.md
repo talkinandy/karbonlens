@@ -76,9 +76,12 @@ for Next.js.
      trace is minified, `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` /
      `SENTRY_PROJECT` were not set at build time — re-check step 4 and
      trigger a redeploy.
-   - The right sidebar shows **User: `<UUID>`** — a 36-char hex UUID,
-     **not** an email address. This verifies the PII-minimisation
-     contract: only the opaque user ID is attached to events.
+   - **User context is unset in v0.1** — a follow-up story (T22.1) will
+     attach `user.id` to the Sentry scope via the session callback in
+     `lib/auth.ts`. For Phase B verification, the issue sidebar will show
+     "no user" — this is expected. Verify instead: (a) the event reached
+     Sentry; (b) the stack trace has source-mapped filenames; (c) the
+     error message matches the thrown Error.
 
 ## 7. Optional — configure alerting
 
