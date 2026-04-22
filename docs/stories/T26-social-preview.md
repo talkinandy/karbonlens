@@ -2,7 +2,7 @@
 id: T26
 title: Social preview (OG + Twitter cards)
 phase: 5-polish
-status: audited
+status: done
 blocked_by: [T25]
 blocks: []
 owner: spec-writer agent
