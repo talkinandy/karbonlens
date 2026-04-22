@@ -2,7 +2,7 @@
 id: T26
 title: Social preview (OG + Twitter cards)
 phase: 5-polish
-status: draft
+status: audited
 blocked_by: [T25]
 blocks: []
 owner: spec-writer agent
@@ -100,7 +100,7 @@ This is confirmed by the Next.js 16 changelog and the absence of `@vercel/og` in
    Notes:
    - **Landing page**: `title` is the full string (not just `"KarbonLens"`) so the template is bypassed; add `openGraph: { url: 'https://karbonlens.com', images: [{ url: '/og-image.png', width: 1200, height: 630, alt: '...' }] }`.
    - **Projects, prices, regulatory, alerts**: use the short-form `title` string so Next.js applies the `template` → `"Projects · KarbonLens"` etc. Include `openGraph: { url: '/projects' }` (relative; resolved by `metadataBase`).
-   - **Methodology**: this page is owned by T24. T26 may add the `export const metadata` only if T24 has landed; if T24 has not yet merged, add a `// TODO T26: add metadata once T24 lands` comment in the T24 stub and document in the PR description.
+   - **Methodology**: this page is owned by T24. **T26 is additionally blocked on T24** for this metadata entry — do not add the `/methodology` metadata until T24 has merged. If T24 has not yet merged, add a `// TODO T26: add metadata once T24 lands` comment in the T24 stub and document in the PR description. (T26's `blocked_by` lists T25 only for the overall story gate; the methodology metadata specifically requires T24 to have landed.)
    - **Auth-gated pages** (`/alerts`): the OG metadata is still valuable — social crawlers see it (no cookie), and unauthenticated previews show the page intent. Do not gate the metadata export behind auth.
 
 4. **Per-project dynamic metadata via `generateMetadata` in `app/(app)/projects/[slug]/page.tsx`.**
@@ -163,13 +163,35 @@ This is confirmed by the Next.js 16 changelog and the absence of `@vercel/og` in
 
 5. **Dynamic OG image at `app/(app)/projects/[slug]/opengraph-image.tsx`.**
 
-   This file is discovered automatically by Next.js as an OG image route handler for `/projects/[slug]/opengraph-image`. It must export `generateImageMetadata` is optional; at minimum export a default function with the correct signature.
+   This file is discovered automatically by Next.js as an OG image route handler for `/projects/[slug]/opengraph-image`. `generateImageMetadata` is optional; at minimum export a default function with the correct signature.
+
+   The implementation uses a lightweight query helper `getProjectSummary` rather than the full `getProjectDetail` to avoid pulling the complete project payload (issuances, alerts, etc.) into every OG image render. Create `lib/queries/project-summary.ts` exporting:
+
+   ```typescript
+   // lib/queries/project-summary.ts
+   export interface ProjectSummary {
+     name: string;
+     score: number | null;
+     province: string | null;
+     hectares: number | null;
+     statusBadge: string | null;
+   }
+
+   export async function getProjectSummary(slug: string): Promise<ProjectSummary | null>;
+   ```
+
+   Query only the hero fields required for the OG image: `nameCanonical`, `integrityScore`, `province`, `hectares`, and `statusBadge`. The full `getProjectDetail` call in `generateMetadata` (§3.4) is separate and continues to use `getProjectDetail` directly.
 
    ```typescript
    import { ImageResponse } from 'next/og';
-   import { getProjectDetail } from '@/lib/queries/project-detail';
+   import { getProjectSummary } from '@/lib/queries/project-summary';
 
-   export const runtime = 'edge';
+   // No runtime export — stays on default Node runtime.
+   // lib/db.ts uses postgres-js (Node.js net.Socket) which is incompatible with
+   // Vercel/Netlify Edge runtime. Next.js 16 defaults to the Node runtime when
+   // no explicit runtime export is present; that is what we want here.
+   // If v0.2 deploys to an edge platform, this file must be rewritten to fetch
+   // project data via an HTTP API instead of importing lib/db.ts directly.
    export const revalidate = 3600; // 1-hour CDN cache
 
    export const size = { width: 1200, height: 630 };
@@ -180,29 +202,38 @@ This is confirmed by the Next.js 16 changelog and the absence of `@vercel/og` in
    }: {
      params: Promise<{ slug: string }>;
    }) {
+     try {
      const { slug } = await params;
-     const detail = await getProjectDetail(slug);
+     const summary = await getProjectSummary(slug);
 
-     // Unknown slug: return the static fallback image.
-     if (!detail) {
-       // Fetch the static og-image.png from the same origin.
-       // In Edge runtime, absolute URL is required.
-       const fallbackUrl = 'https://karbonlens.com/og-image.png';
-       const res = await fetch(fallbackUrl);
-       const buf = await res.arrayBuffer();
-       return new Response(buf, {
-         headers: {
-           'Content-Type': 'image/png',
-           'Cache-Control': 'public, max-age=3600, s-maxage=3600',
-         },
-       });
+     // Unknown slug: return a minimal error-state ImageResponse.
+     // We do NOT redirect to /og-image.png — a try/catch inside the function body
+     // returning a plain ImageResponse is simpler and keeps the 1200×630 contract
+     // without a network round-trip or redirect chain.
+     if (!summary) {
+       return new ImageResponse(
+         (
+           <div
+             style={{
+               display: 'flex',
+               alignItems: 'center',
+               justifyContent: 'center',
+               width: 1200,
+               height: 630,
+               background: '#0F1411',
+               color: '#888780',
+               fontSize: 32,
+             }}
+           >
+             KarbonLens
+           </div>
+         ),
+         { width: 1200, height: 630 },
+       );
      }
 
-     const { project, score } = detail;
      const integrityScore =
-       score?.integrityScore != null
-         ? Number(score.integrityScore).toFixed(1)
-         : null;
+       summary.score != null ? Number(summary.score).toFixed(1) : null;
 
      // Score bucket → pill color mapping (mirrors ScoreCard thresholds).
      // Bucket: ≥70 success-fg, ≥40 warning-fg, <40 danger-fg, null → neutral.
@@ -216,14 +247,14 @@ This is confirmed by the Next.js 16 changelog and the absence of `@vercel/og` in
              : '#a32d2d';  // --color-danger-fg
 
      const name =
-       project.nameCanonical.length > 60
-         ? project.nameCanonical.slice(0, 57) + '…'
-         : project.nameCanonical;
+       summary.name.length > 60
+         ? summary.name.slice(0, 57) + '…'
+         : summary.name;
 
      const subline = [
-       project.province ?? 'Indonesia',
-       project.hectares != null
-         ? `${Number(project.hectares).toLocaleString('en-ID')} ha`
+       summary.province ?? 'Indonesia',
+       summary.hectares != null
+         ? `${Number(summary.hectares).toLocaleString('en-ID')} ha`
          : null,
      ]
        .filter(Boolean)
@@ -331,14 +362,43 @@ This is confirmed by the Next.js 16 changelog and the absence of `@vercel/og` in
          height: 630,
        },
      );
+     } catch {
+       // Render failure (DB error, Satori crash): return a minimal 1200×630 error
+       // state rather than a 500. This keeps the OG image contract intact for
+       // social crawlers and avoids exposing stack traces.
+       return new ImageResponse(
+         (
+           <div
+             style={{
+               display: 'flex',
+               alignItems: 'center',
+               justifyContent: 'center',
+               width: 1200,
+               height: 630,
+               background: '#0F1411',
+               color: '#888780',
+               fontSize: 32,
+             }}
+           >
+             KarbonLens
+           </div>
+         ),
+         { width: 1200, height: 630 },
+       );
+     }
    }
    ```
 
    Implementation notes:
-   - `export const runtime = 'edge'` is **required**. `ImageResponse` uses the Web Streams API and runs in the Edge runtime. The Node.js runtime will also work but cold-starts are slower on Netlify.
-   - Custom fonts (IBM Plex Sans) cannot be loaded from Google Fonts at edge cold-start time within the response budget. The design uses system `sans-serif` as fallback; the visual result is acceptable for an OG image. If the implementer wants to embed a font subset, use the pattern in Next.js docs (fetch a `.ttf` and pass to `ImageResponse` options `fonts` array) — but this is optional for v0.1.
-   - The fallback path for unknown slug avoids a 500 by streaming the static PNG. This path also guards against slug injection.
-   - `revalidate = 3600` sets the `Cache-Control: s-maxage=3600` header, allowing Netlify's CDN to serve stale responses while revalidating. Social crawlers re-fetch at most once per crawl cycle; this is a safe tradeoff.
+   - **Runtime:** No `export const runtime` declaration. Next.js 16 defaults to the Node runtime when no explicit declaration is present — this is what we want. `lib/db.ts` uses `postgres-js`, a Node.js-only driver (`net.Socket`); it is incompatible with Vercel/Netlify Edge runtime. Stays on Node runtime; can safely import `lib/db.ts`. No edge-compat driver needed. If v0.2 deploys to an edge platform, this file must be rewritten to fetch project data via an HTTP API instead.
+   - **`getProjectSummary` helper:** Place in `lib/queries/project-summary.ts`. Query only the five hero fields needed for OG image rendering (name, score, province, hectares, statusBadge). Do not reuse `getProjectDetail` — pulling the full payload (issuances, alerts) into every OG render is wasteful.
+   - **Fallback for unknown slug:** Returns a minimal `new ImageResponse` with the KarbonLens wordmark on a dark background — NOT a redirect to `/og-image.png`. The try/catch wrapping the entire function body catches both the unknown-slug case (handled explicitly) and any unexpected render errors (Satori crash, DB timeout). Keeping the fallback as an `ImageResponse` maintains the 1200×630 contract for social crawlers without a network round-trip.
+   - **Cold-start cost:** On the Hetzner VPS (persistent Node process), the first crawl per slug costs approximately 500ms–2s including DB query, Satori JSX render, and PNG encoding. Subsequent requests within the 1-hour CDN cache window are served from cache at near-zero cost. Social crawlers (Slack, WhatsApp, Twitter) wait up to 5s; this is within budget.
+   - **Font fallback:** `fontFamily: 'IBM Plex Sans, sans-serif'` in the root style has no effect unless the font is provided in the `ImageResponse` options `fonts` array. When no `fonts` array is provided, Satori uses its bundled Noto Sans — not the OS system font and not IBM Plex Sans. The result is readable but does not match the IBM Plex Sans brand typeface. Acceptable for v0.1; see §9 OQ-1.
+   - **Layout inheritance:** `opengraph-image.tsx` does NOT inherit the `(app)` route group layout wrapper. It is a bare function returning an `ImageResponse`, with no access to React context provided by the layout. This is correct behaviour — the OG image renderer should not attempt to render the app shell.
+   - **Auth:** The middleware (`proxy.ts` matcher) covers `/alerts`, `/admin/*`, `/api/admin/*`. The `/projects/[slug]/opengraph-image` path inherits the `(app)` route group but is NOT auth-gated — all `/projects/[slug]/*` paths pass through middleware unauthenticated. Social crawlers reach this route without session cookies.
+   - **Accessibility:** The OG image has no interactive elements; all text is rendered into the PNG by Satori. The `og:image:alt` field in `generateMetadata` (§3.4) provides the accessible description for screen readers and crawlers that parse HTML metadata. No additional accessibility work is required inside the image route itself.
+   - **`revalidate = 3600`** sets the `Cache-Control: s-maxage=3600` header. On the bare-metal Hetzner VPS in v0.1 without a CDN layer, this header is emitted but has no caching effect — every request hits the Node handler. On Netlify or Cloudflare CDN in front of the server, the CDN will cache and serve stale responses for up to 1 hour. This is correct for the expected deployment path.
    - The `background: scorePillColor + '22'` trick appends an 8-bit alpha hex (`22` ≈ 13% opacity) to produce a tinted background behind the score pill. This works because all `scorePillColor` values are 6-digit hex.
 
 6. **Optional: `app/(app)/projects/[slug]/twitter-image.tsx`.**
@@ -454,7 +514,8 @@ Then exit code is 0 with no type errors
 **Inputs:**
 - `legacy/prototype/og-image.png` — source image to copy.
 - `legacy/prototype/index.html` lines 9–30 — reference OG/Twitter tag set and copy.
-- `lib/queries/project-detail.ts` — `getProjectDetail(slug)` returns `ProjectDetail | null`; `project.nameCanonical`, `project.projectType`, `project.province`, `project.hectares`, `project.developer`, `project.totalVcusIssued`; `score.integrityScore`.
+- `lib/queries/project-detail.ts` — `getProjectDetail(slug)` returns `ProjectDetail | null`; `project.nameCanonical`, `project.projectType`, `project.province`, `project.hectares`, `project.developer`, `project.totalVcusIssued`; `score.integrityScore`. Used in `generateMetadata`.
+- `lib/db.ts` — Drizzle client (postgres-js). Used indirectly by both query helpers.
 - `app/layout.tsx` — existing minimal metadata export to be replaced.
 - `app/(public)/page.tsx`, `app/(app)/projects/page.tsx`, `app/(app)/prices/page.tsx`, `app/(app)/regulatory/page.tsx`, `app/(app)/alerts/page.tsx` — receive new `export const metadata` export.
 - `app/(app)/projects/[slug]/page.tsx` — receives new `generateMetadata` export above the render function.
@@ -468,6 +529,7 @@ Then exit code is 0 with no type errors
 - `app/(app)/regulatory/page.tsx` — new `export const metadata` export added.
 - `app/(app)/alerts/page.tsx` — new `export const metadata` export added.
 - `app/(app)/methodology/page.tsx` — new `export const metadata` export added (conditional on T24 landing; see §3.3 note).
+- `lib/queries/project-summary.ts` — new file; lightweight `getProjectSummary(slug)` helper (hero fields only: name, score, province, hectares, statusBadge).
 - `app/(app)/projects/[slug]/opengraph-image.tsx` — new file.
 - `app/(app)/projects/[slug]/page.tsx` — `generateMetadata` function added above `ProjectDetailPage`.
 
@@ -478,11 +540,12 @@ Then exit code is 0 with no type errors
 ## 6. Dependencies & interactions
 
 - **Blocked by T25** — T25 may revise the landing hero title/description. T26's landing metadata must match T25's final copy. Implementer must verify after T25 merges.
+- **Blocked by T24 (partial)** — The `/methodology` metadata entry in §3.3 requires T24 to have merged. The rest of T26 can ship without T24. The story-level `blocked_by` lists T25 as the gate for the full story; T24 is a soft prerequisite for the methodology metadata entry only. Implementer must not add `app/(app)/methodology/page.tsx` metadata until T24 has landed.
 - **Does not block** any current open story.
-- **T24 (methodology page)** — T26 adds metadata to T24's page. If T24 has not yet merged when T26 is implemented, the implementer adds a `// TODO T26: add metadata once T24 lands` comment in the T24 page file and does not create `app/(app)/methodology/page.tsx` in this story.
 - **T12 (project detail page)** — T26 adds `generateMetadata` above the render body only. The render body is not touched. Implementer must confirm the `Props` type (already typed as `{ params: Promise<{ slug: string }>; ... }`) is compatible with `generateMetadata`'s signature.
 - **File ownership (strict, to prevent merge conflicts):**
   - `public/og-image.png` — T26 owns (new file).
+  - `lib/queries/project-summary.ts` — T26 owns (new file).
   - `app/layout.tsx` — T26 owns the `metadata` export only; font configuration is untouched.
   - `app/(public)/page.tsx` — T26 adds metadata export only; T25 owns content/render body.
   - `app/(app)/projects/page.tsx` — T26 adds metadata export only; T11 owns render body.
@@ -497,19 +560,19 @@ Then exit code is 0 with no type errors
 ## 7. Edge cases & failure modes
 
 **(i) Unknown project slug → opengraph-image route.**
-`getProjectDetail` returns `null`. The handler must not call `notFound()` (which throws a Next.js internal redirect not catchable in this route type in Next 16 Edge). Instead, return the static fallback PNG via a `fetch()` + `Response` — see §3.5 implementation. Confirm that the fetch of `https://karbonlens.com/og-image.png` does not create a circular dependency (it should not; `og-image.png` is a static file served from `public/`, not a Next.js route).
+`getProjectSummary` returns `null`. The handler must not call `notFound()` (which throws a Next.js internal redirect not catchable in this route type). Instead, return a minimal `new ImageResponse` with the KarbonLens wordmark — see §3.5 implementation. This is simpler than fetching and proxying the static `/og-image.png` (no network round-trip, no circular-dependency risk), and maintains the 1200×630 PNG contract that social crawlers expect.
 
 **(ii) Project name longer than 60 characters.**
-Truncate to 57 characters and append `…` (Unicode ellipsis `…`). The JSX in `opengraph-image.tsx` does not word-wrap automatically; the 1200 px canvas at 56 px font size fits approximately 25–30 characters per line. The truncation cap (60) is conservative; the implementer may adjust based on visual testing.
+Truncate to 57 characters and append `…` (Unicode ellipsis `…`). The JSX in `opengraph-image.tsx` does not word-wrap automatically; the 1200 px canvas at 56 px font size (Noto Sans fallback) fits approximately 25–30 characters per line. The truncation cap (60) is conservative; the implementer may adjust based on visual testing.
 
 **(iii) Project with no integrity score.**
 `score` may be `null` (project not yet scored) or `score.integrityScore` may be `null`. Both cases → display `"Score —"` in the OG image pill and omit the score from the `generateMetadata` description segment. The pill uses the neutral colour `#888780`.
 
 **(iv) `metadataBase` mismatch in preview deployments.**
-Netlify preview deploy URLs (e.g. `https://deploy-preview-26--karbonlens.netlify.app`) will resolve OG images against the hardcoded `metadataBase` (`https://karbonlens.com`), so OG tags on preview deploys point to production images. This is acceptable for v0.1 — preview deploys are not shared publicly. A `NEXT_PUBLIC_SITE_URL` env var can fix this in v0.2.
+`metadataBase` is hardcoded to `https://karbonlens.com`. Netlify or other preview deploy URLs will resolve OG image relative paths against production. This is acceptable for v0.1 — preview deploys are not shared publicly. A `NEXT_PUBLIC_SITE_URL` env var can fix this in v0.2.
 
-**(v) ImageResponse cold-start on Netlify Edge.**
-Netlify Edge Functions cold-start in ~50–100 ms. Social crawlers (Slack, WhatsApp, Twitter) typically wait up to 5 s for a response. `revalidate = 3600` ensures the CDN serves the cached response on subsequent crawls, so cold-starts only affect the first crawl per hour per slug. Acceptable for v0.1.
+**(v) ImageResponse cold-start on Hetzner VPS.**
+On the Hetzner VPS (persistent Node process, no cold-start), the first crawl per slug costs approximately 500ms–2s including DB query, Satori render, and PNG encoding. Social crawlers (Slack, WhatsApp, Twitter) typically wait up to 5s; this is within budget. `revalidate = 3600` ensures a CDN layer (if present) serves cached responses for 1h; without CDN, every crawl hits the Node handler directly. Acceptable for v0.1.
 
 **(vi) `regulatory/page.tsx` has `export const dynamic = 'force-dynamic'`.**
 Adding `export const metadata` to this file does not conflict with `export const dynamic`. Both are valid named exports in Next.js 16. Ensure they are not accidentally merged into a single export statement.
@@ -528,7 +591,8 @@ Social crawlers do not hold session cookies. `/alerts` and `/projects` are middl
 - [ ] `public/og-image.png` present and served at `/og-image.png` with `Content-Type: image/png`.
 - [ ] `app/layout.tsx` exports the fully-populated `metadata` object (title template, OG, Twitter, `metadataBase`).
 - [ ] All five per-page files export `export const metadata` with correct title and description.
-- [ ] `app/(app)/projects/[slug]/opengraph-image.tsx` created; `runtime = 'edge'`, `revalidate = 3600`, `size = { width: 1200, height: 630 }`.
+- [ ] `lib/queries/project-summary.ts` created; exports `getProjectSummary(slug: string): Promise<ProjectSummary | null>` querying only hero fields.
+- [ ] `app/(app)/projects/[slug]/opengraph-image.tsx` created; no `runtime` export (defaults to Node), `revalidate = 3600`, `size = { width: 1200, height: 630 }`, try/catch fallback to minimal `ImageResponse`.
 - [ ] `app/(app)/projects/[slug]/page.tsx` exports `generateMetadata` without modifying the render body.
 - [ ] `npm run build` exits 0.
 - [ ] `npx tsc --noEmit` exits 0 with no new type errors.
@@ -542,13 +606,13 @@ Social crawlers do not hold session cookies. `/alerts` and `/projects` are middl
 
 ## 9. Open questions
 
-1. **`next/og` font embedding** — IBM Plex Sans is not embeddable from Google Fonts in the Edge runtime without a pre-downloaded font subset. Is the system-font fallback acceptable for the OG image in v0.1, or should the implementer embed a WOFF2/TTF subset of IBM Plex Sans (adds ~30 KB to the Edge Function bundle)? Recommend: accept system font for v0.1; revisit in v0.2 if brand consistency is a concern.
+1. **`next/og` font embedding** — RESOLVED. System font (Satori's bundled Noto Sans) is acceptable for v0.1. No IBM Plex Sans embed. Revisit in v0.2 if brand consistency is a concern.
 
-2. **`metadataBase` for preview deploys** — Should `NEXT_PUBLIC_SITE_URL` be added to `.env.example` now so Netlify preview deploys can set it to their own URL, or is hardcoding `https://karbonlens.com` acceptable for v0.1? Recommend: hardcode for v0.1; add env var in v0.2.
+2. **`metadataBase` for preview deploys** — RESOLVED. Hardcode `https://karbonlens.com` for v0.1. Preview deploys are not a v0.1 concern. Add `NEXT_PUBLIC_SITE_URL` in v0.2.
 
-3. **Dynamic OG vs. static pre-render** — `ImageResponse` at the Edge adds per-slug cold-start latency. An alternative is to pre-generate OG PNGs for all 64 projects at build time via a `generateStaticParams` + `generateImageMetadata` approach. For 64 projects at v0.1 scale, the static approach is viable but requires a DB-connected build step. Is the dynamic approach (specified here) the correct tradeoff? Recommend: yes — dynamic is cleaner, avoids build-time DB dependency, and cold-start latency is invisible once CDN-cached.
+3. **Dynamic OG vs. static pre-render** — RESOLVED. Dynamic per-request OG image with `revalidate = 3600` (1h CDN cache). No static pre-generation.
 
-4. **`og:image` for `/methodology`** — T24 has not yet shipped. Should T26 add a placeholder `export const metadata` to the T24 page stub now, or wait? Recommend: wait; document in PR description.
+4. **`og:image` for `/methodology`** — RESOLVED. Wait for T24 to merge before adding `/methodology` metadata. Document in PR description if T24 has not yet landed when T26 ships.
 
 ---
 
