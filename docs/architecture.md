@@ -686,4 +686,29 @@ Deltas introduced by T06–T10. Section §1–§12 remain forward-looking; §13 
   - idx_monthly_snapshots=10, regulatory_events=10, project_scores=64
   - projects with gfw_geostore_id=55, users=1 (Andy's Google account), sessions=1, accounts=1
 
+### Phase 3 shipped state (as of 2026-04-21)
+
+Deltas introduced by T11–T18, plus follow-ups T05.1 and T06.1. Sections §1–§12 remain forward-looking; this block records divergences from spec.
+
+- **`proxy.ts` replaces `middleware.ts`** per Next.js 16 deprecation (T05.1). The `auth()` wrapper and `config.matcher` are unchanged. Real flagship slugs (`katingan-peatland-restoration-and-conservation-project`, `sumatra-merang-peatland-project-smpp`, `rimba-raya-biodiversity-reserve-project`) replaced the T05 spec placeholders. Live-verified: the three flagships pass through unauthenticated; all other `/projects/[slug]` routes correctly 307.
+
+- **Migration 003** (T06.1) — adds a `CHECK (status IS NULL OR status IN ('active','pipeline','suspended','flagged'))` constraint on `projects.status`, plus a defensive UPDATE to canonicalize any lingering raw Verra strings. Closed the T06 status-map gap: 29 projects that were falsely labelled `suspended` are now correctly `pipeline`. Post-normalization distribution: 5 active / 54 pipeline / 2 suspended / 3 flagged.
+
+- **Migration 004** (T17) — adds `notifications.digested_at TIMESTAMPTZ` plus a partial index on `(user_id, created_at) WHERE digested_at IS NULL`. Enables T17 idempotence: the digest endpoint filters on `digested_at IS NULL` and writes `digested_at` back only on successful Resend delivery.
+
+- **Shared `lib/display/status.ts`** — union of T11's `displayStatus`/`DisplayStatus` export and T12's `badgePillClass` function. Both screens consume the single file; no duplication.
+
+- **Map stack:** MapLibre GL JS v5, Esri World Imagery satellite tiles (free, attribution-compliant). Server/client boundary is clean: `lib/queries/map-geojson.ts` is a pure server file with zero `maplibre-gl` imports. `supercluster` was experimentally installed and removed (MapLibre bundles clustering internally). `ALERTS_MAP_LIMIT=5000` cap prevents embedding 35k+ alerts from high-density projects; UI shows "Showing N of M" with a deep-link to `/alerts?project=<slug>`.
+
+- **Landing route is dynamic (not ISR)** because `auth()` reads the session cookie to branch the CTA between "Sign in with Google" and "Open dashboard →". ISR with `revalidate` cannot coexist with per-request cookie access. Accepted for v0.1 to avoid a flash-of-unauth hydration hop; v0.2 may split stats into a client island if load budget tightens.
+
+- **T17 digest email — Phase A only.** Code, migration 004, XSS-hardened HTML template (text-escaped, no `dangerouslySetInnerHTML`), `?dryRun=true` dry-run, and `digested_at` idempotence are all live. Phase B (live Resend send + Gmail render verification) awaits Andy's `RESEND_API_KEY`. T19 will install the Monday cron once the key is present.
+
+- **New npm deps added this phase:** `recharts ^2.13` (resolved 2.15.4) for T14 price chart dual-axis; `maplibre-gl` for T13; `resend ^6.12` for T17.
+
+- **Current table counts (live DB, 2026-04-21):**
+  - projects=64, registries=64, issuances=307, idx_monthly_snapshots=10, regulatory_events=8
+  - satellite_alerts=246,576 (T07 Phase B live-verified), project_scores=64
+  - notifications=60 (Andy's user; all `type=reversal`), users=1, sessions=1
+
 *End of architecture doc. Paired with `PRD.md` (strategy) and `TASKS.md` (tactics).*
