@@ -2,7 +2,7 @@
 id: T17
 title: Weekly digest email via Resend
 phase: 3
-status: audited
+status: done-phase-a
 blocked_by: [T16]
 blocks: []
 owner: spec-writer agent
