@@ -19,9 +19,14 @@
  *
  * Observability: emits a single structured-JSON log line to stderr per run
  * so the cron log captures `{ users_processed, emails_sent, skipped,
- * errors, ts }` for post-hoc review. v0.1 brief: no DB write-back of
- * `digested_at` (column remains unused by this route — idempotence is
- * enforced by the 7-day rolling window and the cron firing once/week).
+ * errors, ts }` for post-hoc review.
+ *
+ * Idempotence: after a successful `sendEmail`, the route calls
+ * `markNotificationsDigested` which sets `digested_at = NOW()` on every
+ * notification included in the digest. The 7-day window query filters on
+ * `digested_at IS NULL`, so re-running the cron in the same week (or near
+ * a week boundary) sends 0 emails for already-digested notifications.
+ * Dry-run skips the mark so re-runs stay read-only.
  */
 
 import { NextResponse } from 'next/server';
@@ -29,6 +34,7 @@ import crypto from 'node:crypto';
 import {
   buildDigestForUser,
   listOptedInUsers,
+  markNotificationsDigested,
   type DigestUser,
 } from '@/lib/queries/digest';
 import { renderDigestEmail } from '@/lib/email/digest-template';
@@ -153,6 +159,9 @@ async function handle(request: Request): Promise<Response> {
 
       if (result.ok) {
         emails_sent += 1;
+        // Mark all notifications in this digest as digested so they are
+        // excluded from the next run (idempotence — audit F2).
+        await markNotificationsDigested(user.id, bundle.allIds);
         outcomes.push({
           user_id: user.id,
           email: user.email,

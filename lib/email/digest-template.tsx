@@ -221,7 +221,8 @@ export function renderDigestEmail(
           </tr>
           <tr>
             <td style="padding:16px 24px;border-top:1px solid ${COLOR_BORDER};color:${COLOR_MUTED};font-size:12px;line-height:1.5;">
-              You're receiving this because email digests are enabled for ${escapeHtml(user.email)}. Manage preferences in your <a href="${escapeHtml(`${appUrl}/alerts`)}" style="color:${COLOR_ACCENT};">account</a>.
+              You're receiving this because email digests are enabled for ${escapeHtml(user.email)}. <a href="${escapeHtml(`${appUrl}/alerts`)}" style="color:${COLOR_ACCENT};">View all alerts in the KarbonLens app</a>.<br />
+              Email preferences: toggle <code>email_digest_opt_in</code> on your profile (coming in v0.2).
             </td>
           </tr>
         </table>
@@ -266,6 +267,8 @@ export function renderDigestEmail(
   textLines.push(`View all in app: ${appUrl}/alerts`);
   textLines.push('');
   textLines.push(`You're receiving this because email digests are enabled for ${user.email}.`);
+  textLines.push(`View all alerts: ${appUrl}/alerts`);
+  textLines.push('Email preferences: toggle email_digest_opt_in on your profile (coming in v0.2).');
   const text = textLines.join('\n');
 
   return { subject, html, text };

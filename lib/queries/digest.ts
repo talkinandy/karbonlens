@@ -15,11 +15,11 @@
  * so the template can render "+N more" when items are capped.
  *
  * See `docs/stories/T17-weekly-digest-email.md` §3 items 1-3 for the
- * authoritative contract. T17 notes: v0.1 does NOT write `digested_at`
- * back to the DB (per the Live-context brief; idempotence is instead
- * enforced by the 7-day rolling window and the cron running once weekly).
- * The column remains available if a future rev wants to re-enable
- * write-back idempotence — do NOT drop the column.
+ * authoritative contract. Idempotence is enforced by the `digested_at`
+ * write-back: after a successful sendEmail the route calls
+ * `markNotificationsDigested`, which sets `digested_at = NOW()` on the
+ * included rows. Subsequent runs filter `digested_at IS NULL` so the same
+ * notification never appears in two consecutive digests (audit F2 fix).
  */
 
 import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
@@ -62,6 +62,8 @@ export type DigestBundle = {
   byType: Record<string, number>;
   /** Up to 10 most-recent items, flattened. */
   items: DigestNotificationItem[];
+  /** All notification IDs in the window (used by markNotificationsDigested). */
+  allIds: string[];
   /** Groups by project (project_id null → name="Other"), ordered by count desc. */
   groups: DigestProjectGroup[];
   /** The [weekStart, weekEnd] window, YYYY-MM-DD, UTC. */
@@ -190,6 +192,7 @@ export async function buildDigestForUser(
     projectCount,
     byType,
     items: items.slice(0, DIGEST_ITEM_CAP),
+    allIds: items.map((it) => it.id),
     groups,
     windowStart,
     windowEnd,
@@ -201,8 +204,9 @@ export async function buildDigestForUser(
  * when `ids` is empty. Scoped to `userId` so a bug in the caller cannot flip
  * another user's rows.
  *
- * v0.1 brief says to skip this write; exposed here for forward-compat with
- * v0.2 write-back idempotence. Unused by the POST /api/digest route today.
+ * Called by POST /api/digest after a successful sendEmail (skipped in dry-run
+ * so re-runs remain read-only). Implements idempotence: once marked, these
+ * rows are excluded from the `digested_at IS NULL` filter on the next run.
  */
 export async function markNotificationsDigested(
   userId: string,

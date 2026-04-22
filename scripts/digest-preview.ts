@@ -130,6 +130,7 @@ function fixtureBundle(): DigestBundle {
     projectCount: groups.filter((g) => g.project_id !== null).length,
     byType,
     items,
+    allIds: items.map((it) => it.id),
     groups,
     windowStart: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
     windowEnd: now.toISOString().slice(0, 10),
