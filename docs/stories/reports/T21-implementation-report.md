@@ -46,3 +46,15 @@
 - The approve route logs `console.error` on transaction failure and returns 500 with the DB error string. For v0.2 consider sanitising the error message to avoid leaking schema details to clients.
 - `SELECT FOR UPDATE` serialises concurrent approves cleanly; the second transaction's 0-row fallthrough is disambiguated from "unknown id" via a second non-locking lookup so the client gets 404 vs 409 correctly.
 - All child-table collision pre-deletes mirror the unique-index definitions in the live DB (verified via `pg_indexes`): registries `(registry_name, external_id)`, issuances `(project_id, vintage_year, issuance_date, registry_name)`, satellite_alerts `(project_id, alert_date, ROUND(ST_Y(location::geometry),6), ROUND(ST_X(location::geometry),6))`, notifications `(user_id, type, project_id, (created_at AT TIME ZONE 'UTC')::date)`.
+
+## T21 follow-ups
+
+Non-blocking audit notes carried forward from code audit:
+
+1. **Route-path spec drift**: implementer used `app/admin/queue` + `/api/admin/match-queue/{approve,reject,defer}` with POST body `id`, rather than spec's `(admin)` route group + `[id]` URL param. Accept as pragmatic implementation.
+
+2. **Non-admin redirect/status divergence**: layout redirects non-admin authenticated users to `/`; API routes return 403 JSON. Spec said 404 — accept as the chosen implementation (403 is more semantically correct for authenticated non-admin).
+
+3. **Step 9a added (null out queue FK references to B before deleting B)**: spec omitted this step; required by RESTRICT foreign-key constraint on `project_match_queue.candidate_{a,b}_id`. Approve route nulls these references before the DELETE to avoid FK violation. No audit data lost.
+
+4. **`ADMIN_EMAILS` in-code allowlist supersedes spec's env-var `ADMIN_EMAIL`**: shared with T22 via `lib/admin.ts` (`['andy@fmg.co.id', 'icdragoneyes@gmail.com']`). No new env var added to `.env.example`.
