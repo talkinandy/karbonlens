@@ -2,7 +2,7 @@
 id: T20
 title: Backups + pg_dump cron
 phase: 4
-status: audited
+status: done
 blocked_by: [T01]
 blocks: []
 owner: ""
