@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="320" height="80" role="img" aria-label="KarbonLens">
+  <title>KarbonLens</title>
+  <desc>KarbonLens horizontal lockup: five-blade aperture mark with wordmark in IBM Plex Sans 500.</desc>
+  <g transform="translate(40 40)" fill="#0F6E56">
+    <circle r="28" fill="none" stroke="#0F6E56" stroke-width="2.8"></circle>
+    <path d="M 0,-21.8 L 18.5,-10.9 L 0,0 Z"></path>
+    <path d="M 18.5,-10.9 L 18.5,10.9 L 0,0 Z"></path>
+    <path d="M 18.5,10.9 L 0,21.8 L 0,0 Z"></path>
+    <path d="M 0,21.8 L -18.5,10.9 L 0,0 Z"></path>
+    <path d="M -18.5,10.9 L -18.5,-10.9 L 0,0 Z"></path>
+    <line x1="0" y1="-34" x2="0" y2="-30" stroke="#0F6E56" stroke-width="2.8" stroke-linecap="square"></line>
+  </g>
+  <text x="88" y="51" fill="#0F6E56" font-family="&#39;IBM Plex Sans&#39;, system-ui, -apple-system, &#39;Segoe UI&#39;, sans-serif" font-weight="500" font-size="34" letter-spacing="-1.02">KarbonLens</text>
+</svg>

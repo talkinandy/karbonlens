@@ -147,6 +147,8 @@ button {
   gap: 8px;
 }
 
+/* .kl-brand-mark retained for legacy callers; .kl-brand-mark-img is the
+   production SVG mark loaded via <Image src="/brand/karbonlens-mark.svg">. */
 .kl-brand-mark {
   width: 24px;
   height: 24px;
@@ -157,6 +159,11 @@ button {
   place-items: center;
   font-weight: 500;
   font-size: 13px;
+}
+.kl-brand-mark-img {
+  width: 24px;
+  height: 24px;
+  display: block;
 }
 
 .kl-brand-word {
