@@ -2,7 +2,7 @@
 id: T21
 title: Entity resolution admin page — match-queue review
 phase: 4
-status: audited
+status: done
 blocked_by: [T06]
 blocks: []
 owner: unassigned
