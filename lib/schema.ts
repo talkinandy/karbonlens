@@ -330,6 +330,31 @@ export const verificationTokens = pgTable(
   (t) => [primaryKey({ columns: [t.identifier, t.token] })],
 );
 
+// ─── admin_actions (T21 audit log) ───────────────────────────────────────────
+// Mirrors `scrapers/migrations/005_admin_actions.sql`. A separate table (not
+// `notifications`) so audit rows stay out of the T16 inbox and T17 digest paths
+// entirely — no type-filter patch required on those consumers.
+//
+// `actor_id` is `UUID NOT NULL REFERENCES users(id)`. Callers are the approve /
+// reject / defer route handlers, which always run behind `auth()` so the FK
+// target exists (the admin's NextAuth user row is created on first Google login
+// by the T05 DrizzleAdapter).
+export const adminActions = pgTable(
+  'admin_actions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => users.id),
+    action: text('action').notNull(), // 'approve-merge' | 'reject-match' | 'defer-match'
+    entityType: text('entity_type').notNull(), // 'project_match_queue' (v0.1)
+    entityId: uuid('entity_id'),
+    payload: jsonb('payload').$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => [index('idx_admin_actions_created').on(t.createdAt.desc())],
+);
+
 // ─── notifications ───────────────────────────────────────────────────────────
 export const notifications = pgTable(
   'notifications',
