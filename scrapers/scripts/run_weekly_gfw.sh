@@ -27,6 +27,14 @@ set -a
 source "$ENV_FILE"
 set +a
 
+# T19 guard: skip when GFW_API_KEY is unset/empty/placeholder so cron does not
+# produce failure noise before Andy provisions the key.
+if [[ -z "${GFW_API_KEY:-}" || "${GFW_API_KEY}" == "CHANGE_ME" ]]; then
+    mkdir -p "$(dirname "$LOG")"
+    echo "--- $(date --iso-8601=seconds) gfw scraper skip: GFW_API_KEY unset ---" >> "$LOG"
+    exit 0
+fi
+
 cd "$REPO/scrapers"
 
 mkdir -p "$(dirname "$LOG")"
