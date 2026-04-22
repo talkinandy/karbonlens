@@ -94,3 +94,23 @@ regardless of upstream state.
   `generateMetadata` exports plus required imports.
 - No `export const runtime = 'edge'` declaration. Node runtime (default) is what
   `postgres-js` + `lib/db.ts` require.
+
+## T26 follow-ups
+
+- **N-6 `robots: {index:false}` on /alerts** — Positive deviation; the setting is correct for a
+  personalised surface that should not be indexed. Keep as-is. Update spec in a minor doc pass
+  (T26 spec §3 currently omits the robots override).
+
+- **Cold-start cost (~500ms–2s first crawl per slug)** — The `opengraph-image.tsx` route incurs a
+  DB round-trip on the first request per slug (before `revalidate = 3600` kicks in). This is
+  acceptable at current traffic; noted here so it is visible if crawl-budget or TTFB targets are
+  tightened in v0.2.
+
+- **`/methodology` metadata deferred → T26.1** — `app/(public)/methodology/page.tsx` did not exist
+  at T26 implementation time (T24 had not landed). Metadata for /methodology is deferred to a
+  T26.1 follow-up ticket; create after T24 merges.
+
+- **`Cache-Control` on ImageResponse** — Next.js sets `public, max-age=0, must-revalidate` at the
+  origin for `ImageResponse` routes. The `revalidate = 3600` export controls Next's internal ISR
+  revalidation window, not the downstream CDN TTL. Add a proper `s-maxage` / `stale-while-revalidate`
+  header when a CDN layer is introduced (planned for v0.2 if needed).
