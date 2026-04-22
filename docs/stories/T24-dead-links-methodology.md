@@ -2,7 +2,7 @@
 id: T24
 title: Fix dead links + create /methodology page
 phase: 5-polish
-status: audited
+status: done
 blocked_by: []
 blocks: []
 owner: spec-writer
