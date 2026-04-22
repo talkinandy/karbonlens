@@ -2,16 +2,15 @@
 
 ## Current status (2026-04-21)
 
-**Phase 1 + Phase 2 complete.** T01–T10 all done (with deferred items noted below).
+**Phases 1 + 2 + 3 complete.** T01–T18 all done (with deferred items noted below).
 
-**Phase 2 status:** T06 (Verra) fully done. T07 Phase A complete — geostore cache (55/64 projects) + dedupe infrastructure live; Phase B (live alert ingestion) pending `GFW_API_KEY` from Andy. T08 done — 10 months ingested; IDXCarbon source caps the ≥24 AC. T09 done with AC-5 environment-conditional (re-verifies automatically when T07 Phase B runs). T10 done with rows 6–10 pending Andy fact-check. T05 Phase B is now LIVE VERIFIED (Google OAuth round-trip confirmed 2026-04-21). Ready for Phase 3 after checkpoint.
+**Phase 3 status (2026-04-21): complete.** All 8 stories (T11–T18) merged. T17 Phase A only — code, migration 004, XSS-hardened template, dry-run, and `digested_at` idempotence are all live; Phase B (live Resend send + Gmail render verification) pending Andy's `RESEND_API_KEY`. All other Phase 3 stories fully live. Ready for Phase 4 after checkpoint.
 
-**Outstanding deferred items for Andy before Phase 3:**
-1. **GFW_API_KEY** — provide key so T07 Phase B can ingest live satellite alerts and T09 AC-5 re-verify.
-2. **T10 fact-check** — verify rows 6–10 document numbers/dates against authoritative sources (affects T15 regulatory timeline UI if incorrect).
-3. **T09 slug reconciliation** — confirm `rimba-raya` and `cendrawasih-aru` match DB slugs (or update the community-overrides dict in `scrapers/scoring/compute.py`).
+**Outstanding deferred items:**
+1. **T17 Phase B** — Andy's `RESEND_API_KEY`; once provided, T19 installs the Monday 09:00 WIB cron and Phase B is complete.
+2. **OQ-1** — Netlify → self-hosted Postgres connectivity strategy (Tailscale / VPS proxy / managed Postgres). Blocks T23 (replace static prototype with live deploy).
 
-See [`docs/retros/phase-1.md`](retros/phase-1.md) and [`docs/retros/phase-2.md`](retros/phase-2.md) for retrospectives, and [`CHANGELOG.md`](../CHANGELOG.md) for per-story details.
+See [`docs/retros/phase-1.md`](retros/phase-1.md), [`docs/retros/phase-2.md`](retros/phase-2.md), and [`docs/retros/phase-3.md`](retros/phase-3.md) for retrospectives, and [`CHANGELOG.md`](../CHANGELOG.md) for per-story details.
 
 This folder contains the complete v0.1 handoff package for KarbonLens: the Indonesian carbon market intelligence platform.
 
