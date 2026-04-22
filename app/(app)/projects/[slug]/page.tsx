@@ -7,9 +7,11 @@
  * surfaces require sign-in (see `proxy.ts` matcher: /alerts + /admin only).
  */
 
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { getProjectDetail } from '@/lib/queries/project-detail';
+import { getProjectSummary } from '@/lib/queries/project-summary';
 import {
   getProjectAlertsFeatureCollection,
   getProjectBufferFeatureCollection,
@@ -43,6 +45,54 @@ function fmtCredits(raw: string): string {
   const n = Number(raw);
   if (!Number.isFinite(n)) return raw;
   return n.toLocaleString('en-ID');
+}
+
+/**
+ * T26 — per-project dynamic metadata.
+ *
+ * Uses the lightweight `getProjectSummary` helper instead of the full
+ * `getProjectDetail` payload. Unknown slug → returns default metadata (the
+ * render body handles the 404 via `notFound()`); never throw from
+ * `generateMetadata`, which would bypass the not-found page.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const project = await getProjectSummary(slug);
+  if (!project) return {};
+
+  const scoreText = project.score != null ? project.score.toFixed(1) : '—';
+  const hectaresSegment = project.hectares
+    ? ` · ${project.hectares.toLocaleString('en-ID')} ha`
+    : '';
+  const description = `${project.projectType ?? 'Carbon'} project in ${project.province ?? 'Indonesia'} · Score ${scoreText}${hectaresSegment}`;
+
+  // Note on og:image: Next.js 16 auto-injects `og:image` + `twitter:image` from
+  // the colocated `opengraph-image.tsx` + `twitter-image.tsx` file-convention
+  // routes at this same segment. Those routes serve at hashed paths
+  // (e.g. `/projects/[slug]/opengraph-image-<hash>`), and Next 16 emits the
+  // correct hashed URL in the meta tags. Passing an explicit
+  // `images: ['/projects/.../opengraph-image']` here would override that with
+  // the bare (non-hashed) path, which 404s at runtime. Leave `images` off and
+  // let the file-convention do its job.
+  return {
+    title: project.name,
+    description,
+    openGraph: {
+      title: project.name,
+      description,
+      url: `/projects/${slug}`,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: project.name,
+      description,
+    },
+    alternates: { canonical: `/projects/${slug}` },
+  };
 }
 
 export default async function ProjectDetailPage({

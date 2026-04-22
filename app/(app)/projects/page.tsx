@@ -31,6 +31,7 @@
  * `/projects`. This page assumes a signed-in session and does not re-gate.
  */
 
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
   getProjectsList,
@@ -39,6 +40,34 @@ import {
   getStatusOptions,
   type ProjectsListSort,
 } from '@/lib/queries/projects-list';
+
+// T26 — page-level metadata. Short title → title template in app/layout.tsx
+// renders "Projects · KarbonLens" in browser tab + og:title.
+export const metadata: Metadata = {
+  title: 'Projects',
+  description:
+    '64 Indonesian carbon projects — integrity scores, satellite alerts, issuance history.',
+  openGraph: {
+    url: '/projects',
+    title: 'Projects · KarbonLens',
+    description:
+      '64 Indonesian carbon projects — integrity scores, satellite alerts, issuance history.',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: "KarbonLens — Indonesia's carbon market, in one terminal",
+      },
+    ],
+  },
+  twitter: {
+    title: 'Projects · KarbonLens',
+    description:
+      '64 Indonesian carbon projects — integrity scores, satellite alerts, issuance history.',
+    images: ['/og-image.png'],
+  },
+};
 import { getProjectCentroidsFeatureCollection } from '@/lib/queries/map-geojson';
 import { ProjectsTable } from '@/components/projects/ProjectsTable';
 import { FilterChips } from '@/components/projects/FilterChips';
