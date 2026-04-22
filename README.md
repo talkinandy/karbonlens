@@ -9,14 +9,17 @@ KarbonLens is a carbon-market intelligence terminal that reconciles SRN-PPI, IDX
 
 ## Status
 
-**v0.1 Phase 1 complete + Phase 2 Phase-A complete (2026-04-21).** Foundation (T01–T05) and data pipelines (T06–T10) are merged into `feature/v0.1-impl` at HEAD `a45a07f`. Phase B items pending Andy's external keys/data: T07 Phase B (GFW_API_KEY — satellite alerts ingestion), T09 AC-5 re-verify (auto-resolves after T07 Phase B), T10 rows 6–10 fact-check. Ready for Phase 3 (frontend integration) after checkpoint.
+**v0.1 Phases 1 + 2 + 3 complete (2026-04-21).** Foundation (T01–T05), data pipelines (T06–T10), and frontend integration (T11–T18) are all merged into `feature/v0.1-impl`. Only Phase 4 ops hardening (T19–T23) remains before v0.1 ships.
 
-**Live DB:** 64 projects · 307 issuances · 10 IDXCarbon monthly snapshots · 10 regulatory events · 64 project scores · 55/64 gfw_geostore_id cached · 0 satellite alerts (Phase B pending)
+**Live DB:** 64 projects · 307 issuances · 10 IDXCarbon monthly snapshots · 8 regulatory events · 64 project scores · 246,576 satellite alerts · 60 in-app notifications
+
+**Deferred items:** T17 Phase B (live Resend send) pending Andy's `RESEND_API_KEY`; T23 (replace static prototype) pending OQ-1 Postgres-connectivity decision.
 
 - Sprint overview and task statuses: [`docs/TASKS.md`](docs/TASKS.md)
 - What shipped in each story: [`CHANGELOG.md`](CHANGELOG.md)
 - Phase 1 retrospective: [`docs/retros/phase-1.md`](docs/retros/phase-1.md)
 - Phase 2 retrospective: [`docs/retros/phase-2.md`](docs/retros/phase-2.md)
+- Phase 3 retrospective: [`docs/retros/phase-3.md`](docs/retros/phase-3.md)
 
 ## Quickstart (local dev)
 
@@ -63,18 +66,31 @@ source scrapers/.venv/bin/activate   # or: uv run ... from scrapers/
 python -m scrapers.verra.fetch --dry-run --limit 3
 ```
 
-### Routes (Phase 1 — mock data, auth wired)
+### Live screens (Phase 3 — real data)
 
-| Route | Source |
-|---|---|
-| `/` | `app/(public)/page.tsx` — landing |
-| `/projects` | `app/(app)/projects/page.tsx` |
-| `/projects/katingan-peatland` | `app/(app)/projects/[slug]/page.tsx` |
-| `/prices` | `app/(app)/prices/page.tsx` |
-| `/regulatory` | `app/(app)/regulatory/page.tsx` |
-| `/alerts` | `app/(app)/alerts/page.tsx` |
+| Route | Source | Auth |
+|---|---|---|
+| `/` | `app/(public)/page.tsx` — dynamic landing (auth-aware CTA: "Sign in with Google" unauthed, "Open dashboard →" authed); live DB stats via `lib/queries/landing-stats.ts` | Public |
+| `/projects` | `app/(app)/projects/page.tsx` — table + map tab; filters, sort, pagination, CSV export | Gated (3 flagship slugs public) |
+| `/projects/[slug]` | `app/(app)/projects/[slug]/page.tsx` — hero, score breakdown, issuance timeline, MapLibre panel, alerts | Gated (3 flagship slugs public) |
+| `/prices` | `app/(app)/prices/page.tsx` — dual-axis recharts chart + monthly aggregate table | Gated |
+| `/regulatory` | `app/(app)/regulatory/page.tsx` — chronological timeline, bilingual EN/ID, ministry + tag filters | Public |
+| `/alerts` | `app/(app)/alerts/page.tsx` — notifications inbox, bell badge, mark-read | Gated |
 
-All pages currently read from `lib/mock-data.ts`. T11+ swaps the imports for Drizzle queries against live Postgres.
+**5 flagship slugs accessible without sign-in:** `katingan-peatland-restoration-and-conservation-project`, `sumatra-merang-peatland-project-smpp`, `rimba-raya-biodiversity-reserve-project`. All other project detail and list pages redirect to sign-in.
+
+**Map:** MapLibre GL JS v5 with Esri World Imagery (free satellite tiles, attribution `"Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics"` visible on-map).
+
+**Notifications:** bell with unread count badge in top nav; `/alerts` inbox live. Digest email is Phase A only (code + migration 004 for `digested_at` idempotence + XSS-hardened template + dry-run verified); Phase B (live Gmail send) awaits Andy's `RESEND_API_KEY`.
+
+### API surface
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/api/health` | Public | DB connectivity check |
+| GET | `/api/notifications` | Session | Notification list or `?countOnly=true` unread count |
+| POST | `/api/notifications/mark-read` | Session | Mark notifications read (`{ids}` or `{all:true}`) |
+| POST | `/api/digest` | Cron secret | Render + send weekly digest (`?dryRun=true` for preview) |
 
 ## Architecture
 
