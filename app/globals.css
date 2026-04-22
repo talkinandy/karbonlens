@@ -522,6 +522,19 @@ button {
 .score-fill.info { background: var(--info-fg); }
 .score-fill.warning { background: var(--warning-fg); }
 
+/* ===== Shared map container — gives MapLibre a visible box when consumers
+   pass `className="kl-map ..."` without an explicit h-* utility. Prevents
+   the collapsed-to-0 bug that hid the landing hero map. ===== */
+.kl-map {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  min-height: 320px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+/* Descendant .maplibregl-map uses `height:100%` inline — ensure it inherits our aspect-ratio. */
+.kl-map > .maplibregl-map { height: 100% !important; }
+
 /* ===== T12 — Project detail: map placeholder ===== */
 .kl-map-placeholder {
   min-height: 280px;
