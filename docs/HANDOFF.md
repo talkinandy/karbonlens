@@ -2,15 +2,19 @@
 
 ## Current status (2026-04-21)
 
-**Phases 1 + 2 + 3 complete.** T01–T18 all done (with deferred items noted below).
-
-**Phase 3 status (2026-04-21): complete.** All 8 stories (T11–T18) merged. T17 Phase A only — code, migration 004, XSS-hardened template, dry-run, and `digested_at` idempotence are all live; Phase B (live Resend send + Gmail render verification) pending Andy's `RESEND_API_KEY`. All other Phase 3 stories fully live. Ready for Phase 4 after checkpoint.
+**Phases 1 + 2 + 3 + 4 complete.** T01–T22 all done. Only T23 (replace karbonlens.netlify.app static with v0.1 app) remains — blocked on OQ-1 (Netlify → self-hosted Postgres connectivity strategy).
 
 **Outstanding deferred items:**
-1. **T17 Phase B** — Andy's `RESEND_API_KEY`; once provided, T19 installs the Monday 09:00 WIB cron and Phase B is complete.
-2. **OQ-1** — Netlify → self-hosted Postgres connectivity strategy (Tailscale / VPS proxy / managed Postgres). Blocks T23 (replace static prototype with live deploy).
+1. **T17 Phase B** — Andy's RESEND_API_KEY; adds digest live-send verification.
+2. **T22 Phase B** — Andy's SENTRY_DSN; adds live error-capture verification + source-mapped stack.
+3. **T22.1** — `lib/sentry.ts` helper to attach user.id to Sentry scope (deferred 15-LOC follow-up).
+4. **OQ-1** — Netlify → self-hosted Postgres connectivity (Tailscale / VPS proxy / managed Postgres). Blocks T23.
 
-See [`docs/retros/phase-1.md`](retros/phase-1.md), [`docs/retros/phase-2.md`](retros/phase-2.md), and [`docs/retros/phase-3.md`](retros/phase-3.md) for retrospectives, and [`CHANGELOG.md`](../CHANGELOG.md) for per-story details.
+All 5 scraper wrappers + pg backup wrappers live on the box under karbonlens user.
+`/opt/karbonlens/.env` populated; real DATABASE_URL/GFW_API_KEY/DIGEST_CRON_SECRET in place.
+Andy action to close out remaining items: (a) sign up for Resend + drop RESEND_API_KEY; (b) sign up for Sentry + drop SENTRY_DSN; (c) decide OQ-1 to unblock T23.
+
+See [`docs/retros/phase-1.md`](retros/phase-1.md), [`docs/retros/phase-2.md`](retros/phase-2.md), [`docs/retros/phase-3.md`](retros/phase-3.md), and [`docs/retros/phase-4.md`](retros/phase-4.md) for retrospectives, and [`CHANGELOG.md`](../CHANGELOG.md) for per-story details.
 
 This folder contains the complete v0.1 handoff package for KarbonLens: the Indonesian carbon market intelligence platform.
 
