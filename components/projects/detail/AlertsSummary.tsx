@@ -1,23 +1,32 @@
 /**
  * AlertsSummary — satellite-alerts card (#alerts anchor).
  *
- * Also emits the map placeholder as a sibling `<section id="map">` immediately
- * below the card. T13 replaces the placeholder contents; it must not rename or
- * remove the `<section id="map">` element.
+ * Also emits the map section as a sibling `<section id="map">` immediately
+ * below the card. T12 shipped a placeholder inside that section; T13
+ * replaces its inner contents via the optional `mapSlot` prop. The
+ * `<section id="map">` element itself is preserved — do not rename or
+ * remove it.
  *
  * The "View all alerts" link uses `?project={slug}` (not `{id}`) per T16 spec
  * — T16 resolves slug → UUID server-side.
  */
 
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import type { AlertSummary } from '@/lib/queries/project-detail';
 
 type Props = {
   alerts: AlertSummary;
   slug: string;
+  /**
+   * T13 injects the MapLibre client component here. When null/undefined the
+   * original T12 placeholder renders (used only if the project has no
+   * centroid).
+   */
+  mapSlot?: ReactNode;
 };
 
-export function AlertsSummary({ alerts, slug }: Props) {
+export function AlertsSummary({ alerts, slug, mapSlot }: Props) {
   return (
     <>
       <section id="alerts" style={{ marginBottom: 16 }}>
@@ -54,7 +63,11 @@ export function AlertsSummary({ alerts, slug }: Props) {
         aria-label="Project map"
         style={{ marginBottom: 32 }}
       >
-        <div className="kl-map-placeholder">Map coming in T13</div>
+        {mapSlot ?? (
+          <div className="kl-map-placeholder">
+            No location data available for this project.
+          </div>
+        )}
       </section>
     </>
   );
