@@ -2,7 +2,7 @@
 id: T22
 title: Sentry error tracking
 phase: 4
-status: audited
+status: done-phase-a
 blocked_by: [T03]
 blocks: []
 owner: spec-writer agent
