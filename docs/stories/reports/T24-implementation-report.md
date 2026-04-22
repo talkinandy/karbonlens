@@ -119,3 +119,10 @@ $ for t in v1 25 35 20 reversal transparency validation community 60 'Rimba Raya
 - CHANGELOG entry (task brief does not include this in deliverables; the spec §8 DoD lists it but the task scope is tighter).
 - `TASKS.md` status flip (not in task brief deliverables).
 - Story frontmatter status flip (not in task brief deliverables).
+
+## T24 follow-ups
+
+- **T26.1 /methodology metadata (deferred — trivial):** T26 owns `<title>` / OG tags for the whole site, but `/methodology` was not in T26's page-level override list. Add `export const metadata = { title: 'Methodology', description: '...' }` to `app/(public)/methodology/page.tsx` — a one-liner. T26 code-audit noted this as a deferred follow-up.
+- **architecture.md §8 bucket ordering:** The §8 rewrite now matches `lib/score.ts` first-match-wins ordering exactly. Reversal bucket table lists: no-satellite-coverage (50) → zero-alerts (100) → zero-high-conf-and-<10-alerts (85) → <5-high-conf (70) → <20-high-conf (45) → else (20). This ordering was the T24 spec audit blocking issue B-3; resolved in commit 4ca4380.
+- **Link audit — 5 internal hrefs, all resolve after T24 lands:** `href="/alerts"`, `href="/methodology"`, `href="/projects"`, `href="/regulatory"` (4 in app/ + components/), plus T25's DataFreshness component adds a fifth (`href="/methodology"` in the public layout footer). All 5 routes exist in the build manifest post-T24.
+- **Community overrides documented on methodology page:** `COMMUNITY_OVERRIDES` (Rimba Raya = 45 default) is explicitly described in the page's Community Flags section with the rationale ("sustained controversy, repeated third-party flag cycles"). This ensures the page is the canonical user-facing reference for the override, consistent with `lib/score.ts`.
