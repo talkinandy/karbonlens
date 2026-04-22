@@ -526,56 +526,34 @@ ENABLE_EMAIL_DIGEST=true
 
 ## 8. Score methodology v1
 
-This is the v0.1 implementation. It is explicitly a framework, not a final formula. Weights live in `lib/score.ts` as constants and are intended to be iterated.
+This section previously reproduced pseudocode and bucket ranges. Both had
+drifted from the live implementation after the T09 reconciliation (notably,
+the exported names `SCORE_WEIGHTS_V1` / `computeIntegrityScore` do not exist;
+actual exports are `WEIGHTS` / `integrityScore`, and the live buckets are
+exact integer scores rather than ranges).
 
-```typescript
-// lib/score.ts
+Rather than re-duplicate the spec here and risk drift a second time, §8
+points to the two canonical sources:
 
-export const SCORE_WEIGHTS_V1 = {
-  validationRecency: 0.25,
-  reversalRisk: 0.35,
-  communityFlags: 0.20,
-  transparency: 0.20,
-} as const;
+- **User-facing reference:** [`/methodology`](/methodology) — the public
+  methodology page (see `app/(public)/methodology/page.tsx`). Explains
+  WEIGHTS, sub-score buckets, COMMUNITY_OVERRIDES, the composite formula,
+  clamping rules (zero-registry cap of 60, no-GFW-coverage neutral of 50),
+  known limitations, and v0.2 roadmap in prose form for buyers and
+  non-engineers.
 
-export function computeIntegrityScore(p: ProjectScoreInputs): ProjectScore {
-  return {
-    integrityScore: Math.round(
-      p.validationRecencyScore * SCORE_WEIGHTS_V1.validationRecency +
-      p.reversalRiskScore     * SCORE_WEIGHTS_V1.reversalRisk +
-      p.communityFlagsScore   * SCORE_WEIGHTS_V1.communityFlags +
-      p.transparencyScore     * SCORE_WEIGHTS_V1.transparency
-    ),
-    // ... components
-  };
-}
-```
+- **Implementation:** `lib/score.ts` (TypeScript; canonical home of
+  `WEIGHTS`, `COMMUNITY_OVERRIDES`, `ScoreComponents`, and the four
+  sub-score functions plus `integrityScore()`). `scrapers/scoring/weights.py`
+  and `scrapers/scoring/compute.py` mirror the TS side numerically. Hand
+  verification on each change per T09's DoD — there is no automated
+  TS↔Python cross-check in v0.1.
 
-### Component definitions
-
-**Validation recency** (0–100, higher = better):
-- Last validation < 3 years ago → 90–100
-- 3–5 years → 60–89
-- 5–8 years → 30–59
-- >8 years or unknown → 0–29
-
-**Reversal risk** (0–100, inverted: higher = less risk):
-- No alerts in last 90 days inside project buffer → 90–100
-- 1–5 nominal alerts → 70–89
-- 6–15 alerts or any high-confidence → 40–69
-- >15 alerts or active fire clusters → 0–39
-
-**Community flags** (0–100, inverted: higher = fewer flags):
-- For v0.1 with no news scraper, default to 75 for all projects, override manually for known-problematic ones (Rimba Raya, Aru)
-- v0.2 computes from scraped news sentiment
-
-**Transparency** (0–100):
-- Dual registry (Verra + SRN-PPI) → 85
-- Single registry with public PDD → 70
-- Single registry with sparse public data → 50
-- Known opacity issues → <40
-
-Scores computed daily by `scrapers/scripts/run_daily_score.sh` → writes to `project_scores` table.
+Scores computed daily by `scrapers/scripts/run_daily_score.sh` → writes to
+`project_scores` table. Frontend re-evaluates scores at render time using
+`lib/score.ts` (T12 detail page, T18 landing stats) to avoid an extra DB
+round-trip; any Python↔TS drift produces a visible inconsistency between
+the daily-written `project_scores.components` row and the UI.
 
 ---
 
