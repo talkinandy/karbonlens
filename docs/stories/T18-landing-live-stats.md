@@ -2,7 +2,7 @@
 id: T18
 title: Landing page with live stats
 phase: 3
-status: audited
+status: done
 blocked_by: [T11, T14]
 blocks: [T23]
 owner: ""
@@ -23,7 +23,7 @@ T11 proved the query shape for projects and introduced `lib/queries/projects-lis
 
 The public landing page is a marketing surface. The middleware created in T05 explicitly does **not** gate `/` — unauthenticated users must see the page. Signed-in users who navigate to `/` also stay on the landing (no redirect to `/projects`). Both states are in scope.
 
-**Cache strategy.** The page is a Next.js server component. Querying the DB on every cold request would add 100–300 ms to TTFB and create unnecessary read load for what is essentially an immutable stat on 1-hour timescales. T18 uses Next.js's ISR (`export const revalidate = 3600`): the first visitor after each 60-minute window triggers a background revalidation while the cached response is returned immediately. Subsequent visitors within the same window get the stale-while-revalidate HTML. This keeps TTFB < 100 ms for cache-hit requests and limits the landing page to at most one DB round-trip per hour. If v0.2 requires more frequent refresh (e.g., for ops-level alerting on the landing), the constant can be dropped to 900 (15 minutes) without other code changes.
+**Cache strategy.** Page is dynamic because `auth()` reads the session cookie to branch the hero CTA ("Open dashboard →" for authed users vs `<SignInButton>` for anon visitors). ISR path would require splitting the stats section into a client island that hydrates post-auth; deferred to v0.2 if landing page load time becomes a concern. As of 2026-04-21 the page renders under 300ms from DB warm cache, well within budget.
 
 ---
 
@@ -112,13 +112,7 @@ grep -n "[0-9]" app/\(public\)/page.tsx
 
 For every inline static number found in the JSX (e.g., `"214"`, `"1,842"`, `"47"`, `"Rp 4.7B"`), replace with the appropriate `{stats.*}` template variable (e.g., `{stats.projectCount}`, `{stats.gfwAlerts90d}`, `{stats.regulatoryEventCount}`, `{stats.latestValueIdr}`). Do not leave any hardcoded numbers in the rendered hero or stat row — they will diverge from DB state immediately after launch.
 
-Replace the static stat cards with live values. The page must declare:
-
-```typescript
-export const revalidate = 3600; // ISR: revalidate at most once per hour
-```
-
-at module scope (top of file, before the component).
+Replace the static stat cards with live values. The page does **not** declare `export const revalidate` because `auth()` reads the session cookie, opting the route into dynamic rendering regardless. A comment at the top of `app/(public)/page.tsx` records this trade-off (see §3.2 cache strategy note above).
 
 Call `getLandingStats()` at the top of the server component. Keep the `auth()` call for the `<SignInButton>` visibility check (unchanged from T05). Run both in parallel:
 
@@ -208,18 +202,16 @@ Timestamps formatted as relative time ("3 days ago", "2 hours ago") using a simp
 
 #### 3.4 Cache strategy documentation
 
-Add a comment block at the top of `lib/queries/landing-stats.ts`:
+The comment block at the top of `lib/queries/landing-stats.ts` records the dynamic-vs-ISR decision:
 
 ```typescript
 /**
  * getLandingStats — landing page live stats query.
  *
- * Cache contract: app/(public)/page.tsx declares `export const revalidate = 3600`.
- * This means Next.js ISR will serve the cached HTML for up to 1 hour before
- * triggering a background re-fetch. The function itself has no internal cache.
- *
- * v0.2 consideration: if operators need sub-15-minute freshness on the landing
- * (e.g., for ops-level GFW alert monitoring), reduce `revalidate` to 900.
+ * The route is dynamic (not ISR) because auth() reads the session cookie to
+ * branch the hero CTA. ISR path would require a client-island for the CTA;
+ * deferred to v0.2 if load time becomes a concern. As of 2026-04-21 the page
+ * renders under 300ms from DB warm cache.
  */
 ```
 
@@ -230,7 +222,7 @@ Add a comment block at the top of `lib/queries/landing-stats.ts`:
 - Case studies, testimonials, or logo walls — v0.2.
 - Animated hero — keep it static for v0.1.
 - Per-project breakdown on the landing (that belongs to `/projects/[slug]`).
-- Client-side polling / WebSocket live updates — ISR at 1 hour is sufficient for v0.1.
+- Client-side polling / WebSocket live updates — dynamic server rendering is sufficient for v0.1.
 - Public analytics instrumentation (Plausible, GA) — v0.2.
 - Time-range selectors on the stat cards — v0.2.
 
@@ -295,7 +287,8 @@ When npx tsc --noEmit
 Then exit code is 0 with no type errors
 When npm run build
 Then exit code is 0
- And the build output notes "/" as a statically generated ISR route with revalidate=3600
+ And the build output notes "/" as ƒ (Dynamic) — expected because auth() reads
+ the session cookie; ISR is not used for v0.1 (see §3.2 cache strategy note)
 ```
 
 **AC-8: DB error degrades gracefully**
@@ -326,7 +319,7 @@ Then the landing page still renders with "—" in all stat card values
 
 **Outputs:**
 - `lib/queries/landing-stats.ts` — new file.
-- `app/(public)/page.tsx` — updated (live stats, `revalidate = 3600`, removed mock import).
+- `app/(public)/page.tsx` — updated (live stats, dynamic route with trade-off comment, removed mock import).
 - `components/landing/StatCard.tsx` — new file.
 - `components/landing/FeaturedProjects.tsx` — new file.
 - `components/landing/DataSources.tsx` — new file.
@@ -389,12 +382,12 @@ T18 must not modify:
 - [ ] Pre-implementation grep gate run: `grep -rn "mockProjects\|PUBLIC_PROJECT_SLUGS" app/ components/ lib/ --include="*.ts" --include="*.tsx"` — result documented in implementation report.
 - [ ] `app/(public)/page.tsx` imports nothing from `lib/mock-data` (import line deleted).
 - [ ] No inline static numbers remain in hero/stat-row JSX (T03 static-number audit completed).
-- [ ] `export const revalidate = 3600` is present in `app/(public)/page.tsx`.
-- [ ] `lib/queries/landing-stats.ts` exists with the `getLandingStats()` export and cache-contract comment.
+- [ ] `app/(public)/page.tsx` has a comment explaining the dynamic-vs-ISR trade-off (no `export const revalidate` — route is dynamic because of `auth()`).
+- [ ] `lib/queries/landing-stats.ts` exists with the `getLandingStats()` export and dynamic-rendering rationale comment.
 - [ ] `HeroSection.tsx` renders `<Link href="/projects">Open dashboard →</Link>` for authenticated users and `<SignInButton>` for unauthenticated users (conditional CTA verified via AC-6).
 - [ ] All four `components/landing/*.tsx` files exist and are pure server components (no `'use client'`).
 - [ ] `npx tsc --noEmit` exits 0.
-- [ ] `npm run build` exits 0; build log shows `/` as ISR with revalidate=3600.
+- [ ] `npm run build` exits 0; build log shows `/` as `ƒ (Dynamic)` — expected for v0.1 (see §3.2).
 - [ ] Story's files landed in `feature/v0.1-impl` (single commit or PR).
 - [ ] CHANGELOG entry added under `[Unreleased]`: `T18 — Landing page: live DB stats, ISR cache, featured projects`.
 - [ ] `TASKS.md` status for T18 flipped from `todo` → `done`.
@@ -404,8 +397,8 @@ T18 must not modify:
 
 ## 9. Open questions
 
-**OQ-1 — Cache duration**
-1 hour ISR is specified for v0.1. This is appropriate for a marketing surface where data changes daily at most. If v0.2 operators use the landing page for operational awareness (e.g., watching GFW alert counts spike), drop `revalidate` to 900 (15 minutes). Changing this requires no other code changes. Andy's call for v0.2.
+**OQ-1 — Cache strategy**
+The route is dynamic for v0.1 (see §3.2). As of 2026-04-21 page renders under 300ms from DB warm cache. If v0.2 requires ISR caching, split the auth CTA into a client island (`<Suspense>`) so the stats section can revalidate independently. Andy's call for v0.2.
 
 **OQ-2 — Featured projects: static list vs dynamic (top-3 by score)**
 The spec uses a static list (`katingan-peatland`, `sumatra-merang-peat`, `rimba-raya`) for brand consistency and because these three are the "flagship projects" named in the PRD. A dynamic top-3 by score would surface a different project if Katingan's score dropped, which would be surprising to returning visitors and potentially confusing in marketing context. Recommendation: keep static. Andy may override for v0.2 if he wants score-based featuring.
