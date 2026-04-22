@@ -51,8 +51,9 @@ const FOOTER_LINKS: { href: string; label: string }[] = [
   { href: '/prices', label: 'Prices' },
   { href: '/regulatory', label: 'Regulatory' },
   { href: '/methodology', label: 'Methodology' },
-  { href: '/api/auth/signin', label: 'Admin login' },
-  { href: '/about', label: 'About' },
+  { href: '/privacy', label: 'Privacy' },
+  { href: '/terms', label: 'Terms' },
+  { href: '/api/auth/signin', label: 'Sign in' },
 ];
 
 export function DataFreshness({
