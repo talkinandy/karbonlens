@@ -88,3 +88,28 @@ Full output: 8,874 bytes; Gmail- and Outlook-safe (tables + inline CSS only, no 
 ## 6. Commit
 
 Single atomic commit on `agent/T17-digest`. Not pushed, not merged.
+
+## T17 follow-ups
+
+Applied by FIX + DOCS/MERGE agent, 2026-04-22.
+
+### Resolved (this merge)
+
+- **F2 — Idempotence via `digested_at` write-back.** `DigestBundle.allIds` added (all notification IDs in the 7-day pending window). `route.ts` calls `markNotificationsDigested(user.id, bundle.allIds)` after `result.ok`. Dry-run path skipped so re-runs stay read-only. Migration 004 (`scrapers/migrations/004_add_digested_at.sql`) adds the partial index `idx_notifications_pending_digest ON notifications (user_id, created_at) WHERE digested_at IS NULL`. Applied; column already existed from Drizzle push. D3 deviation closed.
+- **F5 — Footer copy.** HTML and plain-text footers now say "View all alerts in the KarbonLens app" (link to `/alerts`) plus a static note: "Email preferences: toggle `email_digest_opt_in` on your profile (coming in v0.2)." No longer falsely claims a preferences UI exists.
+
+### Accepted carry-overs (Phase B)
+
+- **F1 — POST-only, no GET export.** Accepted; cron explicitly uses `-X POST`. No route-level docs change needed.
+- **F3 — No rate-cap warning at Resend free-tier ceiling (100/day).** Phase B monitor: if `users_processed` approaches 90, add a `console.error` warning in the route. Deferred to v0.2.
+- **F4 — `tokenEquals` length-leak timing channel.** Low severity for a 32-byte shared secret. Revisit with `crypto.createHmac('sha256', key).update(s).digest()` + `timingSafeEqual` on the two fixed-length digests in Phase B.
+- **F6 — No `docs/runbooks/resend-api-key.md`.** Write before Phase B key drops (≤ 30 lines: register → API key → Netlify env → VPS env → cron-command template → rotation contract for `DIGEST_CRON_SECRET`).
+
+### Phase B checklist
+
+- (a) Andy obtains a Resend account and API key (free tier sufficient for v0.1 volume).
+- (b) Sets `RESEND_API_KEY` on Netlify (build env) and `DIGEST_CRON_SECRET` on both Netlify + VPS.
+- (c) T19 installs the Monday 00:00 UTC cron: `curl -X POST -H "Authorization: Bearer $DIGEST_CRON_SECRET" https://karbonlens.netlify.app/api/digest`.
+- (d) Manual one-user live send + Gmail spot-check (desktop + mobile) to verify HTML rendering, plain-text fallback, and from-address domain.
+- (e) Write `docs/runbooks/resend-api-key.md` (F6).
+- (f) Constant-time token compare hardening (F4).
