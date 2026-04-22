@@ -2,7 +2,7 @@
 id: T18
 title: Landing page with live stats
 phase: 3
-status: audited
+status: done
 blocked_by: [T11, T14]
 blocks: [T23]
 owner: ""
