@@ -57,5 +57,11 @@ export const config = {
     '/prices/:path*',
     '/regulatory/:path*',
     '/alerts/:path*',
+    // T21 reservation + T22 extension: all admin UI and admin API surfaces
+    // are protected at the middleware layer. Unauthenticated requests are
+    // redirected to `/?signin=1`. Non-admin authenticated users fall
+    // through to the route handler (which enforces `isAdmin(session)`).
+    '/admin/:path*',
+    '/api/admin/:path*',
   ],
 };
