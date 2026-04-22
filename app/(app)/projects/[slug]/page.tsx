@@ -12,6 +12,11 @@ import { notFound } from 'next/navigation';
 
 import { auth } from '@/lib/auth';
 import { getProjectDetail } from '@/lib/queries/project-detail';
+import {
+  getProjectAlertsFeatureCollection,
+  getProjectBufferFeatureCollection,
+  getProjectCentroidCoords,
+} from '@/lib/queries/map-geojson';
 import { METHODOLOGY_VERSION, WEIGHTS } from '@/lib/score';
 
 import { AlertsSummary } from '@/components/projects/detail/AlertsSummary';
@@ -19,6 +24,8 @@ import { IssuancesTable } from '@/components/projects/detail/IssuancesTable';
 import { RegistryList } from '@/components/projects/detail/RegistryList';
 import { ScoreCard } from '@/components/projects/detail/ScoreCard';
 import { SectionHero } from '@/components/projects/detail/SectionHero';
+// T13 — client shell; mounts MapLibre with ssr:false into the #map anchor.
+import { ProjectDetailMapClient } from '@/components/map/ProjectDetailMapClient';
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -57,6 +64,17 @@ export default async function ProjectDetailPage({
 
   const issuancePage = parsePage(sp.issuance_page);
   const issuanceCount = detail.issuances.length;
+
+  // T13 — map data. Fetched server-side for authenticated users so MapLibre
+  // gets its GeoJSON via props (no extra HTTP round-trip). Three parallel
+  // queries; the full payload is bounded by ALERTS_MAP_LIMIT (5 000 points).
+  const [mapCentroid, mapAlerts, mapBuffer] = isAuthed
+    ? await Promise.all([
+        getProjectCentroidCoords(detail.project.id),
+        getProjectAlertsFeatureCollection(detail.project.id),
+        getProjectBufferFeatureCollection(detail.project.id),
+      ])
+    : [null, null, null];
 
   const integrityScoreNumeric =
     detail.score?.integrityScore !== undefined &&
@@ -126,7 +144,21 @@ export default async function ProjectDetailPage({
             </div>
           </section>
 
-          <AlertsSummary alerts={detail.alerts} slug={detail.project.slug} />
+          <AlertsSummary
+            alerts={detail.alerts}
+            slug={detail.project.slug}
+            mapSlot={
+              mapCentroid && mapAlerts && mapBuffer ? (
+                <ProjectDetailMapClient
+                  centroid={mapCentroid}
+                  projectName={detail.project.nameCanonical}
+                  projectSlug={detail.project.slug}
+                  alerts={mapAlerts}
+                  buffer={mapBuffer}
+                />
+              ) : null
+            }
+          />
 
           <section style={{ marginBottom: 32 }}>
             <p className="kl-section-label">Score methodology</p>
