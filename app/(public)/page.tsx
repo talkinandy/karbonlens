@@ -1,14 +1,24 @@
 /**
- * app/(public)/page.tsx — public landing (T18).
+ * app/(public)/page.tsx — public landing (T25 redesign).
  *
- * Route is dynamic because auth() reads the session cookie to branch the hero
- * CTA ("Open dashboard →" vs <SignInButton>). The ISR path would require
- * splitting the stats section into a client island that hydrates post-auth;
- * deferred to v0.2 if landing page load time becomes a concern.
- * See T18 spec §3.2 for the trade-off rationale.
+ * Editorial dark split-hero with a live MapLibre view of the Katingan
+ * Peatland project on the right, a six-item live-data ticker, four data
+ * pipeline cards, featured projects grid, "Built for" persona cards, and
+ * a data-freshness footer strip.
  *
- * All hero numbers are live from the DB. The DB-down fallback returns a
- * zeroed `LandingStats`, which this page renders as "—" plus a banner.
+ * Route remains dynamic — `auth()` reads the session cookie so the hero
+ * primary CTA can branch between "Open the terminal →" and "Open your
+ * dashboard →" (AC-8). The `revalidate` export below is a CDN
+ * `stale-while-revalidate` hint; Next.js does not enable ISR on dynamic
+ * routes (see T25 spec §2, N-2 audit note).
+ *
+ * Data layer: `getLandingStats()` (T18 + T25 extensions) and
+ * `getLandingMapData()` (T25) run in parallel. Both catch internally and
+ * fall through to zeroed / undefined structures if the DB is down — the
+ * page never returns HTTP 500.
+ *
+ * Metadata: NOT declared here. T26 owns `generateMetadata` / `export const
+ * metadata` for this route.
  */
 
 import { auth } from '@/lib/auth';
@@ -16,30 +26,69 @@ import {
   getLandingStats,
   isLikelyDbDown,
 } from '@/lib/queries/landing-stats';
+import { getLandingMapData } from '@/lib/queries/landing-map';
 import { HeroSection } from '@/components/landing/HeroSection';
-import { StatCard } from '@/components/landing/StatCard';
 import { FeaturedProjects } from '@/components/landing/FeaturedProjects';
-import { DataSources } from '@/components/landing/DataSources';
+import { DataFreshness } from '@/components/landing/DataFreshness';
+import { Ticker } from '@/components/landing/Ticker';
+import { PipelinesGrid } from '@/components/landing/PipelinesGrid';
+import { RolesGrid } from '@/components/landing/RolesGrid';
+import LandingHeroMap from '@/components/landing/LandingHeroMap';
 
-// Route is dynamic because auth() reads session cookie. See T18 spec §3.2 for the tradeoff.
+// CDN cache hint — Next.js App Router leaves the route fully dynamic
+// because auth() reads request cookies. See T25 spec §2.
+export const revalidate = 600;
+
+// Katingan Peatland hero centre — lon, lat.
+const KATINGAN_CENTER: [number, number] = [113.2, -1.8];
+const KATINGAN_ZOOM = 9;
 
 export default async function LandingPage() {
-  const [stats, session] = await Promise.all([getLandingStats(), auth()]);
+  const [stats, mapData, session] = await Promise.all([
+    getLandingStats(),
+    getLandingMapData(),
+    auth(),
+  ]);
+
   const dbDown = isLikelyDbDown(stats);
 
   return (
-    <main className="kl-page">
-      <HeroSection session={session} />
+    <main>
+      {/* ============ HERO ============ */}
+      <section className="lp-hero">
+        <div className="lp-hero-inner">
+          <HeroSection session={session} stats={stats} />
+
+          <div className="lp-hero-right">
+            <LandingHeroMap
+              center={KATINGAN_CENTER}
+              zoom={KATINGAN_ZOOM}
+              centroid={mapData.katinganCentroid}
+              alerts={mapData.alerts}
+              buffer={mapData.katinganBuffer}
+            />
+            <div className="lp-hero-caption">
+              Live monitoring ·{' '}
+              <span className="mono">
+                Katingan Peatland, Central Kalimantan
+              </span>{' '}
+              · {mapData.katinganAlerts90d.toLocaleString('en-US')} satellite
+              alerts in last 90 days
+            </div>
+          </div>
+        </div>
+      </section>
 
       {dbDown ? (
         <div
-          className="kl-card"
           role="status"
           style={{
+            maxWidth: 1320,
+            margin: '0 auto',
+            padding: '12px 32px',
             background: 'var(--warning-bg)',
             color: 'var(--warning-fg)',
-            border: 'none',
-            marginBottom: 24,
+            fontSize: 13,
           }}
         >
           We couldn&apos;t reach the database to load live stats. Showing
@@ -47,51 +96,23 @@ export default async function LandingPage() {
         </div>
       ) : null}
 
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: 16,
-          marginBottom: 40,
-        }}
-      >
-        <StatCard
-          label="Indonesian projects tracked"
-          value={stats.projectCount}
-          sublabel="Verra · SRN-PPI · Gold Standard · IDXCarbon"
-        />
-        <StatCard label="Credits issued" value={stats.totalVcusIssued} />
-        <StatCard
-          label="Credits available"
-          value={stats.totalVcusAvailable}
-        />
-        <StatCard
-          label="IDXCarbon avg price"
-          value={stats.latestAvgPriceIdr}
-          sublabel={stats.latestPeriod}
-          trend={
-            stats.momDeltaPct === null ? null : { pct: stats.momDeltaPct }
-          }
-        />
-        <StatCard
-          label="IDXCarbon volume"
-          value={stats.latestVolumeTco2e}
-          sublabel={stats.latestValueIdr ?? undefined}
-        />
-        <StatCard
-          label="Median integrity score"
-          value={stats.medianIntegrityScore}
-        />
-        <StatCard
-          label="GFW alerts (90d)"
-          value={stats.gfwAlerts90d}
-          sublabel={`${stats.regulatoryEventCount} tracked regulations`}
-        />
-      </section>
+      {/* ============ TICKER ============ */}
+      <Ticker stats={stats} />
 
-      <FeaturedProjects projects={stats.featuredProjects} />
+      {/* ============ FOUR DATA PIPELINES ============ */}
+      <PipelinesGrid stats={stats} />
 
-      <DataSources
+      {/* ============ FEATURED PROJECTS ============ */}
+      <FeaturedProjects
+        projects={stats.featuredProjects}
+        totalCount={stats.projectCount}
+      />
+
+      {/* ============ BUILT FOR ============ */}
+      <RolesGrid />
+
+      {/* ============ FRESHNESS FOOTER ============ */}
+      <DataFreshness
         registriesLastSynced={stats.registriesLastSynced}
         satelliteLastIngested={stats.satelliteLastIngested}
         idxLastScraped={stats.idxLastScraped}
