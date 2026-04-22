@@ -14,6 +14,20 @@ export const metadata: Metadata = {
     title: 'Prices · KarbonLens',
     description:
       'IDXCarbon monthly volume, value, and average price — last 10 months.',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: "KarbonLens — Indonesia's carbon market, in one terminal",
+      },
+    ],
+  },
+  twitter: {
+    title: 'Prices · KarbonLens',
+    description:
+      'IDXCarbon monthly volume, value, and average price — last 10 months.',
+    images: ['/og-image.png'],
   },
 };
 

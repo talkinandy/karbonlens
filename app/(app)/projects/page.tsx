@@ -52,6 +52,20 @@ export const metadata: Metadata = {
     title: 'Projects · KarbonLens',
     description:
       '64 Indonesian carbon projects — integrity scores, satellite alerts, issuance history.',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: "KarbonLens — Indonesia's carbon market, in one terminal",
+      },
+    ],
+  },
+  twitter: {
+    title: 'Projects · KarbonLens',
+    description:
+      '64 Indonesian carbon projects — integrity scores, satellite alerts, issuance history.',
+    images: ['/og-image.png'],
   },
 };
 import { getProjectCentroidsFeatureCollection } from '@/lib/queries/map-geojson';
