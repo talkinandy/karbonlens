@@ -12,6 +12,7 @@
  *
  * Ownership: T13. Contract frozen in `docs/stories/T13-map-integration.md §3.8`.
  */
+import type * as GeoJSON from 'geojson';
 import { sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
