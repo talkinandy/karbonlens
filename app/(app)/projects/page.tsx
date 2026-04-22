@@ -39,12 +39,17 @@ import {
   getStatusOptions,
   type ProjectsListSort,
 } from '@/lib/queries/projects-list';
+import { getProjectCentroidsFeatureCollection } from '@/lib/queries/map-geojson';
 import { ProjectsTable } from '@/components/projects/ProjectsTable';
 import { FilterChips } from '@/components/projects/FilterChips';
 import { SortControl } from '@/components/projects/SortControl';
 import { StatsStrip } from '@/components/projects/StatsStrip';
 import { Pagination } from '@/components/projects/Pagination';
 import { EmptyState } from '@/components/projects/EmptyState';
+// T13 — client shell that dynamically imports MapLibre with ssr:false.
+// (next/dynamic { ssr:false } must be invoked inside a client component in
+// Next 16's App Router; the shell handles that for this server page.)
+import { MapExplorerTabClient } from '@/components/map/MapExplorerTabClient';
 import { buildFilterUrl } from '@/lib/url/build-filter-url';
 
 const PATHNAME = '/projects';
@@ -121,6 +126,11 @@ export default async function ProjectsPage({
   const { rows, stats } = result;
   const totalPages = Math.max(1, Math.ceil(stats.totalMatching / limit));
   const showPagination = stats.totalMatching > limit;
+
+  // T13 — fetch centroids only when the map tab is active; avoid extra query
+  // on the (vastly more common) table pageload.
+  const centroidsGeoJSON =
+    tab === 'map' ? await getProjectCentroidsFeatureCollection() : null;
 
   // Tab toggle hrefs. Switching tabs clears `page` (a T13 map doesn't need
   // to preserve the table's cursor) but retains filters and sort.
@@ -206,20 +216,12 @@ export default async function ProjectsPage({
         />
       </div>
 
-      {/* Body — map placeholder (T13) or table (T11 default). */}
+      {/* Body — map (T13) or table (T11 default). */}
       {tab === 'map' ? (
-        <div
-          className="kl-card"
-          style={{
-            minHeight: 480,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-3)',
-          }}
-        >
-          {/* T13 map placeholder — filled by T13 without re-shaping this file. */}
-          <p>Map view coming in T13.</p>
+        <div className="kl-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ height: '60vh', minHeight: 480 }}>
+            <MapExplorerTabClient features={centroidsGeoJSON!} />
+          </div>
         </div>
       ) : rows.length === 0 ? (
         <EmptyState clearFiltersHref={clearFiltersHref} />

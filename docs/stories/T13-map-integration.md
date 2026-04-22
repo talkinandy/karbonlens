@@ -2,7 +2,7 @@
 id: T13
 title: Map integration (MapLibre) — explorer tab + detail panel
 phase: 3
-status: audited
+status: done
 blocked_by: [T11, T12]
 blocks: []
 owner: tbd
