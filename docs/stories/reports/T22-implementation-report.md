@@ -144,3 +144,60 @@ Phase B — in which case User will be unset, which does not fail AC-7).
 
 Single atomic commit in `worktree-agent-a616b372` off
 `feature/v0.1-impl`; ready for PR to `feature/v0.1-impl`.
+
+---
+
+## T22 follow-ups
+
+### T22.1 — User context on Sentry scope (deferred)
+
+**Scope:** `lib/sentry.ts` (new file, ~15 LOC) + one call-site in the
+session callback in `lib/auth.ts`. The helper wraps
+`Sentry.setUser({ id: session.user.id })` — a no-op when the SDK is
+uninitialised (DSN absent), so it adds zero risk to Phase A builds.
+Wire point is the `session` callback already present in `lib/auth.ts`
+(returns `session.user.id` to the client). When T22.1 lands, Phase B
+re-verification should confirm `User: <UUID>` in the Sentry issue
+sidebar and that no email address appears (PII-minimisation contract).
+
+### `silent: true` + missing `errorHandler`
+
+`withSentryConfig` is called with `silent: true` in
+`sentryWebpackPluginOptions`. This suppresses plugin CLI progress output
+(intentional) but also swallows source-map upload failure diagnostics
+from the Sentry CLI. Add:
+
+```typescript
+errorHandler: (err) => console.warn('[sentry] Source map upload warning:', err.message),
+```
+
+to `sentryWebpackPluginOptions` before the first Netlify deploy with a
+real `SENTRY_AUTH_TOKEN`. Without it, a misconfigured org/project slug
+causes silent upload failure — stack traces appear minified in the
+dashboard with no build-log warning.
+
+### Email scrub regex — edge-case tuning
+
+Current regex: `/[\w.+-]+@[\w-]+\.[\w.-]+/g`
+
+Verified against: `user@example.com`, `user+tag@example.com`,
+`user@sub.example.com`, `user.name@example.co.uk`, `andy@fmg.co.id`,
+`UPPER@EXAMPLE.COM`, `double@@example.com` (correctly unchanged),
+`no_at_sign` (correctly unchanged). The regex is tunable if sub-domain
+combinations or `+tag` edge cases emerge in production event payloads.
+
+### Phase B smoke test checklist
+
+Four steps to verify live Sentry capture after Andy sets `SENTRY_DSN`:
+
+1. Set the five env vars in Netlify (`SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`,
+   `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`) and trigger a redeploy.
+2. Sign in as admin (`andy@fmg.co.id`) and hit the debug endpoint:
+   `curl -v https://karbonlens.netlify.app/api/admin/debug-sentry -H "Cookie: <session>"`
+   — expect HTTP 500.
+3. Within 30 seconds, a new issue titled **"Sentry test — safe to
+   trigger"** should appear in the Sentry dashboard under Issues.
+4. Click into the issue: (a) event arrived; (b) stack trace shows
+   `app/api/admin/debug-sentry/route.ts` (source-mapped, not minified);
+   (c) error message matches the thrown Error. User context will be
+   "no user" in v0.1 — this is expected (T22.1 deferred).
