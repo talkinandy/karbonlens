@@ -46,8 +46,15 @@ export default function EsriBaseLayer() {
     });
 
     return () => {
-      if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
-      if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
+      // Guard: during client-side navigation the parent MapLibreBase may
+      // have already called `map.remove()` (sync teardown nukes internal
+      // maps before children unmount). Swallow cleanup errors.
+      try {
+        if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
+        if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
+      } catch {
+        // map already destroyed — nothing to clean up
+      }
     };
   }, [map]);
 

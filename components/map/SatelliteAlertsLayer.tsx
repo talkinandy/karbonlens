@@ -248,25 +248,31 @@ export default function SatelliteAlertsLayer({ alerts, buffer }: Props) {
     map.on('mouseleave', POINT_LAYER, onClusterLeave);
 
     return () => {
-      map.off('click', CLUSTER_LAYER, onClusterClick);
-      map.off('click', POINT_LAYER, onPointClick);
-      map.off('mouseenter', CLUSTER_LAYER, onClusterEnter);
-      map.off('mouseleave', CLUSTER_LAYER, onClusterLeave);
-      map.off('mouseenter', POINT_LAYER, onClusterEnter);
-      map.off('mouseleave', POINT_LAYER, onClusterLeave);
+      // Guard: parent MapLibreBase may have already called `map.remove()`
+      // during client-side nav. Swallow cleanup errors — the map is gone.
+      try {
+        map.off('click', CLUSTER_LAYER, onClusterClick);
+        map.off('click', POINT_LAYER, onPointClick);
+        map.off('mouseenter', CLUSTER_LAYER, onClusterEnter);
+        map.off('mouseleave', CLUSTER_LAYER, onClusterLeave);
+        map.off('mouseenter', POINT_LAYER, onClusterEnter);
+        map.off('mouseleave', POINT_LAYER, onClusterLeave);
 
-      [
-        POINT_LAYER,
-        CLUSTER_COUNT_LAYER,
-        CLUSTER_LAYER,
-        BUFFER_OUTLINE_LAYER,
-        BUFFER_FILL_LAYER,
-      ].forEach((id) => {
-        if (map.getLayer(id)) map.removeLayer(id);
-      });
-      [ALERTS_SOURCE, BUFFER_SOURCE].forEach((id) => {
-        if (map.getSource(id)) map.removeSource(id);
-      });
+        [
+          POINT_LAYER,
+          CLUSTER_COUNT_LAYER,
+          CLUSTER_LAYER,
+          BUFFER_OUTLINE_LAYER,
+          BUFFER_FILL_LAYER,
+        ].forEach((id) => {
+          if (map.getLayer(id)) map.removeLayer(id);
+        });
+        [ALERTS_SOURCE, BUFFER_SOURCE].forEach((id) => {
+          if (map.getSource(id)) map.removeSource(id);
+        });
+      } catch {
+        // map already destroyed
+      }
     };
   }, [map, alerts, buffer]);
 
