@@ -122,6 +122,37 @@ rsync -a --chown=karbonlens:karbonlens \
 chown karbonlens:karbonlens "$TARGET_SCRIPTS_DIR"
 chmod 755 "$TARGET_SCRIPTS_DIR"
 
+# --- Step 3b: rsync scrapers Python source + create venv ---------------------
+# The wrappers run `python -m scrapers.<package>.fetch` which requires the
+# `scrapers/` package importable at runtime. T19 initially installed scripts
+# only — this block also syncs the Python source and creates a venv at
+# `/opt/karbonlens/scrapers/.venv` so the wrappers resolve their shebang
+# targets.
+SCRAPERS_SRC_DIR="$(dirname "$SCRIPT_DIR")"
+TARGET_SCRAPERS_DIR=/opt/karbonlens/scrapers
+info "rsync ${SCRAPERS_SRC_DIR}/ -> ${TARGET_SCRAPERS_DIR}/"
+mkdir -p "$TARGET_SCRAPERS_DIR"
+rsync -a --chown=karbonlens:karbonlens \
+    --exclude='.venv' --exclude='__pycache__' --exclude='*.pyc' --exclude='uv.lock' \
+    "${SCRAPERS_SRC_DIR}/" "${TARGET_SCRAPERS_DIR}/"
+chown karbonlens:karbonlens "$TARGET_SCRAPERS_DIR"
+
+# Create / refresh the venv. Use `uv` from root's install (PATH isn't
+# propagated to karbonlens via sudo -u without --preserve-env).
+UV_BIN=$(command -v uv || echo "/root/.local/bin/uv")
+if [[ ! -x "$UV_BIN" ]]; then
+    warn "uv not found at ${UV_BIN}; scrapers venv not created. Install uv and re-run."
+else
+    info "refreshing venv via ${UV_BIN} sync"
+    # Run as karbonlens so venv files are karbonlens-owned.
+    (cd "$TARGET_SCRAPERS_DIR" && sudo -u karbonlens "$UV_BIN" sync >/dev/null 2>&1)
+    if [[ -x "$TARGET_SCRAPERS_DIR/.venv/bin/python" ]]; then
+        info "venv ready at ${TARGET_SCRAPERS_DIR}/.venv"
+    else
+        err "venv creation failed; check ${TARGET_SCRAPERS_DIR}/.venv manually"
+    fi
+fi
+
 # --- Step 4: logrotate config -------------------------------------------------
 if [[ -f "$LOGROTATE_SRC" ]]; then
     info "installing ${TARGET_LOGROTATE}"
