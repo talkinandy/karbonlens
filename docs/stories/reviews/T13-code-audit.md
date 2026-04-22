@@ -5,7 +5,7 @@
 **Worktree:** `.claude/worktrees/agent-a52d4079`
 **Branch / commit:** `worktree-agent-a52d4079` @ `7e90b28`
 **Base:** `feature/v0.1-impl`
-**Verdict:** **CONDITIONAL PASS** — 1 blocking (junk files); 0 other hard blockers; 4 non-blocking deviations from HANDOFF visual brief; merge **after** implementer deletes `_verify-map*.mjs` and the unused `supercluster` deps.
+**Verdict:** **PASS (after fix commit)** — blocking B-1 resolved; junk files deleted + unused `supercluster` deps removed + implementation report written in fix commit `e5a9624`.
 
 ---
 
@@ -118,6 +118,22 @@ git commit -m "chore(T13): drop scratch verify scripts + unused supercluster dep
 
 After that commit: merge to `feature/v0.1-impl`. The four cosmetic brief-drift findings (N-2) and the cluster-glyph runtime risk (N-3) can be caught in QA and patched in a follow-up; none block a v0.1 demo.
 
-**Blocking count:** 1 (junk files)
+**Blocking count:** 1 (junk files) — RESOLVED, see re-audit note below.
 **Top finding:** B-1 — `_verify-map.mjs` / `_verify-map2.mjs` committed at repo root; `git add -A` from orchestrator swept dev-scratch files into the commit. Delete before merge.
 **Junk-file audit:** 2 offenders (`_verify-map.mjs`, `_verify-map2.mjs`); no stray `.test.*` files, no random root-level throwaways beyond those two.
+
+---
+
+## Re-audit note
+
+**Date:** 2026-04-22
+**Fix commit:** `e5a9624` on `worktree-agent-a52d4079`
+
+All conditions for CONDITIONAL PASS have been satisfied:
+
+- `_verify-map.mjs` and `_verify-map2.mjs` deleted via `git rm` — confirmed absent from `ls _verify-map*.mjs` output.
+- `supercluster@^8.0.1` and `@types/supercluster@^7.1.3` removed via `npm uninstall` — confirmed absent from `package.json` `dependencies` and `devDependencies`.
+- `docs/stories/reports/T13-implementation-report.md` written and committed (N-4 resolved).
+- Re-verification: `npx tsc --noEmit` exit 0; `npm run build` exit 0 (all 10 routes compile).
+
+**Revised verdict: PASS — clear to merge to `feature/v0.1-impl`.**
