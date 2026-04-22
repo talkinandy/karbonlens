@@ -1,16 +1,14 @@
 /**
  * app/(app)/projects/[slug]/page.tsx — project detail (T12).
  *
- * All DB reads live in `lib/queries/project-detail.ts`. Middleware gates slugs
- * (public-slug allowlist in `middleware.ts`); this component checks the
- * authenticated session only to decide whether to render the restricted
- * sections (issuances, retirements, alerts, methodology note) — hero + score +
- * registry render for every visitor who reaches the component at all.
+ * All DB reads live in `lib/queries/project-detail.ts`. Opened up 2026-04-22:
+ * every section (hero, score, registry list, issuances, retirements, alerts
+ * summary + map, methodology) renders for every visitor. Only personalised
+ * surfaces require sign-in (see `proxy.ts` matcher: /alerts + /admin only).
  */
 
 import { notFound } from 'next/navigation';
 
-import { auth } from '@/lib/auth';
 import { getProjectDetail } from '@/lib/queries/project-detail';
 import {
   getProjectAlertsFeatureCollection,
@@ -59,22 +57,18 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  const session = await auth();
-  const isAuthed = Boolean(session?.user);
-
   const issuancePage = parsePage(sp.issuance_page);
   const issuanceCount = detail.issuances.length;
 
-  // T13 — map data. Fetched server-side for authenticated users so MapLibre
-  // gets its GeoJSON via props (no extra HTTP round-trip). Three parallel
-  // queries; the full payload is bounded by ALERTS_MAP_LIMIT (5 000 points).
-  const [mapCentroid, mapAlerts, mapBuffer] = isAuthed
-    ? await Promise.all([
-        getProjectCentroidCoords(detail.project.id),
-        getProjectAlertsFeatureCollection(detail.project.id),
-        getProjectBufferFeatureCollection(detail.project.id),
-      ])
-    : [null, null, null];
+  // T13 — map data. Fetched server-side so MapLibre gets its GeoJSON via
+  // props (no extra HTTP round-trip). Three parallel queries; the full
+  // payload is bounded by ALERTS_MAP_LIMIT (5 000 points).
+  // Opened up 2026-04-22: available to all visitors (no auth gate).
+  const [mapCentroid, mapAlerts, mapBuffer] = await Promise.all([
+    getProjectCentroidCoords(detail.project.id),
+    getProjectAlertsFeatureCollection(detail.project.id),
+    getProjectBufferFeatureCollection(detail.project.id),
+  ]);
 
   const integrityScoreNumeric =
     detail.score?.integrityScore !== undefined &&
@@ -104,9 +98,7 @@ export default async function ProjectDetailPage({
 
       <RegistryList rows={detail.registries} />
 
-      {isAuthed && (
-        <>
-          <IssuancesTable
+      <IssuancesTable
             rows={detail.issuances}
             page={issuancePage}
             pageSize={ISSUANCE_PAGE_SIZE}
@@ -186,8 +178,6 @@ export default async function ProjectDetailPage({
               </p>
             </div>
           </section>
-        </>
-      )}
     </main>
   );
 }
