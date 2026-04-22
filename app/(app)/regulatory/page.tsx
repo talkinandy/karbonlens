@@ -28,6 +28,7 @@
  *     filters." empty state with a Clear-all-filters link (T15 §3.5).
  */
 
+import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { FilterBar } from '@/components/regulatory/FilterBar';
@@ -40,6 +41,20 @@ import {
 } from '@/lib/queries/regulatory';
 
 export const dynamic = 'force-dynamic';
+
+// T26 — page-level metadata. Short title → "Regulatory · KarbonLens".
+// Safe to co-exist with `export const dynamic` above (two separate named exports).
+export const metadata: Metadata = {
+  title: 'Regulatory',
+  description:
+    'Indonesian carbon-market regulations — bilingual summaries, importance and tags filter.',
+  openGraph: {
+    url: '/regulatory',
+    title: 'Regulatory · KarbonLens',
+    description:
+      'Indonesian carbon-market regulations — bilingual summaries, importance and tags filter.',
+  },
+};
 
 type SearchParamValue = string | string[] | undefined;
 type SearchParams = Record<string, SearchParamValue>;

@@ -1,7 +1,21 @@
 // No ISR: auth-gated; server query is sub-ms on period_month index.
+import type { Metadata } from 'next';
 import { getPriceHistory } from '@/lib/queries/prices';
 import { PriceChart } from '@/components/prices/PriceChart';
 import { MonthlyTable } from '@/components/prices/MonthlyTable';
+
+// T26 — page-level metadata. Short title → "Prices · KarbonLens".
+export const metadata: Metadata = {
+  title: 'Prices',
+  description:
+    'IDXCarbon monthly volume, value, and average price — last 10 months.',
+  openGraph: {
+    url: '/prices',
+    title: 'Prices · KarbonLens',
+    description:
+      'IDXCarbon monthly volume, value, and average price — last 10 months.',
+  },
+};
 
 function formatPeriod(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00Z');
