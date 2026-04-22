@@ -2,7 +2,7 @@
 id: T19
 title: Cron installation on VPS
 phase: 4
-status: audited
+status: done
 blocked_by: [T06, T07, T08, T09, T17]
 blocks: []
 owner: spec-writer agent
