@@ -9,17 +9,43 @@ KarbonLens is a carbon-market intelligence terminal that reconciles SRN-PPI, IDX
 
 ## Status
 
-**v0.1 Phases 1 + 2 + 3 complete (2026-04-21).** Foundation (T01–T05), data pipelines (T06–T10), and frontend integration (T11–T18) are all merged into `feature/v0.1-impl`. Only Phase 4 ops hardening (T19–T23) remains before v0.1 ships.
+**v0.1 Phases 1–4 complete (2026-04-21).** Foundation (T01–T05), data pipelines (T06–T10), frontend integration (T11–T18), and ops hardening (T19–T22) are all merged into `feature/v0.1-impl`. Only T23 (replace static prototype with v0.1 app) remains — blocked on OQ-1 (Netlify → self-hosted Postgres connectivity strategy).
 
-**Live DB:** 64 projects · 307 issuances · 10 IDXCarbon monthly snapshots · 8 regulatory events · 64 project scores · 246,576 satellite alerts · 60 in-app notifications
+**Live DB:** 64 projects · 307 issuances · 10 IDXCarbon monthly snapshots · 8 regulatory events · 64 project scores · 247,004 satellite alerts · 60 in-app notifications
 
-**Deferred items:** T17 Phase B (live Resend send) pending Andy's `RESEND_API_KEY`; T23 (replace static prototype) pending OQ-1 Postgres-connectivity decision.
+**Deferred items:** T17 Phase B (live Resend send) pending Andy's `RESEND_API_KEY`; T22 Phase B (live Sentry capture) pending Andy's `SENTRY_DSN`; T23 (Netlify cutover) pending OQ-1 Postgres-connectivity decision.
 
 - Sprint overview and task statuses: [`docs/TASKS.md`](docs/TASKS.md)
 - What shipped in each story: [`CHANGELOG.md`](CHANGELOG.md)
 - Phase 1 retrospective: [`docs/retros/phase-1.md`](docs/retros/phase-1.md)
 - Phase 2 retrospective: [`docs/retros/phase-2.md`](docs/retros/phase-2.md)
 - Phase 3 retrospective: [`docs/retros/phase-3.md`](docs/retros/phase-3.md)
+- Phase 4 retrospective: [`docs/retros/phase-4.md`](docs/retros/phase-4.md)
+
+## Running the scheduled jobs
+
+Scrapers and cron wrappers are live on the Hetzner box under the `karbonlens` user.
+
+- **Scrapers source:** `/opt/karbonlens/scrapers/` (rsynced from repo on install via `scripts/install-crontab.sh`)
+- **Wrappers:** `/opt/karbonlens/scripts/` (owned by `karbonlens`, all +x)
+- **Cron entries:** installed under the `karbonlens` user — inspect with `sudo crontab -u karbonlens -l`
+- **Logs:** `/var/log/karbonlens/*.log` (logrotate weekly, keep 4 weeks compressed)
+- **Backups:** `/var/lib/karbonlens/backups/*.dump` (pg_dump custom-format, 14-day rotation)
+- **Environment:** `/opt/karbonlens/.env` (mode 640, owner `karbonlens:karbonlens`) — populated with real `DATABASE_URL`, `PGPASSWORD`, `GFW_API_KEY`, `DIGEST_CRON_SECRET`; `RESEND_API_KEY` and `SENTRY_DSN` remain `CHANGE_ME` until Andy supplies them
+
+Active cron schedule (as of 2026-04-21):
+
+| Schedule | Job |
+|---|---|
+| Mon 03:00 | Verra registry scraper |
+| Mon 03:30 | GFW satellite alerts scraper |
+| 1st of month 04:00 | IDXCarbon monthly PDF scraper |
+| Daily 04:00 | Project score computation |
+| Mon 00:00 | Weekly digest email (Phase A; live send awaits RESEND_API_KEY) |
+| Daily 02:00 | pg_dump backup (Andy must append from `scrapers/scripts/pg-cron.conf`) |
+| Sun 05:00 | pg_restore drill (Andy must append from `scrapers/scripts/pg-cron.conf`) |
+
+T23 (Netlify production deploy) is deferred pending OQ-1 — the Netlify → self-hosted Postgres connectivity strategy (Tailscale / VPS proxy / managed Postgres). Until OQ-1 is resolved, the app runs on the Hetzner box only.
 
 ## Quickstart (local dev)
 
