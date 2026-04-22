@@ -17,8 +17,7 @@
  * fall through to zeroed / undefined structures if the DB is down — the
  * page never returns HTTP 500.
  *
- * Metadata: NOT declared here. T26 owns `generateMetadata` / `export const
- * metadata` for this route.
+ * Metadata: `export const metadata` (T26) declared below after imports.
  */
 
 import type { Metadata } from 'next';
