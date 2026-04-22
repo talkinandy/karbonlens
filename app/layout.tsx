@@ -22,9 +22,30 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "KarbonLens — Indonesia's carbon market, in one terminal",
+  metadataBase: new URL('https://karbonlens.com'),
+  title: {
+    default: 'KarbonLens',
+    template: '%s · KarbonLens',
+  },
   description:
-    "Satellite MRV, prices, reversal alerts, and regulatory tracking — unified across Verra, SRN-PPI, Gold Standard, and IDXCarbon.",
+    'Satellite MRV, prices, reversal alerts, and regulatory tracking — unified across Verra, SRN-PPI, Gold Standard, and IDXCarbon.',
+  openGraph: {
+    siteName: 'KarbonLens',
+    type: 'website',
+    locale: 'en_US',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'KarbonLens satellite monitor — Katingan peatland with live deforestation alerts',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: ['/og-image.png'],
+  },
 };
 
 export default function RootLayout({

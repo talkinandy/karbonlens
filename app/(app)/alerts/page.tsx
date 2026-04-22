@@ -11,6 +11,7 @@
  *   - `?before=<uuid>`            — cursor-based pagination.
  */
 
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import {
@@ -20,6 +21,20 @@ import {
   type NotificationRow as NotificationRowDto,
 } from '@/lib/queries/notifications';
 import { AlertsInbox } from './AlertsInbox';
+
+// T26 — page-level metadata. `robots: { index: false }` because this page is
+// per-user; search indexing would be misleading (all users see a 302 to sign-in
+// without a session cookie).
+export const metadata: Metadata = {
+  title: 'Alerts inbox',
+  description: 'Your personalised deforestation-alert digest.',
+  robots: { index: false },
+  openGraph: {
+    url: '/alerts',
+    title: 'Alerts inbox · KarbonLens',
+    description: 'Your personalised deforestation-alert digest.',
+  },
+};
 
 const PAGE_SIZE = 50;
 

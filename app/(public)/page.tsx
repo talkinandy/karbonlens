@@ -17,9 +17,10 @@
  * fall through to zeroed / undefined structures if the DB is down — the
  * page never returns HTTP 500.
  *
- * Metadata: NOT declared here. T26 owns `generateMetadata` / `export const
- * metadata` for this route.
+ * Metadata: `export const metadata` (T26) declared below after imports.
  */
+
+import type { Metadata } from 'next';
 
 import { auth } from '@/lib/auth';
 import {
@@ -42,6 +43,35 @@ export const revalidate = 600;
 // Katingan Peatland hero centre — lon, lat.
 const KATINGAN_CENTER: [number, number] = [113.2, -1.8];
 const KATINGAN_ZOOM = 9;
+
+// T26 — landing-page metadata. `title` uses the full string (not just
+// "KarbonLens") so the `%s · KarbonLens` template in app/layout.tsx is bypassed
+// and the OG title matches the landing hero.
+export const metadata: Metadata = {
+  title: "KarbonLens — Indonesia's carbon market, in one terminal",
+  description:
+    'Satellite MRV, prices, reversal alerts, and regulatory tracking — unified across Verra, SRN-PPI, Gold Standard, and IDXCarbon.',
+  openGraph: {
+    url: '/',
+    title: "KarbonLens — Indonesia's carbon market, in one terminal",
+    description:
+      'Satellite MRV, prices, reversal alerts, and regulatory tracking — unified across Verra, SRN-PPI, Gold Standard, and IDXCarbon.',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: "KarbonLens — Indonesia's carbon market, in one terminal",
+      },
+    ],
+  },
+  twitter: {
+    title: "KarbonLens — Indonesia's carbon market, in one terminal",
+    description:
+      'Satellite MRV, prices, reversal alerts, and regulatory tracking — unified across Verra, SRN-PPI, Gold Standard, and IDXCarbon.',
+    images: ['/og-image.png'],
+  },
+};
 
 export default async function LandingPage() {
   const [stats, mapData, session] = await Promise.all([
