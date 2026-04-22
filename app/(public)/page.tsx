@@ -21,6 +21,8 @@
  * metadata` for this route.
  */
 
+import type { Metadata } from 'next';
+
 import { auth } from '@/lib/auth';
 import {
   getLandingStats,
@@ -42,6 +44,21 @@ export const revalidate = 600;
 // Katingan Peatland hero centre — lon, lat.
 const KATINGAN_CENTER: [number, number] = [113.2, -1.8];
 const KATINGAN_ZOOM = 9;
+
+// T26 — landing-page metadata. `title` uses the full string (not just
+// "KarbonLens") so the `%s · KarbonLens` template in app/layout.tsx is bypassed
+// and the OG title matches the landing hero.
+export const metadata: Metadata = {
+  title: "KarbonLens — Indonesia's carbon market, in one terminal",
+  description:
+    'Satellite MRV, prices, reversal alerts, and regulatory tracking — unified across Verra, SRN-PPI, Gold Standard, and IDXCarbon.',
+  openGraph: {
+    url: '/',
+    title: "KarbonLens — Indonesia's carbon market, in one terminal",
+    description:
+      'Satellite MRV, prices, reversal alerts, and regulatory tracking — unified across Verra, SRN-PPI, Gold Standard, and IDXCarbon.',
+  },
+};
 
 export default async function LandingPage() {
   const [stats, mapData, session] = await Promise.all([
