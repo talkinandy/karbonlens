@@ -41,7 +41,7 @@ Tasks are numbered for referencing, not for strict ordering. Parallel tasks are 
 | T17 | Weekly digest email via Resend | T16 | 3h | done (phase A) — Phase B (live Resend send) pending Andy's RESEND_API_KEY |
 | T18 | Landing page with live stats | T11, T14 | 2h | done |
 | T19 | Cron installation on VPS | T06, T07, T08, T09, T17 | 1h | done — installed on this Hetzner box; 5 cron entries active under karbonlens user; Andy must drop real DATABASE_URL password + GFW_API_KEY + RESEND_API_KEY into /opt/karbonlens/.env for full function |
-| T20 | Backups + pg_dump cron | T01 | 1h | todo |
+| T20 | Backups + pg_dump cron | T01 | 1h | done — pg-backup.sh + pg-restore-drill.sh live; 8.77 MB dump on first run; restore drill row counts match live; flock + trap verified; Andy must merge pg-cron.conf into karbonlens crontab (see runbook) |
 | T21 | Entity resolution review admin page | T06 | 3h | done |
 | T22 | Sentry error tracking | T03 | 1h | done (phase A) — Phase B (live Sentry capture) awaits Andy's SENTRY_DSN |
 | T23 | Replace static prototype with live Next.js build | T11, T12, T14, T15, T16, T18 | 2h | todo |
