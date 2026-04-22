@@ -2,7 +2,7 @@
 id: T22
 title: Sentry error tracking
 phase: 4
-status: draft
+status: audited
 blocked_by: [T03]
 blocks: []
 owner: spec-writer agent
@@ -33,13 +33,22 @@ Python scrapers currently use `structlog` for logging. Sentry-SDK integration fo
 
 1. **`npm install @sentry/nextjs` (pin minor version in `package.json`).**
 
-   Use the current stable major at implementation time (expected `^9` or `^10` — verify with `npm info @sentry/nextjs version` before pinning). Pin to a minor-compatible range, e.g. `"@sentry/nextjs": "^9.x.x"`. Confirm `@sentry/nextjs` lists support for Next.js 16 in its peer-dependency range before pinning; if not, open an issue in §9 Open questions.
+   Pin `"@sentry/nextjs": "^10.49.0"`. Version `10.49.0` is confirmed compatible with Next.js 16 (`peerDependencies` declares `^16.0.0-0`). Do not use `^9.x`.
 
 2. **Sentry scaffold files via wizard, then adapted for Next.js 16.**
 
    Run `npx @sentry/wizard@latest -i nextjs --skip-connect` to generate the boilerplate, then adapt as follows. Do not commit wizard-generated files verbatim; review each and apply the adjustments below.
 
-   - **`instrumentation.ts`** (repo root) — Next.js 16 instrumentation hook. Registers Sentry for server and edge runtimes via `register()`.
+   - **`instrumentation.ts`** (repo root) — Next.js 16 instrumentation hook. Registers Sentry for server and edge runtimes via `register()`. The `register()` function **must** branch on `process.env.NEXT_RUNTIME` to avoid importing Node.js-only APIs in the edge runtime:
+
+     ```typescript
+     export async function register() {
+       if (process.env.NEXT_RUNTIME === 'nodejs') await import('./sentry.server.config');
+       if (process.env.NEXT_RUNTIME === 'edge')  await import('./sentry.edge.config');
+     }
+     ```
+
+     Without this branch, both config files are imported in both runtimes, which will fail at edge.
    - **`instrumentation-client.ts`** (repo root) — Next.js 16 client-side instrumentation hook. Imported automatically by the framework on the browser bundle. Calls `Sentry.init(...)` for the browser.
    - **`sentry.server.config.ts`** (repo root) — server-side Sentry configuration.
      - Reads `process.env.SENTRY_DSN`.
@@ -48,7 +57,7 @@ Python scrapers currently use `structlog` for logging. Sentry-SDK integration fo
      - Include a `beforeSend` hook (see §3 item 8 — Filtering).
    - **`sentry.edge.config.ts`** (repo root) — Sentry configuration for the edge runtime used by `proxy.ts` (Next.js middleware). Same no-op guard pattern as `sentry.server.config.ts`.
    - **`sentry.client.config.ts`** (repo root) — browser Sentry configuration. Called from `instrumentation-client.ts`. Same no-op guard pattern: if `NEXT_PUBLIC_SENTRY_DSN` is absent or empty, do not call `Sentry.init()`. Note: browser env vars must be prefixed `NEXT_PUBLIC_`; the implementer must expose the DSN via `NEXT_PUBLIC_SENTRY_DSN` in addition to `SENTRY_DSN`, or use the Sentry wizard's recommended pattern for Next.js (the wizard typically handles this; confirm during implementation).
-   - **`next.config.ts`** — wrap the existing `nextConfig` export with `withSentryConfig`. The wrapper must be **conditional**: only apply if `SENTRY_DSN` is set at build time, so Phase A builds work without any Sentry account. Pattern:
+   - **`next.config.ts`** — wrap the existing `nextConfig` export with `withSentryConfig` **unconditionally**. The wrapper itself is safe without a DSN; runtime no-op is handled inside each `sentry.*.config.ts` via the `SENTRY_DSN` guard. This avoids producing two distinct build artefacts depending on whether `SENTRY_DSN` is set at Netlify build time. Pattern:
 
      ```typescript
      import type { NextConfig } from 'next';
@@ -59,34 +68,23 @@ Python scrapers currently use `structlog` for logging. Sentry-SDK integration fo
      };
 
      const sentryWebpackPluginOptions = {
+       authToken: process.env.SENTRY_AUTH_TOKEN || undefined,
+       org: process.env.SENTRY_ORG || undefined,
+       project: process.env.SENTRY_PROJECT || undefined,
        silent: true,          // suppress Sentry CLI output in CI logs
        hideSourceMaps: true,  // do not ship source maps to browser
      };
 
-     export default process.env.SENTRY_DSN
-       ? withSentryConfig(nextConfig, sentryWebpackPluginOptions)
-       : nextConfig;
+     if (!process.env.SENTRY_AUTH_TOKEN) {
+       console.log('[sentry] Source map upload skipped — SENTRY_AUTH_TOKEN not set');
+     }
+
+     export default withSentryConfig(nextConfig, sentryWebpackPluginOptions);
      ```
 
-3. **Source map upload — conditional on `SENTRY_AUTH_TOKEN` + production build.**
+3. **Source map upload — gated on `SENTRY_AUTH_TOKEN`.**
 
-   Source maps are uploaded to Sentry only when both conditions hold:
-   - `NODE_ENV === 'production'` (or `process.env.VERCEL_ENV === 'production'` / Netlify equivalent)
-   - `SENTRY_AUTH_TOKEN` is set and non-empty
-
-   When either condition is absent, source map upload is skipped. The build must emit a clear single log line: `[sentry] Source map upload skipped — SENTRY_AUTH_TOKEN not set`. Configure this in `sentryWebpackPluginOptions` by gating the `authToken` field:
-
-   ```typescript
-   const sentryWebpackPluginOptions = {
-     authToken: process.env.SENTRY_AUTH_TOKEN || undefined,
-     org: process.env.SENTRY_ORG || undefined,
-     project: process.env.SENTRY_PROJECT || undefined,
-     silent: true,
-     hideSourceMaps: true,
-   };
-   ```
-
-   When `authToken` is `undefined`, the Sentry webpack plugin skips the upload automatically without erroring.
+   Source maps are uploaded to Sentry only when `SENTRY_AUTH_TOKEN` is set and non-empty. When absent, the Sentry webpack plugin skips the upload automatically (because `authToken` is `undefined`). The `next.config.ts` snippet above already handles this, including emitting the explicit log line before calling `withSentryConfig`. No separate configuration block is needed.
 
 4. **`.env.example` — verify and extend (cross-story exception).**
 
@@ -104,11 +102,11 @@ Python scrapers currently use `structlog` for logging. Sentry-SDK integration fo
 
    These lines are commented out (prefixed `#`) because they are optional in dev. Flag this append in the PR description.
 
-5. **`app/api/debug-sentry/route.ts` — admin-only test endpoint.**
+5. **`app/api/admin/debug-sentry/route.ts` — admin-only test endpoint.**
 
-   `GET /api/debug-sentry`
+   `GET /api/admin/debug-sentry`
 
-   - Admin guard: same allowlist pattern as T21 (`NEXT_PUBLIC_ADMIN_EMAIL` env var). If the authenticated user's email does not match `process.env.NEXT_PUBLIC_ADMIN_EMAIL`, return `403 Forbidden` with `{ error: 'Admin only' }`. If unauthenticated, the request never reaches this handler — `proxy.ts` covers `/api/debug-sentry` in its matcher and redirects to `/?signin=1` (see §6 File ownership for the required `proxy.ts` change).
+   - Admin guard: same allowlist pattern as T21 (`NEXT_PUBLIC_ADMIN_EMAIL` env var). If the authenticated user's email does not match `process.env.NEXT_PUBLIC_ADMIN_EMAIL`, return `403 Forbidden` with `{ error: 'Admin only' }`. If unauthenticated, the request never reaches this handler — `proxy.ts` covers `/api/admin/:path*` in its matcher and redirects to `/?signin=1` (see §6 File ownership for the required `proxy.ts` change).
    - When the admin guard passes, throw a deliberate test error:
      ```typescript
      throw new Error('Sentry test — safe to trigger');
@@ -168,8 +166,25 @@ Python scrapers currently use `structlog` for logging. Sentry-SDK integration fo
        if (Math.random() > 0.1) return null;
      }
 
-     // Default PII scrubbing: use Sentry's built-in defaults.
-     // Additional form-data scrubbing via the SDK's default denyUrls/denyPatterns.
+     // Strip email addresses from free-form error messages (Sentry's built-in
+     // scrubbing only strips structured field names like "password" or "token";
+     // it does NOT regex-scrub message strings for email addresses).
+     const emailRe = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
+     if (event.message) event.message = event.message.replace(emailRe, '[email]');
+     if (event.exception?.values) {
+       for (const ex of event.exception.values) {
+         if (ex.value) ex.value = ex.value.replace(emailRe, '[email]');
+       }
+     }
+     // Also scrub extra.* string values.
+     if (event.extra) {
+       for (const key of Object.keys(event.extra)) {
+         if (typeof event.extra[key] === 'string') {
+           event.extra[key] = (event.extra[key] as string).replace(emailRe, '[email]');
+         }
+       }
+     }
+
      return event;
    },
    ```
@@ -193,13 +208,13 @@ Python scrapers currently use `structlog` for logging. Sentry-SDK integration fo
       SENTRY_PROJECT=karbonlens
       ```
    6. Add the same vars to Netlify environment variables (Site settings → Environment variables). For `NEXT_PUBLIC_SENTRY_DSN`, ensure it is exposed at build time (Netlify exposes `NEXT_PUBLIC_*` vars automatically).
-   7. Trigger `/api/debug-sentry` while logged in as admin:
+   7. Trigger `/api/admin/debug-sentry` while logged in as admin:
       ```bash
-      curl -v https://karbonlens.netlify.app/api/debug-sentry \
+      curl -v https://karbonlens.netlify.app/api/admin/debug-sentry \
            -H "Cookie: <your session cookie>"
       ```
       Expected response: `500 Internal Server Error`.
-   8. Open the Sentry dashboard → **Issues**. Within 30 seconds, a new issue titled "Sentry test — safe to trigger" should appear with a source-mapped stack trace pointing to `app/api/debug-sentry/route.ts`.
+   8. Open the Sentry dashboard → **Issues**. Within 30 seconds, a new issue titled "Sentry test — safe to trigger" should appear with a source-mapped stack trace pointing to `app/api/admin/debug-sentry/route.ts`.
    9. Verify the issue shows **User: [UUID]** (not email) in the right sidebar.
    10. Note on Python scrapers: Sentry integration for Python scrapers is deferred to v0.2. At that point, install `sentry-sdk` via pip and initialise with the same or a separate DSN for the scraper project.
 
@@ -250,17 +265,19 @@ Given SENTRY_DSN=https://dummy@sentry.io/1 is set
 And SENTRY_AUTH_TOKEN is not set
 When npm run build runs
 Then the exit code is 0
-And the build log contains a line matching "[sentry] Source map upload skipped"
-And the build does not fail or warn about a missing auth token
+And the build log contains the line "[sentry] Source map upload skipped — SENTRY_AUTH_TOKEN not set"
+  (emitted by the explicit console.log in next.config.ts before withSentryConfig)
+And the .next output directory contains no sourcemap upload receipt files
+  (i.e. no files matching .next/**/*.map.upload or equivalent Sentry artefact markers)
 ```
 
 **AC-5: Debug endpoint is gated — unauthenticated redirect**
 ```
 Given SENTRY_DSN is absent
 And the user is not signed in
-When GET /api/debug-sentry is requested
+When GET /api/admin/debug-sentry is requested
 Then the response is 307 (or 302) redirect to /?signin=1
-  (handled by proxy.ts matcher, not the route handler itself)
+  (handled by proxy.ts /api/admin/:path* matcher, not the route handler itself)
 ```
 
 **AC-6: Runbook file renders correctly**
@@ -278,12 +295,12 @@ And the file contains links to sentry.io signup and the Netlify env vars setting
 ```
 Given SENTRY_DSN is set to Andy's real Sentry project DSN
 And the user is authenticated as admin (andy@fmg.co.id)
-When GET /api/debug-sentry is called (via browser or curl with session cookie)
+When GET /api/admin/debug-sentry is called (via browser or curl with session cookie)
 Then the response status is 500
 And within 30 seconds, a new issue "Sentry test — safe to trigger"
   appears in the Sentry dashboard for the karbonlens project
 And the issue's stack trace is source-mapped back to
-  app/api/debug-sentry/route.ts (not minified)
+  app/api/admin/debug-sentry/route.ts (not minified)
 And the issue sidebar shows User: <UUID> (not email)
 ```
 
@@ -324,7 +341,7 @@ And the issue count does not increment for these request patterns
 | `SENTRY_AUTH_TOKEN` | Andy creates at sentry.io. Optional in dev. Added as commented placeholder to `.env.example` by T22 (append). |
 | `SENTRY_ORG` | Andy's Sentry org slug. Added as commented placeholder to `.env.example` by T22 (append). |
 | `SENTRY_PROJECT` | Andy's Sentry project slug (recommended: `karbonlens`). Added as commented placeholder by T22 (append). |
-| `NEXT_PUBLIC_ADMIN_EMAIL` | Already set (T21). Used by `app/api/debug-sentry/route.ts` for admin guard. |
+| `NEXT_PUBLIC_ADMIN_EMAIL` | Already set (T21). Used by `app/api/admin/debug-sentry/route.ts` for admin guard. |
 | `session.user.id` | Provided by `lib/auth.ts` session callback (T05). Used by `lib/sentry.ts` to attach user context. |
 
 ### Outputs
@@ -337,10 +354,10 @@ And the issue count does not increment for these request patterns
 | Edge Sentry config | `sentry.edge.config.ts` | Same pattern; for middleware |
 | Client Sentry config | `sentry.client.config.ts` | Reads `NEXT_PUBLIC_SENTRY_DSN` |
 | Sentry user helper | `lib/sentry.ts` | `setSentryUser` / `clearSentryUser` |
-| Test endpoint | `app/api/debug-sentry/route.ts` | Admin-only; always returns 500 when reached |
+| Test endpoint | `app/api/admin/debug-sentry/route.ts` | Admin-only; always returns 500 when reached |
 | Runbook | `docs/runbooks/sentry-setup.md` | Andy's Phase B checklist |
-| Modified | `next.config.ts` | Wrapped with `withSentryConfig` (conditional) |
-| Modified | `proxy.ts` | Matcher extended to include `/api/debug-sentry` |
+| Modified | `next.config.ts` | Wrapped with `withSentryConfig` (unconditional) |
+| Modified | `proxy.ts` | Matcher extended to include `/api/admin/:path*` |
 | Modified (append only) | `.env.example` | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` as commented placeholders |
 
 ---
@@ -366,14 +383,20 @@ sentry.server.config.ts
 sentry.edge.config.ts
 sentry.client.config.ts
 lib/sentry.ts
-app/api/debug-sentry/route.ts
+app/api/admin/debug-sentry/route.ts
 docs/runbooks/sentry-setup.md
 ```
 
 T22 may also **modify**:
 ```
-next.config.ts          ← add withSentryConfig wrapper (conditional)
-proxy.ts                ← extend matcher to cover /api/debug-sentry
+next.config.ts          ← add withSentryConfig wrapper (unconditional)
+proxy.ts                ← extend matcher to cover /api/admin/:path*
+```
+
+The `proxy.ts` matcher addition uses the group pattern `/api/admin/:path*` — consistent with how T21's admin routes are covered and naturally extending to any future admin API endpoints. The matcher snippet to add:
+
+```typescript
+'/api/admin/:path*',
 ```
 
 T22 may **append** (not rewrite) to:
@@ -448,7 +471,7 @@ The client bundle can only read env vars prefixed `NEXT_PUBLIC_`. The same DSN v
 
 ## 9. Open questions
 
-1. **Which `@sentry/nextjs` minor version?** Free to pin whichever is current stable at implementation time. As of the spec date the expectation is `^9.x` or `^10.x` — verify with `npm info @sentry/nextjs version`. If the chosen version does not list Next.js 16 in its peer-dependency range, block the story and flag here.
+1. **Which `@sentry/nextjs` minor version?** Resolved. Pin `"@sentry/nextjs": "^10.49.0"`. Audit confirmed `10.49.0` explicitly declares `^16.0.0-0` in its peerDependencies — no blocker.
 
 2. **Sentry plan — free tier adequate?** Free tier: 5,000 errors/month, 1 project, 1 org, unlimited team. v0.1 expected < 100 events/month. No upgrade needed for v0.1. Confirmed OK.
 
@@ -460,6 +483,8 @@ The client bundle can only read env vars prefixed `NEXT_PUBLIC_`. The same DSN v
 
 6. **`withSentryConfig` tree-shaking impact on bundle size?** The Sentry client SDK adds ~50–80 kB gzipped to the browser bundle. Acceptable for v0.1 with no performance budget set. Revisit in v0.2 if Lighthouse scores degrade.
 
+7. **Python scraper monitoring in v0.1?** v0.1 relies on cron log file inspection (`sudo journalctl -u karbonlens-scraper`). T19 sets `MAILTO=""` for cron, so scraper crashes are muted at the cron level too — a complete monitoring blind spot. Observable indirectly via missing database data. v0.2 adds `sentry-sdk` via pip to the scrapers venv with a separate or shared DSN (using the `environment` tag to distinguish events).
+
 ---
 
 ## 10. References
@@ -470,7 +495,7 @@ The client bundle can only read env vars prefixed `NEXT_PUBLIC_`. The same DSN v
 - `docs/stories/T17-weekly-digest-email.md` §5 — cross-story `.env.example` exception pattern
 - `docs/stories/T05-nextauth-google-oauth.md` — Phase A/B split pattern reference
 - `lib/auth.ts` — session callback that provides `session.user.id` (the UUID attached to Sentry scope)
-- `proxy.ts` — matcher to be extended to cover `/api/debug-sentry`
+- `proxy.ts` — matcher to be extended to cover `/api/admin/:path*`
 - `.env.example` — `SENTRY_DSN=` placeholder (T03 sole-owner; T22 appends additional vars)
 - [Sentry Next.js SDK docs](https://docs.sentry.io/platforms/javascript/guides/nextjs/)
 - [Sentry Next.js manual setup](https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/) — fallback if wizard fails
