@@ -48,7 +48,12 @@ Tasks are numbered for referencing, not for strict ordering. Parallel tasks are 
 
 **Total estimated effort:** ~62 hours of focused engineering. Aim for 4–6h/day → roughly 2 weeks calendar, leaves 3+ weeks buffer before end-of-May target.
 
-> **Phase 1 + 2 complete as of 2026-04-21.** T01–T05 fully done (T05 Phase B live-verified 2026-04-21). T06–T10 done with three deferred items: T07 Phase B (pending Andy's GFW_API_KEY — populates satellite_alerts + unblocks T09 AC-5 re-verify); T10 rows 6–10 fact-check (pending Andy). Ready for Phase 3.
+> **Phases 1 + 2 + 3 complete as of 2026-04-21.** T11–T18 all done. Three deferred items across all phases:
+> - T05 Phase B ✅ live-verified 2026-04-21 — Google OAuth end-to-end
+> - T07 Phase B ✅ live-verified 2026-04-21 — 246,576 alerts ingested
+> - T17 Phase B — pending Andy's RESEND_API_KEY (live Gmail send + render verification)
+>
+> Only Phase 4 (ops hardening: T19 cron, T20 backups, T21 admin, T22 Sentry, T23 prototype replacement) remains before v0.1 ship. ~8h of effort.
 
 ---
 
