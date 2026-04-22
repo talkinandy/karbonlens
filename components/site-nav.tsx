@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 type NavItem = { href: string; label: string };
@@ -26,8 +27,15 @@ export function SiteNav({ rightSlot }: Props = {}) {
   return (
     <nav className="kl-topnav">
       <div className="kl-topnav-inner">
-        <Link href="/" className="kl-brand">
-          <span className="kl-brand-mark">K</span>
+        <Link href="/" className="kl-brand" aria-label="KarbonLens — home">
+          <Image
+            src="/brand/karbonlens-mark.svg"
+            alt=""
+            width={24}
+            height={24}
+            className="kl-brand-mark-img"
+            priority
+          />
           <span className="kl-brand-word">KarbonLens</span>
         </Link>
         <div className="kl-nav-links">
