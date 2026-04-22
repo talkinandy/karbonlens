@@ -94,44 +94,46 @@ export default function MethodologyPage() {
             methodology, or on-the-ground conditions to drift. See Known
             limitations below for the PDD-vs-registration-date caveat.
           </p>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th scope="col" style={{ textAlign: 'left' }}>
-                  Years since validation
-                </th>
-                <th scope="col" style={{ textAlign: 'left' }}>
-                  Score
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Unknown</td>
-                <td>50 — unknown-neutral</td>
-              </tr>
-              <tr>
-                <td>&lt; 3 years</td>
-                <td>100</td>
-              </tr>
-              <tr>
-                <td>&lt; 5 years</td>
-                <td>85</td>
-              </tr>
-              <tr>
-                <td>&lt; 8 years</td>
-                <td>70</td>
-              </tr>
-              <tr>
-                <td>&lt; 12 years</td>
-                <td>50</td>
-              </tr>
-              <tr>
-                <td>&ge; 12 years</td>
-                <td>30</td>
-              </tr>
-            </tbody>
-          </table>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th scope="col" style={{ textAlign: 'left' }}>
+                    Years since validation
+                  </th>
+                  <th scope="col" style={{ textAlign: 'left' }}>
+                    Score
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Unknown</td>
+                  <td>50 — unknown-neutral</td>
+                </tr>
+                <tr>
+                  <td>&lt; 3 years</td>
+                  <td>100</td>
+                </tr>
+                <tr>
+                  <td>&lt; 5 years</td>
+                  <td>85</td>
+                </tr>
+                <tr>
+                  <td>&lt; 8 years</td>
+                  <td>70</td>
+                </tr>
+                <tr>
+                  <td>&lt; 12 years</td>
+                  <td>50</td>
+                </tr>
+                <tr>
+                  <td>&ge; 12 years</td>
+                  <td>30</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section style={{ marginBottom: 32 }}>
@@ -164,36 +166,38 @@ export default function MethodologyPage() {
             multiple registries with at least one active listing are the most
             auditable; unlisted projects are the least.
           </p>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th scope="col" style={{ textAlign: 'left' }}>
-                  Registry status
-                </th>
-                <th scope="col" style={{ textAlign: 'left' }}>
-                  Score
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>&ge; 2 registries and &ge; 1 active</td>
-                <td>85</td>
-              </tr>
-              <tr>
-                <td>Exactly 1 registry and 1 active</td>
-                <td>70</td>
-              </tr>
-              <tr>
-                <td>&ge; 1 registry (none active)</td>
-                <td>55</td>
-              </tr>
-              <tr>
-                <td>No registry listings</td>
-                <td>40</td>
-              </tr>
-            </tbody>
-          </table>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th scope="col" style={{ textAlign: 'left' }}>
+                    Registry status
+                  </th>
+                  <th scope="col" style={{ textAlign: 'left' }}>
+                    Score
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>&ge; 2 registries and &ge; 1 active</td>
+                  <td>85</td>
+                </tr>
+                <tr>
+                  <td>Exactly 1 registry and 1 active</td>
+                  <td>70</td>
+                </tr>
+                <tr>
+                  <td>&ge; 1 registry (none active)</td>
+                  <td>55</td>
+                </tr>
+                <tr>
+                  <td>No registry listings</td>
+                  <td>40</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section style={{ marginBottom: 32 }}>
@@ -248,7 +252,7 @@ export default function MethodologyPage() {
             <li>
               <strong>Community flags are hardcoded.</strong> Until a news
               sentiment scraper lands in v0.2, only projects on an
-              Andy-maintained override list are downgraded. Most projects
+              curator-maintained override list are downgraded. Most projects
               therefore sit at the 75 default regardless of real-world
               community standing.
             </li>
