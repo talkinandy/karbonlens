@@ -1,0 +1,26 @@
+[Unit]
+Description=KarbonLens Next.js app (v0.1)
+Documentation=https://github.com/karbonlens/karbonlens
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=karbonlens
+Group=karbonlens
+# Loads DATABASE_URL, GOOGLE_*, NEXTAUTH_*, AUTH_TRUST_HOST
+EnvironmentFile=/opt/karbonlens/app/.env.local
+Environment=NODE_ENV=production
+Environment=PORT=3010
+Environment=HOSTNAME=127.0.0.1
+WorkingDirectory=/opt/karbonlens/app
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=karbonlens-app
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
