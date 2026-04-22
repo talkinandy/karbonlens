@@ -2,7 +2,7 @@
 id: T25
 title: Landing redesign with satellite map visual
 phase: 5-polish
-status: audited
+status: done
 blocked_by: []
 blocks: [T26]
 owner: spec-writer

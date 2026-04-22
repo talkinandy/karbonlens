@@ -53,14 +53,23 @@ export type LandingStats = {
   latestValueIdr: string | null;      // "Rp 4.7B"
   momDeltaPct: number | null;         // rounded 1dp; null if < 2 months
 
+  // T25 ticker additions (MoM vs prior month — idx_monthly_snapshots is monthly)
+  momVolumeDelta: number | null;      // absolute tCO2e diff vs prior month; null if < 2 months
+  idxParticipantCount: number | null; // latest idx_monthly_snapshots.registered_participants
+  momParticipantDelta: number | null; // absolute participant diff vs prior month
+  vcusTradedYtd: string | null;       // formatted YTD volume from idx_monthly_snapshots
+
   // Integrity scores
   medianIntegrityScore: number | null;
 
   // Regulatory events
   regulatoryEventCount: number;
 
-  // GFW alerts (90-day window)
+  // GFW alerts (90-day window) + 30d + 7d for WoW delta
   gfwAlerts90d: number;
+  activeAlerts30d: number;            // T25: sum of satellite_alerts last 30d
+  alerts7d: number;                   // T25: last 7 days count (for WoW delta)
+  alertsPrior7d: number;              // T25: 8–14 days ago count (WoW comparator)
 
   // Data-source last-sync timestamps
   registriesLastSynced: Date | null;
@@ -150,9 +159,16 @@ function zeroStats(): LandingStats {
     latestAvgPriceIdr: null,
     latestValueIdr: null,
     momDeltaPct: null,
+    momVolumeDelta: null,
+    idxParticipantCount: null,
+    momParticipantDelta: null,
+    vcusTradedYtd: null,
     medianIntegrityScore: null,
     regulatoryEventCount: 0,
     gfwAlerts90d: 0,
+    activeAlerts30d: 0,
+    alerts7d: 0,
+    alertsPrior7d: 0,
     registriesLastSynced: null,
     satelliteLastIngested: null,
     idxLastScraped: null,
@@ -200,9 +216,20 @@ export async function getLandingStats(): Promise<LandingStats> {
           SELECT COUNT(*)::int AS reg_count FROM regulatory_events
         ),
         alerts_agg AS (
-          SELECT COUNT(*)::int AS alerts_90d
+          SELECT
+            COUNT(*) FILTER (WHERE alert_date >= (NOW() - INTERVAL '90 days')::date)::int AS alerts_90d,
+            COUNT(*) FILTER (WHERE alert_date >= (NOW() - INTERVAL '30 days')::date)::int AS alerts_30d,
+            COUNT(*) FILTER (WHERE alert_date >= (NOW() - INTERVAL '7 days')::date)::int  AS alerts_7d,
+            COUNT(*) FILTER (
+              WHERE alert_date >= (NOW() - INTERVAL '14 days')::date
+                AND alert_date <  (NOW() - INTERVAL '7 days')::date
+            )::int AS alerts_prior_7d
           FROM satellite_alerts
-          WHERE alert_date >= (NOW() - INTERVAL '90 days')::date
+        ),
+        ytd_agg AS (
+          SELECT COALESCE(SUM(total_volume_tco2e), 0)::numeric AS ytd_volume
+          FROM idx_monthly_snapshots
+          WHERE period_month >= date_trunc('year', CURRENT_DATE)
         ),
         registries_ts AS (
           SELECT MAX(last_synced_at) AS ts FROM registries
@@ -214,15 +241,19 @@ export async function getLandingStats(): Promise<LandingStats> {
           SELECT MAX(scraped_at) AS ts FROM idx_monthly_snapshots
         )
         SELECT
-          (SELECT project_count FROM project_agg)    AS project_count,
-          (SELECT total_issued FROM project_agg)     AS total_issued,
-          (SELECT total_available FROM project_agg)  AS total_available,
-          (SELECT median_score FROM score_agg)       AS median_score,
-          (SELECT reg_count FROM reg_agg)            AS reg_count,
-          (SELECT alerts_90d FROM alerts_agg)        AS alerts_90d,
-          (SELECT ts FROM registries_ts)             AS registries_ts,
-          (SELECT ts FROM satellite_ts)              AS satellite_ts,
-          (SELECT ts FROM idx_ts)                    AS idx_ts
+          (SELECT project_count FROM project_agg)     AS project_count,
+          (SELECT total_issued FROM project_agg)      AS total_issued,
+          (SELECT total_available FROM project_agg)   AS total_available,
+          (SELECT median_score FROM score_agg)        AS median_score,
+          (SELECT reg_count FROM reg_agg)             AS reg_count,
+          (SELECT alerts_90d FROM alerts_agg)         AS alerts_90d,
+          (SELECT alerts_30d FROM alerts_agg)         AS alerts_30d,
+          (SELECT alerts_7d FROM alerts_agg)          AS alerts_7d,
+          (SELECT alerts_prior_7d FROM alerts_agg)    AS alerts_prior_7d,
+          (SELECT ytd_volume FROM ytd_agg)            AS ytd_volume,
+          (SELECT ts FROM registries_ts)              AS registries_ts,
+          (SELECT ts FROM satellite_ts)               AS satellite_ts,
+          (SELECT ts FROM idx_ts)                     AS idx_ts
       `),
 
       // 2. IDXCarbon — latest two rows to compute MoM delta.
@@ -231,7 +262,8 @@ export async function getLandingStats(): Promise<LandingStats> {
           period_month,
           total_volume_tco2e,
           total_value_idr,
-          avg_price_idr
+          avg_price_idr,
+          registered_participants
         FROM idx_monthly_snapshots
         ORDER BY period_month DESC
         LIMIT 2
@@ -272,6 +304,10 @@ export async function getLandingStats(): Promise<LandingStats> {
     const medianScore = toNumberOrNull(aggRow.median_score);
     const regCount = Number(aggRow.reg_count ?? 0) || 0;
     const alerts90d = Number(aggRow.alerts_90d ?? 0) || 0;
+    const alerts30d = Number(aggRow.alerts_30d ?? 0) || 0;
+    const alerts7d = Number(aggRow.alerts_7d ?? 0) || 0;
+    const alertsPrior7d = Number(aggRow.alerts_prior_7d ?? 0) || 0;
+    const ytdVolumeN = Number(aggRow.ytd_volume ?? 0) || 0;
     const registriesLastSynced = toDateOrNull(aggRow.registries_ts);
     const satelliteLastIngested = toDateOrNull(aggRow.satellite_ts);
     const idxLastScraped = toDateOrNull(aggRow.idx_ts);
@@ -285,6 +321,9 @@ export async function getLandingStats(): Promise<LandingStats> {
     let latestAvgPriceIdr: string | null = null;
     let latestValueIdr: string | null = null;
     let momDeltaPct: number | null = null;
+    let momVolumeDelta: number | null = null;
+    let idxParticipantCount: number | null = null;
+    let momParticipantDelta: number | null = null;
 
     if (latest) {
       const period = latest.period_month;
@@ -299,13 +338,26 @@ export async function getLandingStats(): Promise<LandingStats> {
       const val = toNumberOrNull(latest.total_value_idr);
       latestValueIdr = val !== null ? formatIdrCompact(val) : null;
 
-      if (previous && avg !== null) {
+      idxParticipantCount = toNumberOrNull(latest.registered_participants);
+
+      if (previous) {
         const prevAvg = toNumberOrNull(previous.avg_price_idr);
-        if (prevAvg !== null && prevAvg !== 0) {
+        if (avg !== null && prevAvg !== null && prevAvg !== 0) {
           momDeltaPct = Math.round(((avg - prevAvg) / prevAvg) * 1000) / 10;
+        }
+        const prevVol = toNumberOrNull(previous.total_volume_tco2e);
+        if (vol !== null && prevVol !== null) {
+          momVolumeDelta = Math.round(vol - prevVol);
+        }
+        const prevPart = toNumberOrNull(previous.registered_participants);
+        if (idxParticipantCount !== null && prevPart !== null) {
+          momParticipantDelta = Math.round(idxParticipantCount - prevPart);
         }
       }
     }
+
+    // YTD volume — formatted or null if no rows this year.
+    const vcusTradedYtd = ytdVolumeN > 0 ? formatVolume(ytdVolumeN) : null;
 
     const featuredMap = new Map<string, FeaturedProject>();
     for (const raw of featuredRows as unknown as Array<Record<string, unknown>>) {
@@ -336,9 +388,16 @@ export async function getLandingStats(): Promise<LandingStats> {
       latestAvgPriceIdr,
       latestValueIdr,
       momDeltaPct,
+      momVolumeDelta,
+      idxParticipantCount,
+      momParticipantDelta,
+      vcusTradedYtd,
       medianIntegrityScore: medianScore === null ? null : Math.round(medianScore),
       regulatoryEventCount: regCount,
       gfwAlerts90d: alerts90d,
+      activeAlerts30d: alerts30d,
+      alerts7d,
+      alertsPrior7d,
       registriesLastSynced,
       satelliteLastIngested,
       idxLastScraped,

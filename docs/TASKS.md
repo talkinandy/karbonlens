@@ -45,10 +45,12 @@ Tasks are numbered for referencing, not for strict ordering. Parallel tasks are 
 | T21 | Entity resolution review admin page | T06 | 3h | done |
 | T22 | Sentry error tracking | T03 | 1h | done (phase A) — Phase B (live Sentry capture) awaits Andy's SENTRY_DSN |
 | T23 | Replace static prototype with live Next.js build | T11, T12, T14, T15, T16, T18 | 2h | todo |
+| T25 | Landing redesign with satellite map visual | — | 4h | done |
 
 **Total estimated effort:** ~62 hours of focused engineering. Aim for 4–6h/day → roughly 2 weeks calendar, leaves 3+ weeks buffer before end-of-May target.
 
 > **Phases 1–4 complete as of 2026-04-21.** T01–T22 done (T17 + T22 Phase A; Phase B pending external keys). Only T23 (Netlify cutover) remains, blocked on OQ-1. v0.1 ship is ~1 connectivity decision away.
+> **Phase-5 polish follow-ups:** T24 (methodology page), T25 (landing redesign), T26 (social-preview metadata) landed 2026-04-22.
 
 ---
 
