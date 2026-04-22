@@ -130,11 +130,17 @@ export default function ProjectCentroidLayer({ features }: Props) {
     map.on('mouseleave', LAYER_ID, onLeave);
 
     return () => {
-      map.off('click', LAYER_ID, onClick);
-      map.off('mouseenter', LAYER_ID, onEnter);
-      map.off('mouseleave', LAYER_ID, onLeave);
-      if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
-      if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
+      // Guard: parent MapLibreBase may have already destroyed `map` during
+      // client-side nav. Swallow cleanup errors.
+      try {
+        map.off('click', LAYER_ID, onClick);
+        map.off('mouseenter', LAYER_ID, onEnter);
+        map.off('mouseleave', LAYER_ID, onLeave);
+        if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
+        if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
+      } catch {
+        // map already destroyed
+      }
     };
   }, [map, features]);
 
