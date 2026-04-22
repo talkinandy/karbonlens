@@ -711,4 +711,58 @@ Deltas introduced by T11–T18, plus follow-ups T05.1 and T06.1. Sections §1–
   - satellite_alerts=246,576 (T07 Phase B live-verified), project_scores=64
   - notifications=60 (Andy's user; all `type=reversal`), users=1, sessions=1
 
+### Phase 4 shipped state (as of 2026-04-21)
+
+Deltas introduced by T19–T22. Sections §1–§12 remain forward-looking; §13 Phase 1–3 blocks and this block record divergences and additions.
+
+- **Migration 003** (T06.1, landed Phase 3) — `projects.status CHECK (status IS NULL OR status IN ('active','pipeline','suspended','flagged'))` plus defensive UPDATE normalizing raw Verra strings. Documented here for completeness alongside 004 and 005.
+
+- **Migration 004** (T17, landed Phase 3) — `notifications.digested_at TIMESTAMPTZ` plus partial index `(user_id, created_at) WHERE digested_at IS NULL`. Enables idempotent digest: endpoint filters on `digested_at IS NULL` and writes back on successful send.
+
+- **Migration 005** (T21) — `admin_actions` table: `(id UUID PK, admin_email TEXT, action TEXT, target_table TEXT, target_id UUID, payload JSONB, created_at TIMESTAMPTZ)`. Audit trail for entity-resolution merges and future admin operations. Keeps T16/T17 notification queries clean (no admin-generated noise).
+
+- **`lib/admin.ts` — shared allowlist + `isAdmin()`**: single source of truth for the admin email set (`ADMIN_EMAILS` env var, comma-separated, falls back to `NEXT_PUBLIC_ADMIN_EMAIL`). Used by T21 admin pages (`/admin/matches`) and T22 debug endpoint (`/api/debug/sentry-test`). Any future admin surface must import from here.
+
+- **`proxy.ts` matcher (T21 update)**: covers `/admin/:path*` and `/api/admin/:path*` in addition to the Phase 3 authed routes. Both sides of the T21 merge conflict wrote verbatim-identical additions; canonical was taken, no functional divergence.
+
+- **Sentry integration (T22 Phase A)**: unconditional `@sentry/nextjs` wrapper; runtime no-op when `SENTRY_DSN` is absent (Sentry SDK skips init gracefully). Three per-runtime config files: `sentry.server.config.ts`, `sentry.edge.config.ts`, `sentry.client.config.ts`. `beforeSend` hook scrubs `user.email` from all events. Drizzle errors sampled at 1/10 (`tracesSampleRate: 0.1` for that error class) to avoid free-tier exhaustion. Phase B (live capture + source-mapped stack verification) awaits Andy's `SENTRY_DSN`.
+
+- **Cron topology (T19 + T20) live on box:**
+
+  | Schedule (UTC) | Wrapper | Log |
+  |---|---|---|
+  | Mon 03:00 | `run_weekly_verra.sh` | `/var/log/karbonlens/verra.log` |
+  | Mon 03:30 | `run_weekly_gfw.sh` | `/var/log/karbonlens/gfw.log` |
+  | 1st 04:00 | `run_monthly_idxcarbon.sh` | `/var/log/karbonlens/idxcarbon.log` |
+  | Daily 04:00 | `run_daily_score.sh` | `/var/log/karbonlens/score.log` |
+  | Mon 00:00 | `run_weekly_digest.sh` | `/var/log/karbonlens/digest.log` |
+  | Daily 02:00 | `pg-backup.sh` (T20) | `/var/log/karbonlens/backup.log` |
+  | Sun 05:00 | `pg-restore-drill.sh` (T20) | `/var/log/karbonlens/restore-drill.log` |
+
+  T20's two entries (backup + restore drill) are in `scrapers/scripts/pg-cron.conf`; Andy must append them to the karbonlens crontab manually.
+
+- **`/opt/karbonlens` filesystem layout (live):**
+
+  ```
+  /opt/karbonlens/
+    .env                   # 640 karbonlens:karbonlens; real DB/GFW/digest creds; RESEND+SENTRY CHANGE_ME
+    scrapers/              # rsynced from repo by install-crontab.sh
+      .venv/               # Python 3.12 venv (created by installer)
+      verra/ gfw/ idxcarbon/ scoring/ common/ migrations/ scripts/
+    scripts/               # bash wrappers, all +x, karbonlens owner
+  /var/log/karbonlens/     # scraper + backup logs; logrotate weekly, keep 4
+  /var/lib/karbonlens/
+    backups/               # pg_dump -Fc files, 14-day rotation
+    pdf-archive/           # IDXCarbon monthly PDFs
+  ```
+
+- **Installer patch (`1aba5d8`):** `scripts/install-crontab.sh` was patched post-live-smoke-test to rsync `scrapers/` source and create the Python venv. Fresh installs now fully provision the scraper environment without manual steps.
+
+- **T23 deferred; OQ-1 unchanged.** Netlify production deploy blocked on connectivity strategy. Three options remain open: (a) Tailscale on VPS + Netlify proxy, (b) managed Postgres migration (Neon/Supabase), (c) custom domain pointing directly to VPS. No decision made in Phase 4.
+
+- **Current table counts (live DB, 2026-04-21):**
+  - projects=64, registries=64, issuances=307, satellite_alerts=247,004
+  - idx_monthly_snapshots=10, regulatory_events=8, project_scores=64
+  - notifications=60, admin_actions=0
+
 *End of architecture doc. Paired with `PRD.md` (strategy) and `TASKS.md` (tactics).*
