@@ -53,6 +53,20 @@ export const metadata: Metadata = {
     title: 'Regulatory · KarbonLens',
     description:
       'Indonesian carbon-market regulations — bilingual summaries, importance and tags filter.',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: "KarbonLens — Indonesia's carbon market, in one terminal",
+      },
+    ],
+  },
+  twitter: {
+    title: 'Regulatory · KarbonLens',
+    description:
+      'Indonesian carbon-market regulations — bilingual summaries, importance and tags filter.',
+    images: ['/og-image.png'],
   },
 };
 

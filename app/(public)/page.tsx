@@ -57,6 +57,20 @@ export const metadata: Metadata = {
     title: "KarbonLens — Indonesia's carbon market, in one terminal",
     description:
       'Satellite MRV, prices, reversal alerts, and regulatory tracking — unified across Verra, SRN-PPI, Gold Standard, and IDXCarbon.',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: "KarbonLens — Indonesia's carbon market, in one terminal",
+      },
+    ],
+  },
+  twitter: {
+    title: "KarbonLens — Indonesia's carbon market, in one terminal",
+    description:
+      'Satellite MRV, prices, reversal alerts, and regulatory tracking — unified across Verra, SRN-PPI, Gold Standard, and IDXCarbon.',
+    images: ['/og-image.png'],
   },
 };
 

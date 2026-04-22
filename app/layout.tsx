@@ -33,7 +33,6 @@ export const metadata: Metadata = {
     siteName: 'KarbonLens',
     type: 'website',
     locale: 'en_US',
-    alternateLocale: ['id_ID'],
     images: [
       {
         url: '/og-image.png',
