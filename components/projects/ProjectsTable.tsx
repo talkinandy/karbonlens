@@ -16,6 +16,7 @@
 import Link from 'next/link';
 import type { ProjectRow } from '@/lib/queries/projects-list';
 import { displayStatus, type StatusBadge } from '@/lib/display/status';
+import { ScoreBadge } from './ScoreBadge';
 
 export type ProjectsTableProps = {
   rows: ProjectRow[];
@@ -76,11 +77,10 @@ export function ProjectsTable({ rows }: ProjectsTableProps) {
           <tr>
             <th>Project</th>
             <th>Province</th>
-            <th>Project Type</th>
-            <th>Methodology</th>
-            <th style={{ textAlign: 'right' }}>Hectares</th>
+            <th>Type</th>
+            <th className="kl-col-hectares" style={{ textAlign: 'right' }}>Hectares</th>
             <th style={{ textAlign: 'right' }}>Issued</th>
-            <th style={{ textAlign: 'right' }}>Retired</th>
+            <th className="kl-col-retired" style={{ textAlign: 'right' }}>Retired</th>
             <th style={{ textAlign: 'right' }}>Available</th>
             <th>Status</th>
             <th style={{ textAlign: 'right' }}>Score</th>
@@ -105,14 +105,16 @@ export function ProjectsTable({ rows }: ProjectsTableProps) {
                 </td>
                 <td>{p.province ?? 'Unknown'}</td>
                 <td>{formatDash(p.projectType)}</td>
-                <td>{formatDash(p.methodology)}</td>
-                <td style={{ textAlign: 'right' }} className="tnum">
+                <td className="kl-col-hectares tnum" style={{ textAlign: 'right' }}>
                   {formatHectares(p.hectares)}
                 </td>
                 <td style={{ textAlign: 'right' }} className="tnum">
                   {formatCompact(p.totalVcusIssued)}
                 </td>
-                <td style={{ textAlign: 'right' }} className="tnum">
+                <td
+                  className="kl-col-retired tnum"
+                  style={{ textAlign: 'right' }}
+                >
                   {formatCompact(p.totalVcusRetired)}
                 </td>
                 <td style={{ textAlign: 'right' }} className="tnum">
@@ -121,13 +123,8 @@ export function ProjectsTable({ rows }: ProjectsTableProps) {
                 <td>
                   <span className={pillClass}>{status.label}</span>
                 </td>
-                <td
-                  style={{ textAlign: 'right', fontWeight: 500 }}
-                  className="tnum"
-                >
-                  {p.integrityScore === null || p.integrityScore === ''
-                    ? '—'
-                    : Math.round(Number(p.integrityScore)).toString()}
+                <td style={{ textAlign: 'right' }}>
+                  <ScoreBadge score={p.integrityScore} />
                 </td>
               </tr>
             );
