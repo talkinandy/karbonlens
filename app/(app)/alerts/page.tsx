@@ -54,7 +54,7 @@ export default async function AlertsPage(props: {
 }) {
   const session = await auth();
   if (!session?.user?.id) {
-    redirect('/?signin=1');
+    redirect('/?signin=1&from=/alerts');
   }
 
   const sp = await props.searchParams;
