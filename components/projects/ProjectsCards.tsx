@@ -19,6 +19,7 @@
 import Link from 'next/link';
 import type { ProjectRow } from '@/lib/queries/projects-list';
 import { displayStatus, type StatusBadge } from '@/lib/display/status';
+import { toCanonicalProvince } from '@/lib/display/province';
 import { ScoreBadge } from './ScoreBadge';
 
 export type ProjectsCardsProps = {
@@ -56,7 +57,8 @@ export function ProjectsCards({ rows }: ProjectsCardsProps) {
         const pillClass = BADGE_TO_PILL[status.badge];
         const metaParts: string[] = [];
         if (p.developer) metaParts.push(p.developer);
-        if (p.province) metaParts.push(p.province);
+        const canonicalProvince = toCanonicalProvince(p.province);
+        if (canonicalProvince) metaParts.push(canonicalProvince);
 
         return (
           <li key={p.id} className="kl-projects-card">
