@@ -70,6 +70,7 @@ export const metadata: Metadata = {
 };
 import { getProjectCentroidsFeatureCollection } from '@/lib/queries/map-geojson';
 import { ProjectsTable } from '@/components/projects/ProjectsTable';
+import { ProjectsCards } from '@/components/projects/ProjectsCards';
 import { FilterChips } from '@/components/projects/FilterChips';
 import { SortControl } from '@/components/projects/SortControl';
 import { StatsStrip } from '@/components/projects/StatsStrip';
@@ -256,7 +257,14 @@ export default async function ProjectsPage({
         <EmptyState clearFiltersHref={clearFiltersHref} />
       ) : (
         <>
-          <ProjectsTable rows={rows} />
+          {/* Desktop & tablet (≥769px): dense 9-column table. */}
+          <div className="kl-projects-list-desktop">
+            <ProjectsTable rows={rows} />
+          </div>
+          {/* Phone (≤768px): scannable card list, one project per row. */}
+          <div className="kl-projects-list-mobile">
+            <ProjectsCards rows={rows} />
+          </div>
           {showPagination ? (
             <Pagination
               currentPage={page}
