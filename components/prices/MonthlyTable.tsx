@@ -29,6 +29,7 @@ interface MonthlyTableProps {
 export function MonthlyTable({ rows }: MonthlyTableProps) {
   return (
     <div className="kl-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="kl-table-scroll">
       <table className="kl-table">
         <thead>
           <tr>
@@ -67,6 +68,7 @@ export function MonthlyTable({ rows }: MonthlyTableProps) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

@@ -50,6 +50,7 @@ export function IssuancesTable({
     <section id="issuances" style={{ marginBottom: 32 }}>
       <p className="kl-section-label">Issuances</p>
       <div className="kl-card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="kl-table-scroll">
         <table className="kl-table">
           <thead>
             <tr>
@@ -76,6 +77,7 @@ export function IssuancesTable({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {totalPages > 1 && (

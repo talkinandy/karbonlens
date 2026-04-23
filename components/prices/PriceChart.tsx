@@ -62,7 +62,7 @@ export function PriceChart({ rows }: PriceChartProps) {
         <ResponsiveContainer width="100%" height={320}>
           <ComposedChart data={data} margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border, #e5e7eb)" />
-            <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
             <YAxis
               yAxisId="price"
               orientation="left"

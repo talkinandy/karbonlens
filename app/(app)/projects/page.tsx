@@ -226,7 +226,7 @@ export default async function ProjectsPage({
 
       {/* Toolbar: filters on the left, sort on the right. */}
       <div className="kl-toolbar">
-        <div style={{ flex: 1, minWidth: 280 }}>
+        <div style={{ flex: 1, minWidth: 180 }}>
           <FilterChips
             options={{
               province: provinceOptions,
