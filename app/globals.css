@@ -102,6 +102,7 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 a {
@@ -750,6 +751,42 @@ button {
 
 @media (max-width: 900px) { .lp-hero { padding: 32px 20px; } }
 
+@media (max-width: 768px) {
+  /* Landing grids — intermediate 2-col before 640px collapse */
+  .lp-pipeline-grid { grid-template-columns: repeat(2, 1fr); }
+  .lp-roles-grid    { grid-template-columns: repeat(2, 1fr); }
+  .lp-featured-grid { grid-template-columns: repeat(2, 1fr); }
+  .lp-ticker-inner  { grid-template-columns: repeat(3, 1fr); gap: 12px 20px; }
+  .lp-section-head  { grid-template-columns: 1fr; gap: 20px; }
+  .lp-section       { padding: 56px 20px; }
+  .lp-hero-inner    { grid-template-columns: 1fr; gap: 28px; }
+  .lp-h1            { font-size: 56px; letter-spacing: -1.2px; }
+  .lp-h2            { font-size: 36px; }
+
+  /* Product pages — first mobile rules for .kl-* */
+  .kl-topnav        { padding: 0 12px; }
+  .kl-nav-links     { gap: 4px; }
+  .kl-nav-link      { padding: 6px 8px; font-size: 12px; }
+  .kl-page          { padding: 16px 12px 48px; }
+  .kl-page-title    { font-size: 22px; letter-spacing: -0.2px; }
+  .kl-stat-grid     { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .kl-card          { padding: 16px; }
+  .kl-table th,
+  .kl-table td      { padding: 8px 10px; font-size: 12px; }
+  .kl-map           { min-height: 240px; }
+}
+
+/* Horizontally-scrollable wrapper for wide data tables.
+   Wrap any .kl-table in <div class="kl-table-scroll"> to keep the
+   table readable on narrow viewports without forcing page-level
+   horizontal scroll. */
+.kl-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.kl-table-scroll > table { min-width: 640px; }
+
 @media (max-width: 640px) {
   .lp-hero { padding: 24px 20px; }
   .lp-section { padding: 52px 20px; }
@@ -760,4 +797,41 @@ button {
   .lp-featured-grid { grid-template-columns: 1fr; }
   .lp-roles-grid { grid-template-columns: 1fr; }
   .lp-ticker-inner { grid-template-columns: repeat(2, 1fr); }
+  .kl-table-scroll {
+    margin-inline: calc(-1 * var(--kl-page-pad, 12px));
+    padding-inline: var(--kl-page-pad, 12px);
+  }
+}
+
+@media (max-width: 480px) {
+  /* Landing grids — single column at true phone widths */
+  .lp-pipeline-grid,
+  .lp-roles-grid,
+  .lp-featured-grid { grid-template-columns: 1fr; }
+  .lp-ticker-inner  { grid-template-columns: repeat(2, 1fr); }
+  .lp-hero          { padding: 20px 14px; }
+  .lp-section       { padding: 40px 14px; }
+  .lp-h1            { font-size: 38px; letter-spacing: -0.6px; line-height: 1.02; }
+  .lp-h1-em         { font-size: 1em; }
+  .lp-h2            { font-size: 26px; line-height: 1.08; }
+  .lp-pipeline-stat { font-size: 32px; }
+  .lp-hero-stats    { gap: 18px; padding-top: 16px; }
+
+  /* Product pages */
+  .kl-topnav        { padding: 0 10px; }
+  .kl-nav-links     { display: none; }                 /* hide primary nav on very small screens; brand still clickable */
+  .kl-page          { padding: 14px 10px 40px; }
+  .kl-page-title    { font-size: 20px; }
+  .kl-map           { aspect-ratio: 16 / 11; min-height: 200px; }
+
+  /* Tap targets */
+  .kl-btn, .kl-filter-chip, .kl-pill { min-height: 32px; }
+  .lp-cta .kl-btn, .lp-cta .kl-btn--primary { min-height: 44px; padding: 10px 18px; }
+
+  /* Long unbreakable tokens (URLs, slugs, registry IDs) can clip the
+     right edge on 375px. Allow break-anywhere on paragraph-level
+     auxiliary copy to reflow cleanly. */
+  .kl-page-subtitle,
+  .kl-muted,
+  .lp-section-lead { overflow-wrap: anywhere; }
 }

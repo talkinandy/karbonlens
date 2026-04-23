@@ -70,6 +70,7 @@ function formatDash(value: string | null): string {
 export function ProjectsTable({ rows }: ProjectsTableProps) {
   return (
     <div className="kl-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="kl-table-scroll">
       <table className="kl-table">
         <thead>
           <tr>
@@ -133,6 +134,7 @@ export function ProjectsTable({ rows }: ProjectsTableProps) {
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
