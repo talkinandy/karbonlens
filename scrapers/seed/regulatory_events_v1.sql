@@ -228,7 +228,7 @@ SELECT
     'Permenhut',
     '6/2026',
     'Tata Cara Perdagangan Karbon Melalui Offset Emisi GRK Sektor Kehutanan',
-    'https://www.antaranews.com/berita/5528569/ri-perkuat-aturan-perdagangan-karbon-hutan-lewat-permenhut-6-2026',
+    'https://jdih.kehutanan.go.id/new2/home/portfolioDetails3/PERMENHUT_6_2026.pdf/6/2026/5/1341',
     'Implementing regulation for Perpres 110/2025 in the forestry sector. Establishes the procedures for carbon-credit generation, trading, and offset approvals from REDD+, peatland, mangrove, and afforestation projects. Signed by Menteri Kehutanan on 6 April 2026; promulgated 13 April 2026.',
     'Peraturan pelaksana Perpres 110/2025 untuk sektor kehutanan. Menetapkan tata cara penerbitan, perdagangan, dan persetujuan offset kredit karbon dari proyek REDD+, gambut, mangrove, dan penanaman hutan. Ditandatangani Menteri Kehutanan 6 April 2026; diundangkan 13 April 2026.',
     'critical',
