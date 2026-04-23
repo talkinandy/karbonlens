@@ -377,3 +377,38 @@ export const notifications = pgTable(
     index('idx_notifications_user_created').on(t.userId, t.createdAt.desc()),
   ],
 );
+
+// ─── project_descriptions ────────────────────────────────────────────────────
+// T30 — per-project AI-researched narrative (public summary + gated analyst
+// briefing + citations). Populated out-of-band by a Claude research agent;
+// the runtime app reads but never writes. See migration 006.
+export type ProjectDescriptionCitation = {
+  n: number;
+  url: string;
+  title: string;
+  source?: string;
+  date?: string;
+};
+
+export const projectDescriptions = pgTable(
+  'project_descriptions',
+  {
+    projectId: uuid('project_id')
+      .primaryKey()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    summaryMd: text('summary_md').notNull(),
+    detailMd: text('detail_md').notNull(),
+    citations: jsonb('citations')
+      .$type<ProjectDescriptionCitation[]>()
+      .notNull()
+      .default([]),
+    inputFingerprint: text('input_fingerprint').notNull(),
+    model: text('model').notNull().default('claude-agent-websearch'),
+    confidence: text('confidence').notNull(),
+    confidenceReason: text('confidence_reason'),
+    generatedAt: timestamp('generated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index('idx_proj_desc_generated').on(t.generatedAt.desc())],
+);

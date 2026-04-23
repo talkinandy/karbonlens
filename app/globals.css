@@ -1154,3 +1154,149 @@ button {
     padding: 3px 8px;
   }
 }
+
+/* =========== /projects/[slug] AI-researched description (T30) =========== */
+
+.kl-desc {
+  margin: 16px 0 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.kl-desc-summary p {
+  font-family: var(--font-instrument-serif), Georgia, serif;
+  font-size: 19px;
+  line-height: 1.45;
+  color: var(--text);
+  margin: 0;
+  max-width: 720px;
+}
+
+.kl-desc-briefing {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  max-width: 820px;
+}
+
+.kl-desc-briefing > .kl-section-label {
+  margin-bottom: 14px;
+}
+
+.kl-desc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.kl-desc-body p {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text);
+  margin: 0;
+}
+
+.kl-desc-body strong {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.kl-desc-cite-marker {
+  font-size: 0.72em;
+  line-height: 0;
+  vertical-align: super;
+  margin-left: 1px;
+}
+.kl-desc-cite-marker a {
+  color: var(--info-fg);
+  text-decoration: none;
+  padding: 0 3px;
+  border-radius: 3px;
+}
+.kl-desc-cite-marker a:hover {
+  background: var(--info-bg);
+}
+
+/* Gated state: teaser + soft fade + sign-in CTA block */
+.kl-desc-body--gated {
+  position: relative;
+}
+.kl-desc-gate {
+  position: relative;
+  margin-top: 8px;
+  padding-top: 40px;
+}
+.kl-desc-gate-fade {
+  position: absolute;
+  top: -60px;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0) 0%,
+    var(--surface) 100%
+  );
+  pointer-events: none;
+}
+.kl-desc-gate-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 18px 20px;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+}
+.kl-desc-gate-label {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+/* Citations list — numbered, small, spaced. Honours the [N] anchors via
+   id="cite-N" so inline superscripts jump here. */
+.kl-desc-citations {
+  margin: 20px 0 0;
+  padding-left: 22px;
+  border-top: 0.5px solid var(--border);
+  padding-top: 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.kl-desc-citations li {
+  margin-bottom: 6px;
+  scroll-margin-top: 80px; /* so #cite-N jump doesn't hide under sticky nav */
+}
+.kl-desc-citations a {
+  color: var(--info-fg);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.kl-desc-citations a:hover { text-decoration: underline; }
+.kl-desc-cite-source { color: var(--text-3); }
+.kl-desc-cite-date { color: var(--text-3); }
+
+/* AI-disclosure footer — quiet, always visible */
+.kl-desc-disclosure {
+  margin: 16px 0 0;
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--text-3);
+  letter-spacing: 0.2px;
+}
+.kl-desc-disclosure a {
+  color: var(--text-2);
+  text-decoration: underline;
+}
+.kl-desc-disclosure a:hover { color: var(--info-fg); }
+
+@media (max-width: 640px) {
+  .kl-desc-summary p { font-size: 17px; }
+  .kl-desc-briefing { padding: 18px 14px; }
+  .kl-desc-body p { font-size: 13.5px; }
+}
