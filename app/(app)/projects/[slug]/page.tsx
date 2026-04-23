@@ -10,7 +10,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+import { auth } from '@/lib/auth';
 import { getProjectDetail } from '@/lib/queries/project-detail';
+import { getProjectDescription } from '@/lib/queries/project-description';
 import { getProjectSummary } from '@/lib/queries/project-summary';
 import {
   getProjectAlertsFeatureCollection,
@@ -21,6 +23,7 @@ import { METHODOLOGY_VERSION, WEIGHTS } from '@/lib/score';
 
 import { AlertsSummary } from '@/components/projects/detail/AlertsSummary';
 import { IssuancesTable } from '@/components/projects/detail/IssuancesTable';
+import { ProjectDescription } from '@/components/projects/detail/ProjectDescription';
 import { RegistryList } from '@/components/projects/detail/RegistryList';
 import { ScoreCard } from '@/components/projects/detail/ScoreCard';
 import { SectionHero } from '@/components/projects/detail/SectionHero';
@@ -107,6 +110,14 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
+  // T30 — AI-researched narrative. Runs in parallel with the session read
+  // so the auth check doesn't block the description fetch.
+  const [description, session] = await Promise.all([
+    getProjectDescription(detail.project.id),
+    auth(),
+  ]);
+  const isAuthed = !!session?.user?.id;
+
   const issuancePage = parsePage(sp.issuance_page);
   const issuanceCount = detail.issuances.length;
 
@@ -138,6 +149,12 @@ export default async function ProjectDetailPage({
         hectares={detail.project.hectares}
         status={detail.project.status}
         registryNames={detail.registries.map((r) => r.registryName)}
+      />
+
+      <ProjectDescription
+        description={description}
+        isAuthed={isAuthed}
+        projectSlug={slug}
       />
 
       <ScoreCard
