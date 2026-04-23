@@ -376,6 +376,81 @@ button {
   align-items: center;
 }
 
+/* Collapsible filter group — native <details>. Summary is the tappable
+   header; chip row reveals on open. Keeps the filter card compact when
+   users aren't actively filtering (most of the time). */
+.kl-filter-details {
+  border-top: 0.5px solid var(--border);
+  padding-top: 8px;
+}
+.kl-filter-details:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+.kl-filter-details > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+  border-radius: 6px;
+  color: var(--text-2);
+  transition: color 0.12s;
+}
+.kl-filter-details > summary::-webkit-details-marker { display: none; }
+.kl-filter-details > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--text-3);
+  font-size: 10px;
+  transform: translateY(-1px);
+  transition: transform 0.12s;
+}
+.kl-filter-details[open] > summary::before { transform: rotate(90deg) translateX(-1px); }
+.kl-filter-details > summary:hover { color: var(--text); }
+.kl-filter-details > .kl-filter-chip-row {
+  padding-top: 10px;
+}
+
+.kl-filter-summary-label {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-2);
+  font-weight: 500;
+  flex: 0 0 auto;
+}
+.kl-filter-summary-count {
+  color: var(--text-3);
+  font-weight: 400;
+  margin-left: 4px;
+}
+.kl-filter-summary-active {
+  font-size: 12px;
+  color: var(--text);
+  font-family: var(--font-plex-sans), sans-serif;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .kl-filter-summary-active {
+    display: none; /* on phones the active-chip preview competes with label for scarce width; the open-by-default state already shows selections */
+  }
+  .kl-filter-details > summary { padding: 10px 0; }
+}
+
 .kl-stats-strip {
   display: flex;
   gap: 24px;

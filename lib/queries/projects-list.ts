@@ -18,6 +18,10 @@
 
 import { db } from '@/lib/db';
 import { sql } from 'drizzle-orm';
+import {
+  toCanonicalProvince,
+  expandCanonicalToRaw,
+} from '@/lib/display/province';
 
 export type ProjectsListSort =
   | 'score_desc'
@@ -118,10 +122,16 @@ export async function getProjectsList(
   const offset = (page - 1) * limit;
   const sort: ProjectsListSort = params.sort ?? 'score_desc';
 
-  // Province filter — peel off the Unknown sentinel before binding.
+  // Province filter — peel off the Unknown sentinel before binding, then
+  // expand every selected canonical label back to the full set of raw
+  // DB variants so "North Sumatra" matches rows stored as "Sumatera
+  // Utara", "North Sumatra Province", etc. See `lib/display/province.ts`.
   const provinceArr = params.province ?? [];
   const hasUnknown = provinceArr.includes('Unknown');
-  const namedProvinces = provinceArr.filter((p) => p !== 'Unknown');
+  const canonicalSelections = provinceArr.filter((p) => p !== 'Unknown');
+  const namedProvinces = Array.from(
+    new Set(canonicalSelections.flatMap(expandCanonicalToRaw)),
+  );
   const projectTypes = (params.projectType ?? []).filter((v) => v !== '');
   const statuses = (params.status ?? []).filter((v) => v !== '');
 
@@ -303,17 +313,39 @@ export async function getProjectsList(
 }
 
 /**
- * Distinct province values. NULL maps to the string `'Unknown'` so the chip
- * group can offer a filter for projects with no province recorded.
+ * Canonicalised province options for the filter UI. Raw DB strings are
+ * collapsed via `toCanonicalProvince` — obviously-bad values ("na",
+ * "Entire territory of Indonesia", project codes) are dropped, and
+ * Indonesian/English variants plus case typos deduplicate to a single
+ * label. NULL rows fold into the `'Unknown'` sentinel so users can
+ * still filter projects with no recorded province.
+ *
+ * Keeping the canonicalisation in JS (rather than SQL) lets the mapping
+ * table live next to the display code; the SQL filter predicate then
+ * expands a selected canonical label back to every raw variant it
+ * covers — see `listProjects`.
  */
 export async function getProvinceOptions(): Promise<string[]> {
   const result = await db.execute(sql`
-    SELECT DISTINCT COALESCE(province, 'Unknown') AS province
+    SELECT DISTINCT province
     FROM projects
     WHERE country = 'ID'
-    ORDER BY province
   `);
-  return (result as unknown as { province: string }[]).map((r) => r.province);
+  const rows = result as unknown as { province: string | null }[];
+  const canonical = new Set<string>();
+  let hasUnknown = false;
+  for (const row of rows) {
+    if (row.province === null) {
+      hasUnknown = true;
+      continue;
+    }
+    const mapped = toCanonicalProvince(row.province);
+    if (mapped === null) continue;
+    canonical.add(mapped);
+  }
+  const sorted = Array.from(canonical).sort((a, b) => a.localeCompare(b));
+  if (hasUnknown) sorted.push('Unknown');
+  return sorted;
 }
 
 /**

@@ -16,6 +16,7 @@
 import Link from 'next/link';
 import type { ProjectRow } from '@/lib/queries/projects-list';
 import { displayStatus, type StatusBadge } from '@/lib/display/status';
+import { toCanonicalProvince } from '@/lib/display/province';
 import { ScoreBadge } from './ScoreBadge';
 
 export type ProjectsTableProps = {
@@ -103,7 +104,7 @@ export function ProjectsTable({ rows }: ProjectsTableProps) {
                     <div className="kl-page-subtitle">{p.developer}</div>
                   ) : null}
                 </td>
-                <td>{p.province ?? 'Unknown'}</td>
+                <td>{toCanonicalProvince(p.province) ?? 'Unknown'}</td>
                 <td>{formatDash(p.projectType)}</td>
                 <td className="kl-col-hectares tnum" style={{ textAlign: 'right' }}>
                   {formatHectares(p.hectares)}
