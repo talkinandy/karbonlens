@@ -835,3 +835,119 @@ button {
   .kl-muted,
   .lp-section-lead { overflow-wrap: anywhere; }
 }
+
+/* =========== Sign-in required modal (T28) =========== */
+
+.kl-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(26, 26, 26, 0.42);
+  backdrop-filter: blur(2px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  animation: kl-modal-fade 0.14s ease-out;
+}
+
+.kl-modal {
+  position: relative;
+  background: var(--surface);
+  border: 0.5px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  max-width: 420px;
+  width: 100%;
+  padding: 28px 28px 24px;
+  animation: kl-modal-rise 0.16s ease-out;
+}
+
+.kl-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-2);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.12s, color 0.12s;
+}
+.kl-modal-close:hover { background: var(--surface-2); color: var(--text); }
+
+.kl-modal-title {
+  font-family: var(--font-instrument-serif), Georgia, serif;
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: -0.3px;
+  margin: 0 0 10px;
+  color: var(--text);
+  line-height: 1.15;
+}
+
+.kl-modal-body {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-2);
+  margin: 0 0 22px;
+}
+
+.kl-modal-path {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface-2);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.kl-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kl-modal-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.kl-modal-secondary {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  font-size: 13px;
+  padding: 8px;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+.kl-modal-secondary:hover { color: var(--text-2); text-decoration: underline; }
+
+@keyframes kl-modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes kl-modal-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 480px) {
+  .kl-modal-backdrop { padding: 14px; align-items: end; }
+  .kl-modal { padding: 24px 20px 20px; }
+  .kl-modal-title { font-size: 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kl-modal-backdrop,
+  .kl-modal { animation: none; }
+}

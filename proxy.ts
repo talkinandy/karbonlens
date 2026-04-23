@@ -32,6 +32,9 @@ export default auth((req) => {
   if (!req.auth) {
     const url = new URL('/', req.nextUrl.origin);
     url.searchParams.set('signin', '1');
+    // Preserve the original destination so the sign-in modal can round-trip
+    // the user back to where they were trying to go (e.g. /alerts, /admin/queue).
+    url.searchParams.set('from', req.nextUrl.pathname);
     return NextResponse.redirect(url);
   }
   return NextResponse.next();

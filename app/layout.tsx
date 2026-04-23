@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { IBM_Plex_Sans, IBM_Plex_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
+import { SignInRequiredModal } from "@/components/auth/SignInRequiredModal";
 
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",
@@ -61,7 +63,12 @@ export default function RootLayout({
       lang="en"
       className={`${plexSans.variable} ${plexMono.variable} ${instrumentSerif.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <Suspense fallback={null}>
+          <SignInRequiredModal />
+        </Suspense>
+      </body>
     </html>
   );
 }
