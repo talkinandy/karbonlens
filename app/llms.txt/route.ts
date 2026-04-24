@@ -25,6 +25,10 @@ const BODY = `# KarbonLens
 ## Project Registry
 
 - [Projects explorer](https://karbonlens.com/projects): Filterable registry of Indonesian carbon projects across Verra, Gold Standard, CDM, and SRN-PPI.
+- [By province](https://karbonlens.com/projects/by-province): Projects grouped by Indonesian province (Central Kalimantan, Riau, West Java, etc.).
+- [By methodology](https://karbonlens.com/projects/by-methodology): Projects grouped by VCS / CDM methodology code (VM0007, VM0048, VM0033, ACM0002, AMS-III.H, etc.).
+- [By registry](https://karbonlens.com/projects/by-registry): Projects grouped by Verra / Gold Standard / CDM / SRN-PPI / IDXCarbon.
+- [By developer](https://karbonlens.com/projects/by-developer): Projects grouped by project proponent / developer.
 - [Methodology](https://karbonlens.com/methodology): How the v1 integrity score is calculated — validation recency, reversal risk, community, transparency.
 
 ## Market data
@@ -34,6 +38,10 @@ const BODY = `# KarbonLens
 ## Regulatory
 
 - [Regulatory timeline](https://karbonlens.com/regulatory): Indonesian carbon-market regulations since Perpres 98/2021.
+
+## Glossary
+
+- [Glossary](https://karbonlens.com/glossary): Plain-language definitions of methodologies, registries, and regulations — VM0007, SRN-PPI, POME, Permenhut, Perpres, and more.
 
 ## Site policies
 

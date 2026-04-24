@@ -80,6 +80,22 @@ const CANONICAL_BY_RAW: Record<string, string | null> = {
   // West Java.
   'West Java': 'West Java',
   'West Java Province': 'West Java',
+
+  // T32 additions — raw values introduced when the location audit
+  // backfilled the 14 previously-unknown projects.
+  'Lampung': 'Lampung',
+  'Lampung Province': 'Lampung',
+  'Central Papua': 'Central Papua',
+  'Papua Tengah': 'Central Papua',
+  'West Papua': 'West Papua',
+  'Papua Barat': 'West Papua',
+  'Riau Islands': 'Riau Islands',
+  'Kepulauan Riau': 'Riau Islands',
+
+  // Sentinel for genuinely-multi-province projects (cross-island
+  // aggregators, cookstove national rollouts, multi-watershed schemes).
+  // Rendered as a dedicated filter chip and hub page in Phase 3.
+  'Multiple provinces': 'Multiple provinces',
 };
 
 /**

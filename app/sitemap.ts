@@ -15,6 +15,14 @@
 import type { MetadataRoute } from 'next';
 import { db } from '@/lib/db';
 import { sql } from 'drizzle-orm';
+import {
+  listCanonicalProvinces,
+  listDistinctMethodologies,
+  listDistinctRegistries,
+  listDistinctDevelopers,
+  provinceCanonicalToSlug,
+} from '@/lib/queries/projects-by';
+import { listTerms } from '@/lib/data/glossary';
 
 const BASE = 'https://karbonlens.com';
 
@@ -127,5 +135,78 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // defensive
   }
 
-  return [...staticEntries, ...projectEntries, ...regulatoryEntries, ...priceEntries];
+  // T32 — Phase 3 programmatic hub pages. Each hub lists projects in a slice
+  // (by province / methodology / registry / developer) plus an index page
+  // per dimension, plus a glossary. These are the compounding SEO surfaces.
+  const hubIndexEntries: MetadataRoute.Sitemap = [
+    { url: `${BASE}/projects/by-province`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${BASE}/projects/by-methodology`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${BASE}/projects/by-registry`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${BASE}/projects/by-developer`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${BASE}/glossary`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+  ];
+
+  let provinceHubEntries: MetadataRoute.Sitemap = [];
+  try {
+    const provs = await listCanonicalProvinces();
+    provinceHubEntries = provs.map((p) => ({
+      url: `${BASE}/projects/by-province/${provinceCanonicalToSlug(p.canonical)}`,
+      lastModified: now,
+      changeFrequency: 'weekly' as const,
+      priority: 0.6,
+    }));
+  } catch {}
+
+  let methodologyHubEntries: MetadataRoute.Sitemap = [];
+  try {
+    const codes = await listDistinctMethodologies();
+    methodologyHubEntries = codes.map((code) => ({
+      url: `${BASE}/projects/by-methodology/${code.toLowerCase().replace(/\./g, '-')}`,
+      lastModified: now,
+      changeFrequency: 'weekly' as const,
+      priority: 0.6,
+    }));
+  } catch {}
+
+  let registryHubEntries: MetadataRoute.Sitemap = [];
+  try {
+    const regs = await listDistinctRegistries();
+    registryHubEntries = regs.map((r) => ({
+      url: `${BASE}/projects/by-registry/${r.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`,
+      lastModified: now,
+      changeFrequency: 'weekly' as const,
+      priority: 0.6,
+    }));
+  } catch {}
+
+  let developerHubEntries: MetadataRoute.Sitemap = [];
+  try {
+    const devs = await listDistinctDevelopers();
+    developerHubEntries = devs.map((d) => ({
+      url: `${BASE}/projects/by-developer/${d.slug}`,
+      lastModified: now,
+      changeFrequency: 'weekly' as const,
+      priority: 0.5,
+    }));
+  } catch {}
+
+  const glossaryEntries: MetadataRoute.Sitemap = listTerms().map((t) => ({
+    url: `${BASE}/glossary/${t.slug}`,
+    lastModified: now,
+    changeFrequency: 'monthly' as const,
+    priority: 0.5,
+  }));
+
+  return [
+    ...staticEntries,
+    ...projectEntries,
+    ...regulatoryEntries,
+    ...priceEntries,
+    ...hubIndexEntries,
+    ...provinceHubEntries,
+    ...methodologyHubEntries,
+    ...registryHubEntries,
+    ...developerHubEntries,
+    ...glossaryEntries,
+  ];
 }
