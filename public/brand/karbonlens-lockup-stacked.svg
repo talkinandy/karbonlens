@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 180" width="240" height="180" role="img" aria-label="KarbonLens">
+  <title>KarbonLens</title>
+  <desc>KarbonLens stacked lockup for square formats.</desc>
+  <g transform="translate(120 70)" fill="#0F6E56">
+    <circle r="38" fill="none" stroke="#0F6E56" stroke-width="3.4"></circle>
+    <path d="M 0,-29.5 L 25.1,-14.8 L 0,0 Z"></path>
+    <path d="M 25.1,-14.8 L 25.1,14.8 L 0,0 Z"></path>
+    <path d="M 25.1,14.8 L 0,29.5 L 0,0 Z"></path>
+    <path d="M 0,29.5 L -25.1,14.8 L 0,0 Z"></path>
+    <path d="M -25.1,14.8 L -25.1,-14.8 L 0,0 Z"></path>
+    <line x1="0" y1="-46" x2="0" y2="-41" stroke="#0F6E56" stroke-width="3.4" stroke-linecap="square"></line>
+  </g>
+  <text x="120" y="158" fill="#0F6E56" text-anchor="middle" font-family="&#39;IBM Plex Sans&#39;, system-ui, -apple-system, &#39;Segoe UI&#39;, sans-serif" font-weight="500" font-size="28" letter-spacing="-0.84">KarbonLens</text>
+</svg>
