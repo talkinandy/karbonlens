@@ -69,6 +69,7 @@ export const metadata: Metadata = {
   },
 };
 import { getProjectCentroidsFeatureCollection } from '@/lib/queries/map-geojson';
+import { JsonLd } from '@/components/seo/JsonLd';
 import { ProjectsTable } from '@/components/projects/ProjectsTable';
 import { ProjectsCards } from '@/components/projects/ProjectsCards';
 import { FilterChips } from '@/components/projects/FilterChips';
@@ -85,6 +86,45 @@ import { buildFilterUrl } from '@/lib/url/build-filter-url';
 const PATHNAME = '/projects';
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
+
+// T31 — answer-first JSON-LD for the projects index. The DataCatalog block
+// tells crawlers and LLMs that this URL is the canonical entry point for the
+// Indonesian carbon-project registry; the BreadcrumbList anchors the site
+// hierarchy. Both are static (no per-request data) so they live at module
+// scope.
+const dataCatalogSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'DataCatalog',
+  name: 'KarbonLens Indonesian Carbon Project Registry',
+  description:
+    'Registry of Indonesian carbon projects reconciled across Verra, Gold Standard, CDM, and SRN-PPI.',
+  url: 'https://karbonlens.com/projects',
+  publisher: {
+    '@type': 'Organization',
+    name: 'KarbonLens',
+    url: 'https://karbonlens.com',
+  },
+  spatialCoverage: { '@type': 'Country', name: 'Indonesia' },
+  inLanguage: 'en',
+};
+const projectsBreadcrumbSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      name: 'Home',
+      item: 'https://karbonlens.com/',
+    },
+    {
+      '@type': 'ListItem',
+      position: 2,
+      name: 'Projects',
+      item: 'https://karbonlens.com/projects',
+    },
+  ],
+};
 const VALID_SORTS: ProjectsListSort[] = [
   'score_desc',
   'score_asc',
@@ -192,6 +232,8 @@ export default async function ProjectsPage({
 
   return (
     <main className="kl-page">
+      <JsonLd data={dataCatalogSchema} id="ld-datacatalog" />
+      <JsonLd data={projectsBreadcrumbSchema} id="ld-breadcrumb" />
       <header className="kl-page-header">
         <div>
           <p className="kl-section-label">Registry · v0.1</p>

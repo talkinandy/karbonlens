@@ -3,6 +3,39 @@ import { Suspense } from "react";
 import { IBM_Plex_Sans, IBM_Plex_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { SignInRequiredModal } from "@/components/auth/SignInRequiredModal";
+import { JsonLd } from "@/components/seo/JsonLd";
+
+/**
+ * Site-wide schema.org blocks (T31). Single Organization + WebSite pair
+ * renders on every page so LLMs and Google can resolve the publisher
+ * across any entry URL. `sameAs` is intentionally empty for v0.1 — add
+ * Wikipedia/LinkedIn/Crunchbase URLs as they go live to compound the
+ * E-E-A-T signal.
+ */
+const ORGANIZATION_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "KarbonLens",
+  url: "https://karbonlens.com",
+  logo: "https://karbonlens.com/brand/karbonlens-mark.svg",
+  description:
+    "Indonesian carbon-market intelligence — reconciled SRN-PPI, IDXCarbon, Verra, Gold Standard, Sentinel (RADD / VIIRS / NDVI), and JDIH into a single workspace.",
+  areaServed: "ID",
+  sameAs: [] as string[],
+};
+const WEBSITE_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "KarbonLens",
+  url: "https://karbonlens.com",
+  inLanguage: "en",
+  publisher: { "@type": "Organization", name: "KarbonLens" },
+  potentialAction: {
+    "@type": "SearchAction",
+    target: "https://karbonlens.com/projects?q={query}",
+    "query-input": "required name=query",
+  },
+};
 
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",
@@ -68,6 +101,8 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <SignInRequiredModal />
         </Suspense>
+        <JsonLd data={ORGANIZATION_SCHEMA} id="ld-organization" />
+        <JsonLd data={WEBSITE_SCHEMA} id="ld-website" />
       </body>
     </html>
   );

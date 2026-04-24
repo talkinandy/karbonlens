@@ -1300,3 +1300,105 @@ button {
   .kl-desc-briefing { padding: 18px 14px; }
   .kl-desc-body p { font-size: 13.5px; }
 }
+
+/* T31 — answer-first surfaces (TL;DR, key facts, FAQ, sources footer).
+ * Appended after the original T30 .kl-desc-* block so the cascade order is:
+ * T30 base styles → T31 additions. Existing rules untouched. */
+.kl-desc-tldr {
+  font-family: var(--font-instrument-serif), Georgia, serif;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--text);
+  padding: 14px 18px;
+  background: var(--surface-2);
+  border-left: 3px solid var(--success-fg);
+  border-radius: 6px;
+  margin: 0 0 20px;
+}
+
+.kl-desc-facts {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) 1fr;
+  gap: 6px 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0 0 24px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+}
+.kl-desc-facts dt {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-3);
+  align-self: start;
+}
+.kl-desc-facts dd {
+  margin: 0;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.kl-desc-faq {
+  margin: 28px 0;
+  padding-top: 20px;
+  border-top: 0.5px solid var(--border);
+}
+.kl-desc-faq h3 {
+  font-family: var(--font-instrument-serif), Georgia, serif;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text);
+  margin: 20px 0 6px;
+  line-height: 1.3;
+}
+.kl-desc-faq h3:first-of-type { margin-top: 6px; }
+.kl-desc-faq p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-2);
+  margin: 0 0 14px;
+}
+
+.kl-desc-sources {
+  margin: 16px 0 0;
+  padding-top: 14px;
+  border-top: 0.5px solid var(--border);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-3);
+}
+.kl-desc-sources strong {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-2);
+  font-weight: 500;
+  display: block;
+  margin-bottom: 6px;
+}
+.kl-desc-sources ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.kl-desc-sources li {
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}
+.kl-desc-sources a {
+  color: var(--text-2);
+  text-decoration: none;
+}
+.kl-desc-sources a:hover { text-decoration: underline; }
+
+@media (max-width: 640px) {
+  .kl-desc-facts { grid-template-columns: 1fr; gap: 2px 0; padding: 14px; }
+  .kl-desc-facts dt { margin-top: 8px; }
+  .kl-desc-facts dd { margin-bottom: 4px; }
+}
