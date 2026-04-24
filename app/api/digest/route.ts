@@ -87,7 +87,7 @@ function extractBearer(request: Request): string | null {
 }
 
 function getAppUrl(): string {
-  const raw = process.env.NEXTAUTH_URL ?? 'https://karbonlens.netlify.app';
+  const raw = process.env.NEXTAUTH_URL ?? 'https://karbonlens.com';
   return raw.replace(/\/+$/, '');
 }
 
@@ -203,8 +203,8 @@ async function handle(request: Request): Promise<Response> {
     outcomes,
   };
 
-  // One structured-JSON line per run. `console.error` goes to stderr on
-  // both Node and Netlify's function runtime so the cron log captures it.
+  // One structured-JSON line per run. `console.error` goes to stderr so
+  // systemd / journalctl captures it from the karbonlens-app service.
   const logPayload = {
     event: 'digest_run',
     users_processed: summary.users_processed,
