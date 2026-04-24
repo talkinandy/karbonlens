@@ -197,6 +197,33 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
+  // T33 Phase 4B — news posts (weekly Market Wrap + future post kinds).
+  // Table may not exist on fresh dev DBs; swallow errors so the sitemap
+  // still ships without the news block.
+  const newsIndexEntry: MetadataRoute.Sitemap = [
+    { url: `${BASE}/news`, lastModified: now, changeFrequency: 'weekly', priority: 0.7 },
+  ];
+  let newsEntries: MetadataRoute.Sitemap = [];
+  try {
+    const rows = (await db.execute(sql`
+      SELECT slug, published_at AS updated_at
+      FROM news_posts
+      WHERE superseded_by IS NULL
+      ORDER BY published_at DESC
+    `)) as unknown as Row[];
+
+    newsEntries = rows
+      .filter((r) => r.slug)
+      .map((r) => ({
+        url: `${BASE}/news/${r.slug}`,
+        lastModified: iso(r.updated_at),
+        changeFrequency: 'yearly' as const, // once published, body is immutable
+        priority: 0.6,
+      }));
+  } catch {
+    // news_posts table missing on fresh DBs — fall through.
+  }
+
   return [
     ...staticEntries,
     ...projectEntries,
@@ -208,5 +235,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...registryHubEntries,
     ...developerHubEntries,
     ...glossaryEntries,
+    ...newsIndexEntry,
+    ...newsEntries,
   ];
 }

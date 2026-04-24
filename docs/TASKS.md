@@ -48,11 +48,14 @@ Tasks are numbered for referencing, not for strict ordering. Parallel tasks are 
 | T25 | Landing redesign with satellite map visual | — | 4h | done |
 | T26 | Social preview (OG + Twitter) | — | 2.5h | done |
 | T24 | Fix dead links + /methodology page | — | 1.5h | done |
+| T31 | Technical SEO + answer-first templates + admin dashboard | — | 4h | done |
+| T32 | Programmatic hub pages (by-province / -methodology / -registry / -developer) + glossary + monthly prices + IndexNow | — | 5h | done |
+| T33 | Automated content cadence — nightly IndexNow + weekly Market Wrap (/news) | T32 | 4h | done |
 
 **Total estimated effort:** ~62 hours of focused engineering. Aim for 4–6h/day → roughly 2 weeks calendar, leaves 3+ weeks buffer before end-of-May target.
 
 > **Phases 1–4 complete as of 2026-04-21.** T01–T22 done (T17 + T22 Phase A; Phase B pending external keys). Only T23 (Netlify cutover) remains, blocked on OQ-1. v0.1 ship is ~1 connectivity decision away.
-> **Phase-5 polish follow-ups:** T24 (methodology page), T25 (landing redesign), T26 (social-preview metadata) landed 2026-04-22.
+> **Phase-5 polish follow-ups:** T24 (methodology page), T25 (landing redesign), T26 (social-preview metadata) landed 2026-04-22. T31 (technical SEO) + T32 (programmatic hubs) + T33 (automated content cadence: nightly IndexNow + weekly Market Wrap) landed 2026-04-24.
 
 ---
 

@@ -24,6 +24,15 @@ import 'server-only';
 import { sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 
+export type RefreshCandidate = {
+  projectId: string;
+  slug: string;
+  name: string;
+  generatedAt: Date;
+  ageDays: number; // days since generated_at
+  reason: 'old' | 'stale_fingerprint' | 'old_and_stale';
+};
+
 export type SeoMetrics = {
   contentInventory: {
     totalProjects: number;
@@ -40,6 +49,12 @@ export type SeoMetrics = {
     staleDescriptionExampleSlug: string | null;
     missedUpcomingExampleTitle: string | null;
     staleScoresExampleSlug: string | null;
+  };
+  refreshCandidates: {
+    totalCandidates: number;
+    oldDescriptions: number; // generated_at > 90d old
+    staleFingerprints: number; // input_fingerprint mismatch vs current facts (proxy)
+    examples: RefreshCandidate[]; // top 10, most stale first
   };
 };
 
@@ -181,6 +196,103 @@ export async function getSeoMetrics(): Promise<SeoMetrics> {
     `),
   );
 
+  // ── Refresh candidates (T33 Phase 4D-lite) ───────────────────────────────
+  // Projects whose AI description should be regenerated, either because it
+  // is >90 days old or because underlying facts (issuances, retirements,
+  // score date, or projects.updated_at) changed AFTER generated_at — a cheap
+  // proxy for "the T30 input_fingerprint is now stale vs current DB state".
+  // LIMIT 200 is defensive; we display only the top 10 but count totals
+  // across the full candidate set.
+  const refreshCandidatesRows = await safeQuery('refreshCandidates', () =>
+    db.execute(sql`
+      WITH facts AS (
+        SELECT
+          pd.project_id,
+          pd.generated_at,
+          GREATEST(
+            COALESCE((SELECT MAX(ingested_at) FROM issuances WHERE project_id = pd.project_id), '1970-01-01'::timestamptz),
+            COALESCE((SELECT MAX(ingested_at) FROM retirements WHERE project_id = pd.project_id), '1970-01-01'::timestamptz),
+            COALESCE((SELECT MAX(score_date)::timestamptz FROM project_scores WHERE project_id = pd.project_id), '1970-01-01'::timestamptz),
+            (SELECT updated_at FROM projects WHERE id = pd.project_id)
+          ) AS facts_latest,
+          now() - pd.generated_at AS age
+        FROM project_descriptions pd
+      )
+      SELECT
+        f.project_id,
+        p.slug,
+        p.name_canonical,
+        f.generated_at,
+        EXTRACT(EPOCH FROM f.age) / 86400 AS age_days,
+        CASE
+          WHEN f.age > INTERVAL '90 days' AND f.facts_latest > f.generated_at THEN 'old_and_stale'
+          WHEN f.age > INTERVAL '90 days' THEN 'old'
+          WHEN f.facts_latest > f.generated_at THEN 'stale_fingerprint'
+          ELSE NULL
+        END AS reason
+      FROM facts f
+      JOIN projects p ON p.id = f.project_id
+      WHERE (f.age > INTERVAL '90 days' OR f.facts_latest > f.generated_at)
+      ORDER BY (f.facts_latest > f.generated_at) DESC, f.generated_at ASC
+      LIMIT 200
+    `),
+  );
+
+  const refreshRows = ((): Row[] => {
+    if (!refreshCandidatesRows) return [];
+    const rows = Array.isArray(refreshCandidatesRows)
+      ? refreshCandidatesRows
+      : (refreshCandidatesRows as { rows?: Row[] }).rows;
+    return (rows ?? []) as Row[];
+  })();
+
+  type NormalizedRefreshRow = {
+    projectId: string;
+    slug: string;
+    name: string;
+    generatedAt: Date;
+    ageDays: number;
+    reason: 'old' | 'stale_fingerprint' | 'old_and_stale';
+  };
+
+  const refreshNormalized: NormalizedRefreshRow[] = refreshRows.flatMap((r) => {
+    const reasonRaw = r.reason;
+    if (
+      reasonRaw !== 'old' &&
+      reasonRaw !== 'stale_fingerprint' &&
+      reasonRaw !== 'old_and_stale'
+    ) {
+      return [];
+    }
+    const generatedAt = toDate(r.generated_at);
+    if (!generatedAt) return [];
+    const projectId = toString(r.project_id);
+    const slug = toString(r.slug);
+    const name = toString(r.name_canonical);
+    if (!projectId || !slug || !name) return [];
+    return [
+      {
+        projectId,
+        slug,
+        name,
+        generatedAt,
+        ageDays: Math.round(toNumber(r.age_days)),
+        reason: reasonRaw,
+      },
+    ];
+  });
+
+  const refreshCandidates = {
+    totalCandidates: refreshNormalized.length,
+    oldDescriptions: refreshNormalized.filter(
+      (r) => r.reason === 'old' || r.reason === 'old_and_stale',
+    ).length,
+    staleFingerprints: refreshNormalized.filter(
+      (r) => r.reason === 'stale_fingerprint' || r.reason === 'old_and_stale',
+    ).length,
+    examples: refreshNormalized.slice(0, 10),
+  };
+
   return {
     contentInventory: {
       totalProjects: toNumber(firstRow(totalProjectsRow)?.n),
@@ -204,5 +316,6 @@ export async function getSeoMetrics(): Promise<SeoMetrics> {
         firstRow(missedUpcomingExampleRow)?.title,
       ),
     },
+    refreshCandidates,
   };
 }
