@@ -14,7 +14,7 @@
  *
  * Cache: hourly. The link list itself almost never changes — only the
  * blockquote tagline and section bodies are touched when we add a new
- * top-level surface (e.g. `/about`). One hour keeps Netlify's edge cache
+ * top-level surface (e.g. `/about`). One hour keeps the nginx / CDN layer
  * fresh enough that copy edits land same-day without burning origin CPU.
  */
 
