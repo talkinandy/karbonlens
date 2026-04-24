@@ -1,0 +1,6 @@
+# T08: ignore the throwaway scraper venv created by `uv venv scrapers/.venv`.
+# T06 owns pyproject.toml and the canonical venv workflow; this worktree venv
+# is local-only and must never be committed.
+.venv/
+__pycache__/
+*.pyc

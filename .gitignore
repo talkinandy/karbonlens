@@ -1,7 +1,70 @@
-.DS_Store
+# KarbonLens .gitignore — merged from Next.js scaffold + pre-existing rules.
+# See https://help.github.com/articles/ignoring-files/
+
+# dependencies
+/node_modules
 node_modules/
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+*.log
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files — keep .env.example tracked; everything else ignored
 .env
 .env.local
-*.log
+.env.*.local
+.env.development
+.env.production
+.env.test
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# editor / agent caches
 .vscode/
 .idea/
+.claude/
+
+# drizzle introspect output — config is committed, generated artifacts are not
+/drizzle/*
+!/drizzle/.gitkeep
+
+# Python scraper venv and caches — pyproject.toml + uv.lock are committed
+scrapers/.venv/
+scrapers/**/__pycache__/
+scrapers/.ruff_cache/
+
+# Tailscale TLS material for private host access (OQ-1 investigation artifacts).
+# OQ-1 was resolved by self-hosting the app on the same Hetzner box, but these
+# certs may still be in use for tailnet-private previews. Never commit them.
+*.ts.net.crt
+*.ts.net.key
+
