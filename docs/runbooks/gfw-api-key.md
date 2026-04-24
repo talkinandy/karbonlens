@@ -13,7 +13,7 @@ time; re-use them at renewal time (annual).
 ## 1. Register a GFW account
 
 1. Go to https://www.globalforestwatch.org/ and sign up with your Google
-   workspace email (the `andy@fmg.co.id` address is fine).
+   workspace email (the `admin@example.com` address is fine).
 2. Verify the confirmation email.
 
 ---
@@ -33,7 +33,7 @@ time; re-use them at renewal time (annual).
    - Organization: Flying Monkey Group / KarbonLens
    - Use case: "Monitoring deforestation alerts near Indonesian carbon
      projects tracked by KarbonLens (karbonlens.com)."
-   - Email: `andy@fmg.co.id`
+   - Email: `admin@example.com`
 
 4. Wait for the approval email. It typically arrives within minutes to a
    few hours; some applications require manual review and can take up to a
@@ -159,7 +159,5 @@ logs `gfw_auth_failed` with a pointer back to this runbook.
 
 ## References
 
-- Spec: `docs/stories/T07-gfw-alerts-scraper.md`
-- Audit: `docs/stories/reviews/T07-spec-audit.md`
 - GFW Data API: https://data-api.globalforestwatch.org/
 - GFW developer portal: https://www.globalforestwatch.org/help/developers/

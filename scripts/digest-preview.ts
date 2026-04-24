@@ -123,7 +123,7 @@ function fixtureBundle(): DigestBundle {
   return {
     user: {
       id: 'fixture-user',
-      email: 'andy@fmg.co.id',
+      email: 'admin@example.com',
       name: 'Andy Wuffet',
     },
     totalCount: items.length,
