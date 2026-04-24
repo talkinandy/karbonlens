@@ -18,7 +18,7 @@ const sentryWebpackPluginOptions = {
 };
 
 // Build-time visibility for CI: echo the runtime-no-op state from
-// `next.config.ts` so the log is present in Netlify build logs (the
+// `next.config.ts` so the log is present in the build output (the
 // runtime `Sentry.init` guard inside `sentry.server.config.ts` only
 // fires when the server boots, which does not happen during `next
 // build`). Matches T22 AC-3.
@@ -40,6 +40,6 @@ if (!process.env.__KARBONLENS_SENTRY_BUILD_LOGGED) {
 
 // Unconditional wrap per T22 §3 (audit decision): gating the wrap on
 // `SENTRY_DSN` at build time produces a permanently-uninstrumented
-// deployment if the env var is missing at Netlify build time. Runtime
-// no-op is handled inside each `sentry.*.config.ts` via the DSN guard.
+// deployment if the env var is missing during CI build. Runtime no-op
+// is handled inside each `sentry.*.config.ts` via the DSN guard.
 export default withSentryConfig(nextConfig, sentryWebpackPluginOptions);
