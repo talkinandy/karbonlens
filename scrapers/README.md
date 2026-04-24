@@ -1,29 +1,20 @@
-# karbonlens-scrapers
+# scrapers/
 
-Python scrapers for KarbonLens (Verra, GFW alerts, IDXCarbon, score computation).
+This directory contains only the **database schema migrations** and
+**static seed data** used by the public KarbonLens application.
 
-See `docs/scraper-patterns.md` at the repo root for conventions that every scraper
-in this directory must follow.
+- `migrations/` — canonical SQL schema migrations. The Drizzle schema
+  in `lib/schema.ts` mirrors these files; when they disagree, the SQL
+  wins and the Drizzle side is updated.
+- `seed/` — hand-curated reference data (regulatory events, etc.)
+  applied as idempotent SQL.
 
-## Quickstart
+## Where is the actual ingestion code?
 
-```bash
-# First time
-uv sync --extra dev
+The Python scrapers, scoring job, cron wrappers, and the GLAD-S2
+pipeline live in a companion repository that is **not public**. The
+public app consumes the data produced by those pipelines; it does not
+run them itself.
 
-# Run the Verra scraper (smoke test)
-uv run python -m verra.fetch --dry-run --limit 3
-
-# Full run
-uv run python -m verra.fetch
-```
-
-## Layout
-
-```
-scrapers/
-  common/      shared helpers (db, config, logging)
-  verra/       Verra registry scraper (T06)
-  scripts/     bash wrappers for cron (installed by T19)
-  migrations/  SQL migrations (owned by T02, T07)
-```
+This split keeps upstream-registry terms of service outside the public
+surface and lets the ingestion moat evolve independently of the app.
