@@ -56,10 +56,10 @@ for Next.js.
 ## 5. Deploy and trigger the debug endpoint
 
 1. Redeploy from Netlify (or push a commit to trigger a build).
-2. Sign in to the production site as admin (`andy@fmg.co.id`).
+2. Sign in to the production site as admin (`admin@example.com`).
 3. Hit the debug endpoint:
    ```bash
-   curl -v https://karbonlens.netlify.app/api/admin/debug-sentry \
+   curl -v https://karbonlens.com/api/admin/debug-sentry \
         -H "Cookie: <your session cookie>"
    ```
    Expected response: **500 Internal Server Error**. This is deliberate

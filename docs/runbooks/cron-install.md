@@ -176,8 +176,6 @@ sudo rm -f /etc/logrotate.d/karbonlens
 
 ## 9. References
 
-- Spec: `docs/stories/T19-cron-install.md`
-- Spec audit: `docs/stories/reviews/T19-spec-audit.md`
 - Architecture: §4 (cron schedule), §7 (env vars), §10 (ops notes)
 - T17 digest route: `app/api/digest/route.ts`
 - Sibling wrappers: `scrapers/scripts/run_weekly_verra.sh`, `run_weekly_gfw.sh`, `run_monthly_idxcarbon.sh`, `run_daily_score.sh`

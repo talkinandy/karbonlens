@@ -1,27 +1,29 @@
 /**
  * lib/admin.ts — shared admin allowlist + `isAdmin(session)` helper.
  *
- * Shared between T21 (match-queue admin page) and T22 (Sentry debug
- * endpoint). Authored under T22 per the revised Phase-4 audit decision
- * (switching from a `NEXT_PUBLIC_ADMIN_EMAIL` env-var single-admin gate
- * to an in-code allowlist). If T22 merges first, T21 imports from here.
- * If T21 lands first and creates this file independently, T22 reads the
- * existing definition.
+ * The allowlist is read once from the `ADMIN_EMAILS` env var (comma-
+ * separated). Missing or empty → no admins, which fails closed.
  *
- * Deliberately in-code rather than env-var because (a) the allowlist is
- * non-secret (admin emails are not credentials — they just keep UX from
- * exposing admin affordances to regular users), (b) keeping it in source
- * control gives us auditability (every allowlist change shows up in git
- * blame / PR review), and (c) it avoids a deploy-time footgun where a
- * missing env var silently unlocks no one.
+ * Moved to env (from the original in-source array) before open-sourcing
+ * the repo: the emails themselves are not credentials, but they are
+ * personal contact info and should not live in public source.
+ * Auditability is preserved through the deploy pipeline / secret manager
+ * rather than git blame.
  */
 
 import type { Session } from 'next-auth';
 
-export const ADMIN_EMAILS: readonly string[] = [
-  'andy@fmg.co.id',
-  'icdragoneyes@gmail.com',
-];
+function parseAdminEmails(raw: string | undefined): readonly string[] {
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e.length > 0);
+}
+
+const ADMIN_EMAILS: readonly string[] = parseAdminEmails(
+  process.env.ADMIN_EMAILS,
+);
 
 /**
  * True iff `session?.user?.email` is in the admin allowlist.

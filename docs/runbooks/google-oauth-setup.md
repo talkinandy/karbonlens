@@ -50,13 +50,13 @@ configuring environment variables locally and on Netlify, and smoke-testing the 
 
 Add both:
 - `http://localhost:3000`
-- `https://karbonlens.netlify.app`
+- `https://karbonlens.com`
 
 ### Authorised redirect URIs
 
 Add all three (add the custom domain entry when the domain is confirmed):
 - `http://localhost:3000/api/auth/callback/google`
-- `https://karbonlens.netlify.app/api/auth/callback/google`
+- `https://karbonlens.com/api/auth/callback/google`
 - *(production custom domain TBD — add `https://<custom-domain>/api/auth/callback/google` when known)*
 
 5. Click **Create**
@@ -98,11 +98,11 @@ Do this **at the same time** as Step 4 — the GCP OAuth client already lists th
    | `GOOGLE_CLIENT_ID` | same Client ID as above |
    | `GOOGLE_CLIENT_SECRET` | same Client Secret as above |
    | `NEXTAUTH_SECRET` | same 32-byte base64 string as above |
-   | `NEXTAUTH_URL` | `https://karbonlens.netlify.app` |
+   | `NEXTAUTH_URL` | `https://karbonlens.com` |
 
 3. Click **Save**. Netlify will use these on the next deploy.
 
-> **Note:** `NEXTAUTH_URL` must be `https://karbonlens.netlify.app` on Netlify (not `http://localhost:3000`). The local `.env.local` and the Netlify env var have different values — this is expected and correct.
+> **Note:** `NEXTAUTH_URL` must be `https://karbonlens.com` on Netlify (not `http://localhost:3000`). The local `.env.local` and the Netlify env var have different values — this is expected and correct.
 
 ---
 

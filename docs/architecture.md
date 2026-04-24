@@ -1,7 +1,7 @@
 # KarbonLens — Architecture
 
-**Audience:** Claude Code and any future engineer. Read this before touching any implementation task.
-**Companion to:** `PRD.md` (strategic), `TASKS.md` (tactical task list).
+**Audience:** any engineer working on or running KarbonLens.
+**Companion to:** [`PRD.md`](PRD.md) (strategic intent), [`runbooks/`](runbooks/) (operational how-tos).
 
 ---
 
@@ -10,12 +10,12 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │  User browser                                                        │
-│  https://karbonlens.netlify.app                                      │
+│  https://karbonlens.com                                              │
 └────────────────────────────────┬────────────────────────────────────┘
-                                 │ HTTPS
+                                 │ HTTPS (nginx + Let's Encrypt)
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  Netlify — Next.js 15 app                                            │
+│  Hetzner CX32 — Next.js 16 app (self-hosted)                         │
 │  • Pages (App Router, server components)                             │
 │  • API routes: /api/projects, /api/prices, /api/alerts, etc.        │
 │  • NextAuth.js v5 with Google provider                               │
@@ -375,7 +375,7 @@ CREATE INDEX idx_notifications_user_created ON notifications(user_id, created_at
 
 ## 4. Scraper patterns
 
-Every scraper in `scrapers/` must follow these conventions. See `docs/scraper-patterns.md` for worked examples.
+Every scraper must follow these conventions. (Scraper implementations live in the companion private ingest repository.)
 
 ### Required behaviors
 
@@ -499,7 +499,7 @@ All in plain `.env` files. Three environments: local dev (`.env.local`), staging
 DATABASE_URL=postgresql://karbonlens:xxx@localhost:5432/karbonlens
 
 # NextAuth
-NEXTAUTH_URL=https://karbonlens.netlify.app
+NEXTAUTH_URL=https://karbonlens.com
 NEXTAUTH_SECRET=<openssl rand -base64 32>
 GOOGLE_CLIENT_ID=<from Google Cloud Console>
 GOOGLE_CLIENT_SECRET=<from Google Cloud Console>
@@ -564,7 +564,7 @@ the daily-written `project_scores.components` row and the UI.
 - No WebSockets, no push — polling on page load is fine for v0.1
 
 ### Weekly digest (Mondays 09:00 Asia/Jakarta)
-- Cron on VPS hits `https://karbonlens.netlify.app/api/digest/cron` with shared secret
+- Cron on VPS hits `https://karbonlens.com/api/digest/cron` with shared secret
 - The endpoint:
   1. Queries `notifications` for all users where `digested_at IS NULL AND created_at > now() - interval '7 days' AND email_digest_opt_in = TRUE`
   2. Groups by user
@@ -579,7 +579,7 @@ the daily-written `project_scores.components` row and the UI.
 ## 10. Operational notes
 
 ### Staging vs production
-- For v0.1, staging and production are the same Hetzner CX32. "Staging" means `feature/` branches deploy to Netlify preview URLs. Production is `main` → karbonlens.netlify.app.
+- For v0.1, staging and production are the same Hetzner CX32. "Staging" means `feature/` branches deploy to Netlify preview URLs. Production is `main` → karbonlens.com.
 - When traffic warrants, promote database to a larger Hetzner box (CPX31 or similar), keep the frontend on Netlify (no reason to self-host that).
 
 ### Backups
@@ -634,7 +634,7 @@ These do not block v0.1 but should be revisited:
 
 - [ ] When to split scrapers into their own repo
 - [ ] Whether to add TimescaleDB for `idx_transactions` once we have daily data flowing
-- [x] ~~Whether to move from Netlify to self-hosted when we need more API flexibility~~ — **Resolved 2026-04-22.** Self-hosted on the same Hetzner CX32 that runs Postgres; `karbonlens-app.service` on port 3010 behind nginx + Let's Encrypt. Older sections of this document still reference `karbonlens.netlify.app` as historical context; the canonical URL is `karbonlens.com`.
+- [x] ~~Whether to move from Netlify to self-hosted when we need more API flexibility~~ — **Resolved 2026-04-22.** Self-hosted on the same Hetzner CX32 that runs Postgres; `karbonlens-app.service` on port 3010 behind nginx + Let's Encrypt. Older sections of this document still reference `karbonlens.com` as historical context; the canonical URL is `karbonlens.com`.
 - [ ] What the paid Pro tier unlocks beyond "more projects" — API access, raw data export, alert customization, priority email support
 - [ ] Whether to build paperclip / openclaw integrations for scraper orchestration or stick with cron
 - [ ] What additional data buyers will pay for that we can't get cheaply (carbon stock estimates, offtake gossip, CA authorization status)
@@ -653,7 +653,7 @@ Deltas between what the architecture specified and what Phase 1 actually shipped
 - **Adapter table binding:** NextAuth is configured with an explicit table map (`usersTable`, `accountsTable`, `sessionsTable`, `verificationTokensTable`). The adapter's auto-detect looks for singular names (`user`, `account`, …); our plural schema names (`users`, `accounts`, …) require the explicit map.
 - **Route group layouts:** `app/(public)/layout.tsx` and `app/(app)/layout.tsx` are passthrough wrappers (no `<html>` / `<body>`). Root `app/layout.tsx` owns the document shell, fonts, and providers.
 - **Table ownership:** all 15 tables in migration 001 are owned by the `karbonlens` Postgres role (not `postgres`), so future `ALTER TABLE` migrations applied by the scraper user succeed without superuser escalation.
-- **Netlify deploy:** deferred. v0.1 runs local-only on the Hetzner box. Connectivity strategy (Tailscale / VPS proxy / managed Postgres migration) is undecided. Tracked as **OQ-1** in `docs/stories/reports/T04-implementation-report.md`.
+- **Deployment (resolved):** self-hosted on the same Hetzner CX32 as Postgres. `karbonlens-app.service` on port 3010 behind nginx + Let's Encrypt at `karbonlens.com`. Netlify was evaluated and dropped.
 - **pg_hba.conf ordering:** scram-sha-256 rule for the karbonlens role was inserted BEFORE any catch-all trust lines (first-match-wins). The runbook (`docs/runbooks/vps-setup.md`) documents this ordering requirement. Non-issue on a fresh host; documented for multi-tenant safety.
 - **`users.email_verified`:** §3 DDL shows `email_verified TIMESTAMPTZ` — this is correct and matches what shipped. No change needed.
 
@@ -661,7 +661,7 @@ Deltas between what the architecture specified and what Phase 1 actually shipped
 
 Deltas introduced by T06–T10. Section §1–§12 remain forward-looking; §13 Phase 1 block and this block record divergences.
 
-- **Migration 002 (T07):** adds `projects.gfw_geostore_id TEXT` plus three expression-based unique indexes: `uq_sat_project_date_loc` on `satellite_alerts`, `uq_issuances_dedupe` on `issuances`, and `uq_notifications_dedupe` on `notifications`. **Critical gotcha:** `ON CONFLICT ON CONSTRAINT <name>` fails against expression-based unique indexes because they are not named constraints. All three scrapers must use the column-list form `ON CONFLICT (col_a, col_b, ...)` instead. See `docs/scraper-patterns.md` §ON-CONFLICT for the worked pattern.
+- **Migration 002 (T07):** adds `projects.gfw_geostore_id TEXT` plus three expression-based unique indexes: `uq_sat_project_date_loc` on `satellite_alerts`, `uq_issuances_dedupe` on `issuances`, and `uq_notifications_dedupe` on `notifications`. **Critical gotcha:** `ON CONFLICT ON CONSTRAINT <name>` fails against expression-based unique indexes because they are not named constraints. All three scrapers must use the column-list form `ON CONFLICT (col_a, col_b, ...)` instead.
 
 - **T06 Verra — OData, not HTML (§5.1 update):** §5.1 above describes the registry as "stable HTML scraping." This is outdated. The registry SPA is an Angular app; the documented search URLs return a Next-shell only. T06 reverse-engineered the internal OData endpoints: `/uiapi/resource/resource/search` (project list), `/uiapi/resource/resourceSummary/{id}` (project detail), `/uiapi/asset/asset/search` (issuances). These endpoints are anonymous-accessible but undocumented. Treat them as fragile — a Verra SPA upgrade may change paths without notice.
 

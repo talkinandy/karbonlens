@@ -73,7 +73,7 @@ Measurable outcomes that let us call v0.1 "done":
 1. **Data freshness.** Verra, GFW, and IDXCarbon data for Indonesia refresh at their natural cadence (weekly, weekly, monthly respectively) without manual intervention for four consecutive weeks.
 2. **Coverage.** At least 40 Indonesian carbon projects populated in the database with registry cross-references, score breakdown, and centroid geometry.
 3. **Alert pipeline end-to-end.** A GFW integrated alert inside a project's 10km buffer triggers a notification in the in-app bell and is included in the next weekly digest email.
-4. **Live prototype at karbonlens.netlify.app shows real data**, not mocks, for at least 10 flagship projects.
+4. **Live prototype at karbonlens.com shows real data**, not mocks, for at least 10 flagship projects.
 5. **Login works.** Google OAuth session persists, free-tier gating is enforced, unauthenticated users see public landing + limited data.
 6. **Three external demos** delivered to prospects in the target personas — broker, corporate, researcher — with at least one positive follow-up conversation.
 

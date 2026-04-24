@@ -1,0 +1,28 @@
+KarbonLens
+Copyright 2026 the KarbonLens contributors
+
+This product includes software developed by the KarbonLens community
+(https://github.com/talkinandy/karbonlens).
+
+Licensed under the Apache License, Version 2.0. See LICENSE for details.
+
+---
+
+KarbonLens aggregates and presents public data about voluntary carbon
+market projects. Upstream data sources retain their own copyrights and
+terms of use:
+
+  - Verra (verra.org)
+  - Gold Standard (goldstandard.org)
+  - Puro.earth (puro.earth)
+  - American Carbon Registry / ACR (americancarbonregistry.org)
+  - Climate Action Reserve / CAR (climateactionreserve.org)
+  - Global Forest Watch / GLAD-S2 (globalforestwatch.org)
+
+The aggregated dataset compiled by the KarbonLens project is made
+available under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
+Attribution to upstream registries is preserved in project records.
+
+Third-party open-source dependencies are listed in package.json and
+licensed under their respective terms. See node_modules/<pkg>/LICENSE
+for each.

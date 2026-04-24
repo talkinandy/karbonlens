@@ -1,7 +1,6 @@
 # Backup & restore runbook — KarbonLens
 
 Covers daily `pg_dump` backups, 14-day local retention, weekly restore drill, and
-manual recovery. See `docs/stories/T20-backups.md` for design rationale.
 
 ---
 
