@@ -30,6 +30,7 @@ import { sql } from 'drizzle-orm';
 import { auth } from '@/lib/auth';
 import { isAdmin } from '@/lib/admin';
 import { db } from '@/lib/db';
+import { setSentryUserFromSession } from '@/lib/sentry';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -38,6 +39,7 @@ type Body = { id?: unknown; confirmed?: unknown };
 
 export async function POST(request: Request) {
   const session = await auth();
+  setSentryUserFromSession(session);
   if (!session?.user?.email) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }

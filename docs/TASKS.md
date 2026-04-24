@@ -38,13 +38,14 @@ Tasks are numbered for referencing, not for strict ordering. Parallel tasks are 
 | T14 | Price intelligence screen | T04, T08 | 3h | done |
 | T15 | Regulatory timeline screen | T04, T10 | 2h | done |
 | T16 | Notifications bell + alerts inbox | T04, T05, T07 | 3h | done |
-| T17 | Weekly digest email via Resend | T16 | 3h | done (phase A) — Phase B (live Resend send) pending Andy's RESEND_API_KEY |
+| T17 | Weekly digest email via Resend | T16 | 3h | done — RESEND_API_KEY provisioned on prod; next Monday 00:00 UTC cron will be the first live send |
 | T18 | Landing page with live stats | T11, T14 | 2h | done |
 | T19 | Cron installation on VPS | T06, T07, T08, T09, T17 | 1h | done — installed on this Hetzner box; 5 cron entries active under karbonlens user; Andy must drop real DATABASE_URL password + GFW_API_KEY + RESEND_API_KEY into /opt/karbonlens/.env for full function |
 | T20 | Backups + pg_dump cron | T01 | 1h | done — pg-backup.sh + pg-restore-drill.sh live; 8.77 MB dump on first run; restore drill row counts match live; flock + trap verified; Andy must merge pg-cron.conf into karbonlens crontab (see runbook) |
 | T21 | Entity resolution review admin page | T06 | 3h | done |
-| T22 | Sentry error tracking | T03 | 1h | done (phase A) — Phase B (live Sentry capture) awaits Andy's SENTRY_DSN |
-| T23 | Replace static prototype with live Next.js build | T11, T12, T14, T15, T16, T18 | 2h | todo |
+| T22 | Sentry error tracking | T03 | 1h | done — SENTRY_DSN provisioned on prod; `Sentry.init` + beforeSend scrubber live on server/edge/client runtimes |
+| T22.1 | `lib/sentry.ts` helper — attach user.id to Sentry scope | T22 | 0.25h | done — helper wired into both `/api/admin/match-queue` endpoints |
+| ~~T23~~ | ~~Replace static prototype with live Next.js build~~ | T11, T12, T14, T15, T16, T18 | 2h | **superseded** — resolved by self-hosting the Next.js app on the same Hetzner CX32 as Postgres (OQ-1 decision, 2026-04-22). Live at karbonlens.com. |
 | T25 | Landing redesign with satellite map visual | — | 4h | done |
 | T26 | Social preview (OG + Twitter) | — | 2.5h | done |
 | T24 | Fix dead links + /methodology page | — | 1.5h | done |
@@ -54,7 +55,7 @@ Tasks are numbered for referencing, not for strict ordering. Parallel tasks are 
 
 **Total estimated effort:** ~62 hours of focused engineering. Aim for 4–6h/day → roughly 2 weeks calendar, leaves 3+ weeks buffer before end-of-May target.
 
-> **Phases 1–4 complete as of 2026-04-21.** T01–T22 done (T17 + T22 Phase A; Phase B pending external keys). Only T23 (Netlify cutover) remains, blocked on OQ-1. v0.1 ship is ~1 connectivity decision away.
+> **v0.1 shipped 2026-04-24.** T01–T33 all done; T23 superseded by the self-host decision. Site live at karbonlens.com. RESEND_API_KEY + SENTRY_DSN provisioned; `lib/sentry.ts` user-scope helper (T22.1) landed. Remaining: a Bing Webmaster baseline-crawl action (Andy dashboard, unblocks IndexNow 422 cold-start). All follow-up SEO/GEO work (Bahasa Indonesia, link-building, knowledge-graph enrichment) is v0.2 scope.
 > **Phase-5 polish follow-ups:** T24 (methodology page), T25 (landing redesign), T26 (social-preview metadata) landed 2026-04-22. T31 (technical SEO) + T32 (programmatic hubs) + T33 (automated content cadence: nightly IndexNow + weekly Market Wrap) landed 2026-04-24.
 
 ---
