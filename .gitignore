@@ -62,3 +62,9 @@ scrapers/.venv/
 scrapers/**/__pycache__/
 scrapers/.ruff_cache/
 
+# Tailscale TLS material for private host access (OQ-1 investigation artifacts).
+# OQ-1 was resolved by self-hosting the app on the same Hetzner box, but these
+# certs may still be in use for tailnet-private previews. Never commit them.
+*.ts.net.crt
+*.ts.net.key
+

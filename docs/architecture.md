@@ -599,6 +599,24 @@ the daily-written `project_scores.components` row and the UI.
 
 ---
 
+## 10a. Content cadence pipeline (T33)
+
+Two automated jobs keep search engines and LLMs freshly aware of the site without any hand-rolled publishing workflow:
+
+**Nightly IndexNow delta-ping** (`scripts/indexnow-nightly.ts`, cron 02:30 UTC). Unions 8 freshness sources (`projects.updated_at`, `issuances.ingested_at`, `retirements.ingested_at`, `satellite_alerts.ingested_at`, `project_descriptions.generated_at`, `regulatory_events.created_at`, `idx_monthly_snapshots.scraped_at`, `news_posts.published_at`), dedupes in memory, and submits the 24h delta to `api.indexnow.org/IndexNow`. Key file served at `/indexnow/{INDEXNOW_KEY}.txt` by `app/indexnow/[key]/route.ts`.
+
+**Weekly Market Wrap** (`scripts/publish-weekly-wrap.ts` + `lib/composers/weekly-wrap.ts`, cron Mon 06:00 UTC). A deterministic composer reads a 7-day DB window and emits a fully-formed post (title, summary, body-md, facts-json). The composer never calls an LLM — every number traces back to a source row, and `facts_json` preserves the exact composer inputs for deterministic re-rendering. Inserts into `news_posts` (migration 007) with `ON CONFLICT DO NOTHING` against `uq_news_posts_kind_date`, then pings IndexNow for the new post URL and the `/news` index.
+
+**Skip guardrail.** Publishing requires at least one of (≥1 new issuance, ≥5 new alerts, ≥1 new regulation, new price month). Quiet weeks log `weekly_wrap_skip` and exit 0.
+
+**Surfaces.** `/news` (index — reverse-chrono list), `/news/[slug]` (detail — ISR, `revalidate = 3600`, inline Markdown renderer for the composer's narrow dialect). JSON-LD: Blog + CollectionPage + BreadcrumbList on index; Article + BreadcrumbList on detail. `/sitemap.xml` unions the post slugs; `/llms.txt` advertises the `## News` section.
+
+**Ordering discipline.** The nightly IndexNow job sits after the 02:00 UTC pg-backup and before the 03:00 UTC scrapers, so it submits yesterday's steady-state. The weekly wrap runs Monday 06:00 UTC — 2.5h after the 03:00–03:30 UTC scraper window, so the composer reads a settled 7-day delta.
+
+Operational detail in [`docs/runbooks/content-cadence.md`](runbooks/content-cadence.md).
+
+---
+
 ## 11. Conventions and style
 
 - **Python:** 3.12, `uv` for package management, `ruff` for lint + format, type hints on public functions only
@@ -616,7 +634,7 @@ These do not block v0.1 but should be revisited:
 
 - [ ] When to split scrapers into their own repo
 - [ ] Whether to add TimescaleDB for `idx_transactions` once we have daily data flowing
-- [ ] Whether to move from Netlify to self-hosted when we need more API flexibility
+- [x] ~~Whether to move from Netlify to self-hosted when we need more API flexibility~~ — **Resolved 2026-04-22.** Self-hosted on the same Hetzner CX32 that runs Postgres; `karbonlens-app.service` on port 3010 behind nginx + Let's Encrypt. Older sections of this document still reference `karbonlens.netlify.app` as historical context; the canonical URL is `karbonlens.com`.
 - [ ] What the paid Pro tier unlocks beyond "more projects" — API access, raw data export, alert customization, priority email support
 - [ ] Whether to build paperclip / openclaw integrations for scraper orchestration or stick with cron
 - [ ] What additional data buyers will pay for that we can't get cheaply (carbon stock estimates, offtake gossip, CA authorization status)

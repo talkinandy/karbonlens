@@ -4,7 +4,7 @@ Operator: Andy. Target: Hetzner CX32 VPS. OS user: `karbonlens`.
 
 This runbook installs the 5-entry cron schedule that drives all periodic jobs for KarbonLens v0.1: Verra, GFW, IDXCarbon, score compute, and the weekly digest email. All schedule times are UTC — WIB equivalents (UTC+7) are in the crontab comments.
 
-`pg-backup` (T20) and `pg-restore-drill` (T22) are tracked in their own stories and are not installed by T19.
+`pg-backup` (T20) and `pg-restore-drill` (T22) are tracked in their own stories and are not installed by T19. The two T33 cron entries (nightly IndexNow, weekly Market Wrap) are also separate and are installed manually per [`content-cadence.md`](content-cadence.md). Full installed state on a Phase-5 box: **9 cron entries** (5 from T19 + 2 from T20 + 2 from T33).
 
 ## 1. Prerequisites
 
