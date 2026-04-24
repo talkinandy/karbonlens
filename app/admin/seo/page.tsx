@@ -1,7 +1,7 @@
 /**
  * app/admin/seo/page.tsx — T31 admin-only SEO health dashboard.
  *
- * Server-rendered, no interactivity. Four cards on `.kl-page`:
+ * Server-rendered, no interactivity. Five cards on `.kl-page`:
  *
  *   1. Content inventory — counts + latest-ingest timestamps for the
  *      tables that drive public SEO surfaces (projects, descriptions,
@@ -9,10 +9,14 @@
  *   2. Freshness alerts — rows that should normally be 0. Anything
  *      non-zero is operator-actionable (stale scores, stale Claude
  *      descriptions per T30 runbook, missed `is_upcoming` flips).
- *   3. Sitemap preview — server-side fetch of the public sitemap.xml
+ *   3. Refresh candidates (T33 Phase 4D-lite) — projects whose AI
+ *      description should be regenerated, either because it is >90d
+ *      old or because underlying facts changed after generated_at
+ *      (stale input_fingerprint proxy). Auto-refresh cron deferred.
+ *   4. Sitemap preview — server-side fetch of the public sitemap.xml
  *      with a 1h revalidate window. Counts <url>/<lastmod> via regex
  *      (no parser dependency).
- *   4. Indexation hints — three external operator links. The IndexNow
+ *   5. Indexation hints — three external operator links. The IndexNow
  *      manual-ping link is rendered as a disabled note (forward-ref
  *      to a future T31 Phase-4 route).
  *
@@ -282,7 +286,104 @@ export default async function SeoDashboardPage() {
           )}
         </section>
 
-        {/* ── Card 3: Sitemap preview ───────────────────────────────────── */}
+        {/* ── Card 3: Refresh candidates (T33 Phase 4D-lite) ────────────── */}
+        <section className="kl-card" aria-label="Refresh candidates">
+          <div className="kl-section-label">Refresh candidates</div>
+          {metrics.refreshCandidates.totalCandidates === 0 ? (
+            <p
+              style={{
+                margin: '12px 0 0',
+                fontSize: 13,
+                color: 'var(--success-fg, var(--text-1))',
+              }}
+            >
+              <span
+                className="kl-pill kl-pill--success"
+                style={{ marginRight: 8 }}
+              >
+                OK
+              </span>
+              All project descriptions are current.
+            </p>
+          ) : (
+            <>
+              <div style={{ marginTop: 8 }}>
+                <StatRow
+                  label="Total candidates"
+                  value={metrics.refreshCandidates.totalCandidates.toLocaleString()}
+                />
+                <StatRow
+                  label="Old (> 90 days)"
+                  value={metrics.refreshCandidates.oldDescriptions.toLocaleString()}
+                />
+                <StatRow
+                  label="Stale fingerprint"
+                  value={metrics.refreshCandidates.staleFingerprints.toLocaleString()}
+                />
+              </div>
+              <h3
+                style={{
+                  fontSize: 13,
+                  fontWeight: 500,
+                  marginTop: 16,
+                  marginBottom: 6,
+                }}
+              >
+                Top 10 (most stale first)
+              </h3>
+              <ul
+                style={{
+                  listStyle: 'none',
+                  padding: 0,
+                  margin: 0,
+                  fontSize: 13,
+                }}
+              >
+                {metrics.refreshCandidates.examples.map((c) => (
+                  <li
+                    key={c.projectId}
+                    style={{
+                      padding: '6px 0',
+                      borderBottom: '0.5px solid var(--border)',
+                    }}
+                  >
+                    <a
+                      href={`/projects/${c.slug}`}
+                      style={{
+                        color: 'var(--info-fg)',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      {c.name}
+                    </a>
+                    {' — '}
+                    <span style={{ color: 'var(--text-3)', fontSize: 12 }}>
+                      {c.ageDays} days old · {c.reason.replace('_', ' ')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: 'var(--text-3)',
+                  marginTop: 12,
+                }}
+              >
+                Trigger regeneration per{' '}
+                <a
+                  href="/docs/runbooks/project-descriptions"
+                  style={{ color: 'var(--text-2)' }}
+                >
+                  the T30 runbook
+                </a>
+                . Auto-refresh cron deferred to v0.2.
+              </p>
+            </>
+          )}
+        </section>
+
+        {/* ── Card 4: Sitemap preview ───────────────────────────────────── */}
         <section className="kl-card" aria-labelledby="seo-sitemap-h">
           <div className="kl-section-label" id="seo-sitemap-h">
             Sitemap preview
@@ -345,7 +446,7 @@ export default async function SeoDashboardPage() {
           )}
         </section>
 
-        {/* ── Card 4: Indexation hints ──────────────────────────────────── */}
+        {/* ── Card 5: Indexation hints ──────────────────────────────────── */}
         <section className="kl-card" aria-labelledby="seo-indexation-h">
           <div className="kl-section-label" id="seo-indexation-h">
             Indexation hints

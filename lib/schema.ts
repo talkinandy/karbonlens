@@ -390,6 +390,31 @@ export type ProjectDescriptionCitation = {
   date?: string;
 };
 
+// ─── news_posts ──────────────────────────────────────────────────────────────
+// T33 — auto-composed weekly Market Wrap (and future post kinds). Written
+// out-of-band by `scripts/publish-weekly-wrap.ts`; the runtime app reads
+// only. `facts_json` captures the composer's inputs so posts can be
+// re-rendered under a new template without re-scraping. See migration 007.
+export type NewsPostFacts = Record<string, unknown>;
+
+export const newsPosts = pgTable(
+  'news_posts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    slug: text('slug').notNull().unique(),
+    kind: text('kind').notNull(), // 'weekly_wrap' for now
+    title: text('title').notNull(),
+    summary: text('summary').notNull(),
+    bodyMd: text('body_md').notNull(),
+    factsJson: jsonb('facts_json').$type<NewsPostFacts>().notNull().default({}),
+    publishedAt: timestamp('published_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    supersededBy: uuid('superseded_by'),
+  },
+  (t) => [index('idx_news_posts_published').on(t.publishedAt.desc())],
+);
+
 export const projectDescriptions = pgTable(
   'project_descriptions',
   {

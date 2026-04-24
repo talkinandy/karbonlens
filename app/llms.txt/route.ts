@@ -35,6 +35,10 @@ const BODY = `# KarbonLens
 
 - [IDXCarbon prices](https://karbonlens.com/prices): Monthly volume and price snapshots from Indonesia's carbon exchange.
 
+## News
+
+- [Weekly Market Wrap](https://karbonlens.com/news): Auto-published Monday digest of the prior week's new issuances, satellite alerts, regulatory events, and IDXCarbon price move. Composed deterministically from DB deltas — every number is traceable to a source row.
+
 ## Regulatory
 
 - [Regulatory timeline](https://karbonlens.com/regulatory): Indonesian carbon-market regulations since Perpres 98/2021.
