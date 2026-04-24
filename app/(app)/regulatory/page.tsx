@@ -33,12 +33,35 @@ import Link from 'next/link';
 
 import { FilterBar } from '@/components/regulatory/FilterBar';
 import { TimelineCard } from '@/components/regulatory/TimelineCard';
+import { JsonLd } from '@/components/seo/JsonLd';
 import {
   getDistinctMinistries,
   getDistinctTags,
   getRegulatoryEvents,
   type RegulatoryEventRow,
 } from '@/lib/queries/regulatory';
+
+// T31 — BreadcrumbList JSON-LD for the regulatory timeline. Anchors crawlers
+// (Home → Regulatory) and pairs with the per-event detail page schemas at
+// `/regulatory/[slug]`.
+const breadcrumbSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      name: 'Home',
+      item: 'https://karbonlens.com/',
+    },
+    {
+      '@type': 'ListItem',
+      position: 2,
+      name: 'Regulatory timeline',
+      item: 'https://karbonlens.com/regulatory',
+    },
+  ],
+};
 
 export const dynamic = 'force-dynamic';
 
@@ -146,6 +169,7 @@ export default async function RegulatoryPage({
 
   return (
     <main className="kl-page">
+      <JsonLd data={breadcrumbSchema} id="ld-breadcrumb" />
       <header className="kl-page-header">
         <div>
           <p className="kl-section-label">Regulatory timeline · Indonesia</p>

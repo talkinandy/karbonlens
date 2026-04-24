@@ -22,6 +22,8 @@
  *     opens in a new tab with rel="noopener noreferrer".
  */
 
+import Link from 'next/link';
+
 import type { RegulatoryEventRow } from '@/lib/queries/regulatory';
 
 const IMPORTANCE_COLOR: Record<string, string> = {
@@ -69,6 +71,25 @@ function isSentinelDocNumber(docNumber: string | null): boolean {
   return /^[A-Z]+-[A-Z]+-\d{4}$/.test(docNumber);
 }
 
+/**
+ * Derive the per-event detail slug. Mirrors the SQL formula in
+ * `app/sitemap.ts` and `lib/queries/regulatory-detail.ts`:
+ *   lower(replace(replace(coalesce(type,'') || '-' || coalesce(number,''),
+ *                         '/', '-'), ' ', '-'))
+ * Returns null when both inputs are missing or the result collapses to the
+ * sentinel '-' (matches the sitemap's filter).
+ */
+function deriveSlug(
+  documentType: string | null,
+  documentNumber: string | null,
+): string | null {
+  const t = documentType ?? '';
+  const n = documentNumber ?? '';
+  const raw = `${t}-${n}`.replace(/\//g, '-').replace(/ /g, '-').toLowerCase();
+  if (!raw || raw === '-') return null;
+  return raw;
+}
+
 export function TimelineCard({
   event,
   lang,
@@ -97,6 +118,12 @@ export function TimelineCard({
     : null;
 
   const isUpcoming = event.isUpcoming === true;
+
+  // T31 — per-event detail slug. Null when no meaningful slug exists; in
+  // that case we fall back to plain (unlinked) text so we never produce a
+  // dead `/regulatory/-` href.
+  const slug = deriveSlug(event.documentType, event.documentNumber);
+  const detailHref = slug ? `/regulatory/${slug}` : null;
 
   return (
     <article
@@ -163,7 +190,17 @@ export function TimelineCard({
         ) : null}
 
         {docPillText ? (
-          <span className="kl-pill kl-pill--info">{docPillText}</span>
+          detailHref ? (
+            <Link
+              href={detailHref}
+              className="kl-pill kl-pill--info"
+              style={{ textDecoration: 'none' }}
+            >
+              {docPillText}
+            </Link>
+          ) : (
+            <span className="kl-pill kl-pill--info">{docPillText}</span>
+          )
         ) : null}
 
         {event.importance ? (
@@ -198,7 +235,16 @@ export function TimelineCard({
           letterSpacing: '-0.2px',
         }}
       >
-        {event.title}
+        {detailHref ? (
+          <Link
+            href={detailHref}
+            style={{ color: 'inherit', textDecoration: 'none' }}
+          >
+            {event.title}
+          </Link>
+        ) : (
+          event.title
+        )}
       </h2>
 
       {effectiveSummary ? (

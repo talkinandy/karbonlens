@@ -29,6 +29,9 @@ import { ScoreCard } from '@/components/projects/detail/ScoreCard';
 import { SectionHero } from '@/components/projects/detail/SectionHero';
 // T13 — client shell; mounts MapLibre with ssr:false into the #map anchor.
 import { ProjectDetailMapClient } from '@/components/map/ProjectDetailMapClient';
+// T31 — answer-first JSON-LD (Dataset + BreadcrumbList) for LLM extraction.
+import { JsonLd } from '@/components/seo/JsonLd';
+import { displayStatus } from '@/lib/display/status';
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -140,6 +143,144 @@ export default async function ProjectDetailPage({
   const components = detail.score?.components ?? null;
   const inputs = components?.inputs;
 
+  // T31 — Build the typed facts object the description renders as a key-facts
+  // table. We also reuse a few of these values to populate the Dataset
+  // JSON-LD below (variableMeasured, spatialCoverage, dateModified).
+  const statusBadge = displayStatus(detail.project.status);
+  const hectaresValue = detail.project.hectares
+    ? Number(detail.project.hectares)
+    : null;
+  const integrityScoreRounded =
+    integrityScoreNumeric !== null ? Math.round(integrityScoreNumeric) : null;
+  const latestVintageYear = detail.issuances[0]?.vintageYear ?? null;
+  const registryIds = detail.registries
+    .map((r) => `${r.registryName} ${r.externalId}`)
+    .join(', ');
+  const facts = {
+    nameCanonical: detail.project.nameCanonical,
+    developer: detail.project.developer,
+    province: detail.project.province,
+    projectType: detail.project.projectType,
+    methodology: detail.project.methodology,
+    hectares: hectaresValue,
+    status: detail.project.status,
+    statusLabel: statusBadge.label,
+    statusPillClass: `kl-pill ${
+      statusBadge.badge === 'active'
+        ? 'kl-pill--success'
+        : statusBadge.badge === 'pipeline'
+          ? 'kl-pill--info'
+          : statusBadge.badge === 'suspended'
+            ? 'kl-pill--danger'
+            : statusBadge.badge === 'flagged'
+              ? 'kl-pill--warning'
+              : 'kl-pill--neutral'
+    }`,
+    integrityScore: integrityScoreRounded,
+    latestVintageYear,
+    registryIds: registryIds || null,
+    generatedAt: description?.generatedAt ?? null,
+    scoreComponents: components,
+  };
+
+  // T31 — Dataset schema. Each project page is a discoverable carbon-project
+  // dossier. Variables use schema.org PropertyValue so LLMs and dataset
+  // crawlers can ingest the headline numbers without parsing the page.
+  const variableMeasured = [
+    {
+      "@type": "PropertyValue",
+      name: "Integrity score",
+      value: integrityScoreRounded ?? undefined,
+      minValue: 0,
+      maxValue: 100,
+    },
+    {
+      "@type": "PropertyValue",
+      name: "Hectares",
+      value: hectaresValue ?? undefined,
+      unitText: "ha",
+    },
+    {
+      "@type": "PropertyValue",
+      name: "Methodology",
+      value: detail.project.methodology ?? undefined,
+    },
+    {
+      "@type": "PropertyValue",
+      name: "Status",
+      value: detail.project.status ?? undefined,
+    },
+  ].filter((v) => v.value !== undefined);
+
+  const datasetSchema = {
+    "@context": "https://schema.org",
+    "@type": "Dataset",
+    name: `${detail.project.nameCanonical} — Carbon project dossier`,
+    description:
+      description?.summaryMd ||
+      `${detail.project.nameCanonical} — integrity score, issuance history, and satellite alerts.`,
+    url: `https://karbonlens.com/projects/${slug}`,
+    identifier: detail.project.id,
+    isPartOf: {
+      "@type": "DataCatalog",
+      name: "KarbonLens Indonesian Carbon Project Registry",
+      url: "https://karbonlens.com/projects",
+    },
+    creator: {
+      "@type": "Organization",
+      name: "KarbonLens",
+      url: "https://karbonlens.com",
+    },
+    license: "https://karbonlens.com/terms",
+    spatialCoverage: {
+      "@type": "Place",
+      name: detail.project.province || "Indonesia",
+      address: {
+        "@type": "PostalAddress",
+        addressRegion: detail.project.province,
+        addressCountry: "ID",
+      },
+    },
+    temporalCoverage: detail.score?.scoreDate
+      ? `2009-01-01/${detail.score.scoreDate}`
+      : "2009-01-01/..",
+    variableMeasured,
+    keywords: [
+      "Indonesian carbon market",
+      detail.project.projectType,
+      detail.project.methodology,
+      detail.project.province,
+    ]
+      .filter(Boolean)
+      .join(", "),
+    dateModified: description?.generatedAt?.toISOString().slice(0, 10),
+  };
+
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: "https://karbonlens.com/",
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Projects",
+        item: "https://karbonlens.com/projects",
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: detail.project.nameCanonical,
+        item: `https://karbonlens.com/projects/${slug}`,
+      },
+    ],
+  };
+
   return (
     <main className="kl-page">
       <SectionHero
@@ -155,6 +296,7 @@ export default async function ProjectDetailPage({
         description={description}
         isAuthed={isAuthed}
         projectSlug={slug}
+        facts={facts}
       />
 
       <ScoreCard
@@ -245,6 +387,9 @@ export default async function ProjectDetailPage({
               </p>
             </div>
           </section>
+
+      <JsonLd data={datasetSchema} id="ld-dataset" />
+      <JsonLd data={breadcrumbSchema} id="ld-breadcrumb" />
     </main>
   );
 }
