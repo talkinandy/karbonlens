@@ -9,18 +9,16 @@ KarbonLens is a carbon-market intelligence terminal that reconciles SRN-PPI, IDX
 
 ## Status
 
-**v0.1 Phases 1–4 complete (2026-04-21).** Foundation (T01–T05), data pipelines (T06–T10), frontend integration (T11–T18), and ops hardening (T19–T22) are all merged into `feature/v0.1-impl`. Only T23 (replace static prototype with v0.1 app) remains — blocked on OQ-1 (Netlify → self-hosted Postgres connectivity strategy).
+**v0.1 shipped 2026-04-24.** All five phases merged into `main` and live at https://karbonlens.com: foundation (T01–T05), data pipelines (T06–T10), frontend integration (T11–T18), ops hardening (T19–T22), and the Phase-5 polish + SEO/GEO pass (T24–T33 — methodology page, mobile polish, AI project descriptions, technical SEO, programmatic hubs, automated content cadence). The original T23 "Netlify cutover" was resolved by dropping Netlify entirely and self-hosting the Next.js app on the same Hetzner CX32 as Postgres.
 
-**Live DB:** 64 projects · 307 issuances · 10 IDXCarbon monthly snapshots · 8 regulatory events · 64 project scores · 247,004 satellite alerts · 60 in-app notifications
+**Live DB:** 200 projects · 307 issuances · 10 IDXCarbon monthly snapshots · 10 regulatory events · 247k satellite alerts · 1 auto-published weekly Market Wrap at [`/news`](https://karbonlens.com/news).
 
-**Deferred items:** T17 Phase B (live Resend send) pending Andy's `RESEND_API_KEY`; T22 Phase B (live Sentry capture) pending Andy's `SENTRY_DSN`; T23 (Netlify cutover) pending OQ-1 Postgres-connectivity decision.
+**Deferred items:** T17 Phase B (live Resend send) pending Andy's `RESEND_API_KEY`; T22 Phase B (live Sentry capture) pending Andy's `SENTRY_DSN`; Bing Webmaster Tools baseline crawl pending (unblocks IndexNow 422 cold-start).
 
+- Handoff doc: [`docs/HANDOFF.md`](docs/HANDOFF.md)
 - Sprint overview and task statuses: [`docs/TASKS.md`](docs/TASKS.md)
 - What shipped in each story: [`CHANGELOG.md`](CHANGELOG.md)
-- Phase 1 retrospective: [`docs/retros/phase-1.md`](docs/retros/phase-1.md)
-- Phase 2 retrospective: [`docs/retros/phase-2.md`](docs/retros/phase-2.md)
-- Phase 3 retrospective: [`docs/retros/phase-3.md`](docs/retros/phase-3.md)
-- Phase 4 retrospective: [`docs/retros/phase-4.md`](docs/retros/phase-4.md)
+- Phase retrospectives: [`docs/retros/phase-1.md`](docs/retros/phase-1.md) · [`phase-2`](docs/retros/phase-2.md) · [`phase-3`](docs/retros/phase-3.md) · [`phase-4`](docs/retros/phase-4.md) · [`phase-5`](docs/retros/phase-5.md)
 
 ## Running the scheduled jobs
 
@@ -33,19 +31,21 @@ Scrapers and cron wrappers are live on the Hetzner box under the `karbonlens` us
 - **Backups:** `/var/lib/karbonlens/backups/*.dump` (pg_dump custom-format, 14-day rotation)
 - **Environment:** `/opt/karbonlens/.env` (mode 640, owner `karbonlens:karbonlens`) — populated with real `DATABASE_URL`, `PGPASSWORD`, `GFW_API_KEY`, `DIGEST_CRON_SECRET`; `RESEND_API_KEY` and `SENTRY_DSN` remain `CHANGE_ME` until Andy supplies them
 
-Active cron schedule (as of 2026-04-21):
+Active cron schedule (as of 2026-04-24):
 
-| Schedule | Job |
+| Schedule (UTC) | Job |
 |---|---|
+| Daily 02:00 | pg_dump backup (`pg-backup.sh`) |
+| Daily 02:30 | Nightly IndexNow delta-ping (`indexnow-nightly.ts`) — T33 |
 | Mon 03:00 | Verra registry scraper |
 | Mon 03:30 | GFW satellite alerts scraper |
 | 1st of month 04:00 | IDXCarbon monthly PDF scraper |
 | Daily 04:00 | Project score computation |
+| Sun 05:00 | pg_restore drill |
 | Mon 00:00 | Weekly digest email (Phase A; live send awaits RESEND_API_KEY) |
-| Daily 02:00 | pg_dump backup (Andy must append from `scrapers/scripts/pg-cron.conf`) |
-| Sun 05:00 | pg_restore drill (Andy must append from `scrapers/scripts/pg-cron.conf`) |
+| Mon 06:00 | Weekly Market Wrap publisher (`publish-weekly-wrap.ts`) — T33 |
 
-T23 (Netlify production deploy) is deferred pending OQ-1 — the Netlify → self-hosted Postgres connectivity strategy (Tailscale / VPS proxy / managed Postgres). Until OQ-1 is resolved, the app runs on the Hetzner box only.
+The app itself runs as `karbonlens-app.service` (Next.js 16 on port 3010) behind nginx + Let's Encrypt at `https://karbonlens.com`. No Netlify, no external frontend host — the entire stack lives on one Hetzner CX32.
 
 ## Quickstart (local dev)
 
@@ -122,7 +122,7 @@ python -m scrapers.verra.fetch --dry-run --limit 3
 
 Full details: [`docs/architecture.md`](docs/architecture.md)
 
-- **Frontend:** Next.js 16 App Router, deployed on Netlify (deploy deferred — see below)
+- **Frontend:** Next.js 16 App Router, self-hosted on the same Hetzner CX32 as Postgres (`karbonlens-app.service` port 3010 behind nginx + Let's Encrypt)
 - **Styling:** Tailwind v4 CSS-first with design tokens in `app/globals.css`
 - **Database:** PostgreSQL 16 + PostGIS on Hetzner CX32 VPS, Drizzle ORM for TypeScript schema
 - **Auth:** NextAuth v5 with Google OAuth provider, sessions in Postgres via `@auth/drizzle-adapter`
@@ -172,7 +172,7 @@ Full pipeline doc: [`docs/stories/README.md`](docs/stories/README.md) (if presen
 
 ## Deploy
 
-v0.1 runs **local-dev only** on the Hetzner VPS. Netlify deploy is deferred pending a Postgres-connectivity strategy decision: connecting Netlify to the self-hosted Postgres requires either Tailscale, a VPS-side proxy, or migrating to a managed Postgres provider. This is tracked as open question **OQ-1** in the T04 implementation report (`docs/stories/reports/T04-implementation-report.md`).
+v0.1 is live at **https://karbonlens.com**, self-hosted on a Hetzner CX32 alongside the PostgreSQL + PostGIS database. The Next.js app runs as a systemd service (`karbonlens-app.service`, port 3010) behind nginx + Let's Encrypt. Scrapers and cron scripts run under the `karbonlens` user on the same box; the app talks to Postgres over the loopback. Deploys are rsync + `npm run build` + `systemctl restart` — see [`docs/HANDOFF.md`](docs/HANDOFF.md) "Hosting decision".
 
 ## Design
 

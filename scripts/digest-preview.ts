@@ -151,7 +151,7 @@ async function liveBundle(userId: string): Promise<DigestBundle | null> {
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
-  const appUrl = process.env.NEXTAUTH_URL ?? 'https://karbonlens.netlify.app';
+  const appUrl = process.env.NEXTAUTH_URL ?? 'https://karbonlens.com';
 
   const bundle = args.userId ? await liveBundle(args.userId) : fixtureBundle();
   if (!bundle) {
