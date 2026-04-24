@@ -80,9 +80,10 @@ echo "GFW_API_KEY=<your-actual-key>" >> /opt/karbonlens/.env
 The weekly cron wrapper `scrapers/scripts/run_weekly_gfw.sh` sources this
 file before invoking the scraper.
 
-**Netlify:** the server-side app does not call GFW directly (yet), so no
-Netlify env var is required for v0.1. When v0.2 adds a server-side map
-proxy for GFW tiles, also add `GFW_API_KEY` to the Netlify site env.
+**App-side note:** the Next.js app does not call GFW directly in v0.1, so
+`GFW_API_KEY` is not required in `/opt/karbonlens/app/.env.local`. When a
+future version adds a server-side map proxy for GFW tiles, add the key
+there too and restart the app service.
 
 ---
 

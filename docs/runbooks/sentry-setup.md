@@ -47,15 +47,17 @@ SENTRY_PROJECT=karbonlens
 **Why two DSN vars?** The browser bundle can only read env vars prefixed
 `NEXT_PUBLIC_`. Same value, two keys.
 
-## 4. Netlify — populate production env vars
+## 4. Production env — populate on the Hetzner box
 
-Go to **Site settings -> Environment variables** and add the same five
-vars. Netlify automatically exposes `NEXT_PUBLIC_*` vars at build time
-for Next.js.
+SSH to the production box and append the same five vars to
+`/opt/karbonlens/app/.env.local` (owned by `karbonlens:karbonlens`, mode
+640). Next.js exposes `NEXT_PUBLIC_*` vars to the browser bundle at build
+time, so they must be present before `npm run build`.
 
 ## 5. Deploy and trigger the debug endpoint
 
-1. Redeploy from Netlify (or push a commit to trigger a build).
+1. Rebuild and restart: `sudo -u karbonlens npm run build` followed by
+   `sudo systemctl restart karbonlens-app.service`.
 2. Sign in to the production site as admin (`admin@example.com`).
 3. Hit the debug endpoint:
    ```bash
@@ -93,15 +95,14 @@ every new issue" is reasonable. Revisit the threshold in v0.2.
 
 ## Troubleshooting
 
-- **"Sentry disabled (no DSN)" in Netlify build logs** — `SENTRY_DSN`
-  is missing from Netlify env vars. Add it under Site settings ->
-  Environment variables.
+- **"Sentry disabled (no DSN)" in build logs** — `SENTRY_DSN` is missing
+  from `/opt/karbonlens/app/.env.local`. Add it and rebuild.
 - **"Source map upload skipped — SENTRY_AUTH_TOKEN not set"** — expected
   when `SENTRY_AUTH_TOKEN` is absent. Stack traces will be minified in
   the dashboard. Add the auth token and redeploy.
 - **Debug endpoint returns 403 instead of 500** — your account email is
-  not in the allowlist at `lib/admin.ts`. Add it (requires code change
-  + PR) or sign in with an allowed account.
+  not in the `ADMIN_EMAILS` env var on prod. Update
+  `/opt/karbonlens/app/.env.local`, restart the service, and retry.
 - **Debug endpoint redirects to `/?signin=1`** — your browser session
   expired. Sign in at the landing page and retry.
 
@@ -114,7 +115,7 @@ every new issue" is reasonable. Revisit the threshold in v0.2.
   (`sudo journalctl -u karbonlens-scraper`).
 - **Session replay.** Free tier includes 500 replays/month; nice-to-have
   but deferred to keep T22 scope tight.
-- **Release health tracking.** Requires a Netlify deploy hook; deferred
-  until the deploy pipeline is more mature.
+- **Release health tracking.** Requires emitting a release marker on
+  deploy; deferred until the deploy pipeline is more mature.
 - **Performance tracing.** Paid feature. `tracesSampleRate: 0` in all
   three `sentry.*.config.ts` files explicitly disables it.

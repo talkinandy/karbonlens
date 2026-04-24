@@ -287,6 +287,10 @@ sudo systemctl reload postgresql
 
 ---
 
-## Notes for T04 (Netlify connectivity — deferred)
+## Notes on database connectivity
 
-v0.1 Postgres is `localhost`-only. When T04 wires up Netlify, the chosen strategy (Tailscale, public IP + `pg_hba` IP allowlist, or VPS-side proxy) will require additional steps not covered here. This runbook will be updated or supplemented at that point.
+In v0.1, Postgres listens on `localhost` only and the Next.js app lives on
+the same Hetzner box, connecting over the loopback. No external DB
+connectivity is configured. If a future deploy splits the app onto its
+own node, update `pg_hba.conf` to allow the app host (Tailscale or
+VPN-fronted private interface is preferred over public IP + scram-sha-256).

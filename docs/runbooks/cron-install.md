@@ -170,9 +170,9 @@ sudo rm -f /etc/logrotate.d/karbonlens
 
 **Wrapper logs show "ENV_FILE not found":** `/opt/karbonlens/.env` got deleted. Re-run `install-crontab.sh` to bootstrap from the template.
 
-**Digest cron fires but receives HTTP 401:** `DIGEST_CRON_SECRET` on the VPS does not match the value the Next.js deploy has. Update the VPS `.env` to match the Netlify env var, or rotate both.
+**Digest cron fires but receives HTTP 401:** `DIGEST_CRON_SECRET` in `/opt/karbonlens/.env` (scraper side) does not match the value in `/opt/karbonlens/app/.env.local` (app side). Set both to the same value and restart the app service.
 
-**Digest cron fires but receives HTTP 503:** Next.js is missing `RESEND_API_KEY` or `DIGEST_CRON_SECRET` (see T17 route.ts). Set those env vars on the Netlify deploy.
+**Digest cron fires but receives HTTP 503:** The app is missing `RESEND_API_KEY` or `DIGEST_CRON_SECRET`. Set both in `/opt/karbonlens/app/.env.local` and restart the app service.
 
 ## 9. References
 

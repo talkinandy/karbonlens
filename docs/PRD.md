@@ -37,7 +37,7 @@ Buyers come later once we have pricing and volume signal. Project developers are
 ## 3. Scope for v0.1
 
 ### In scope
-- Next.js rebuild of the existing Netlify prototype, replacing mock data with live data
+- Next.js rebuild of the existing static prototype, replacing mock data with live data
 - Data pipelines for three sources: **Verra Registry**, **GFW Integrated Alerts**, **IDXCarbon monthly reports**
 - PostgreSQL + PostGIS on Hetzner CX32, schema per `docs/architecture.md`
 - Google OAuth login (NextAuth.js) with free-tier access control
@@ -85,15 +85,15 @@ Non-goal for v0.1: revenue. That's v0.2.
 
 Full details in `docs/architecture.md`. Summary:
 
-- **Frontend:** Next.js 15 App Router, TypeScript, Tailwind CSS v4, deployed to Netlify
+- **Frontend:** Next.js 16 App Router, TypeScript, Tailwind CSS v4, self-hosted on the same Hetzner CX32 as Postgres (`karbonlens-app.service` behind nginx + Let's Encrypt)
 - **Backend:** Next.js API routes in the same repo, called server-side from pages
-- **Database:** PostgreSQL 16 + PostGIS on Hetzner CX32, accessed via Drizzle ORM
-- **Scrapers:** Python 3.12 in a separate `/scrapers` directory, scheduled by cron on the VPS, writing directly to Postgres via psycopg
+- **Database:** PostgreSQL 17 + PostGIS on Hetzner CX32, accessed via Drizzle ORM
+- **Ingestion:** Python 3.12 scrapers (Verra, GFW, IDXCarbon, scoring) live in the private companion repo `karbonlens-ingest`, scheduled by cron on the Hetzner box, writing directly to Postgres via psycopg
 - **Auth:** NextAuth.js v5 with Google provider, sessions in Postgres
 - **Maps:** MapLibre GL JS v5 with Esri World Imagery tiles (free)
-- **Email:** Resend for the weekly digest (free tier covers v0.1)
-- **Secrets:** Plain `.env` on the VPS for scrapers, Netlify environment variables for the frontend
-- **CI/CD:** Frontend auto-deploys on push to `main`. Scrapers deploy by `git pull` on the VPS.
+- **Email:** Resend for the weekly digest
+- **Secrets:** Plain `.env` files on the Hetzner box — `/opt/karbonlens/.env` for the scraper user, `/opt/karbonlens/app/.env.local` for the Next.js service
+- **Deploy:** rsync + `npm run build` + `systemctl restart karbonlens-app.service` for the app; `git pull` + `install-crontab.sh` for ingestion
 
 Explicit non-choices: no Redis, no queue system, no Docker orchestration, no TimescaleDB for v0.1, no separate backend repo.
 
@@ -145,8 +145,8 @@ Rather than trusting fuzzy matching blindly or calling Claude for every ambiguou
 
 This PRD is stable. It changes when strategy changes, not when implementation changes.
 
-- For **implementation tasks** (what to build next, in what order, with what acceptance criteria), see `TASKS.md`.
-- For **technical detail** (schema, scraper patterns, env vars, API endpoints), see `docs/architecture.md`.
-- For **design details** (tokens, components, screens), see `KarbonLens_Design_Brief.md` and `KarbonLens_Design_Brief_Maps_Addendum.md`.
+- For **open work and implementation tasks**, see [GitHub Issues](https://github.com/talkinandy/karbonlens/issues).
+- For **technical detail** (schema, env vars, API endpoints), see [`docs/architecture.md`](architecture.md).
+- For **operational procedures**, see [`docs/runbooks/`](runbooks/).
 
 If any of these docs contradict each other, the PRD wins for strategic questions and `docs/architecture.md` wins for technical questions.

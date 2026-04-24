@@ -1,7 +1,8 @@
 # Runbook: Google OAuth setup for KarbonLens
 
-This guide walks Andy through registering the Google OAuth client in Google Cloud Console,
-configuring environment variables locally and on Netlify, and smoke-testing the sign-in flow.
+This guide walks through registering the Google OAuth client in Google Cloud Console,
+configuring environment variables locally and on the production Hetzner box, and
+smoke-testing the sign-in flow.
 
 ## Prerequisites
 
@@ -86,23 +87,31 @@ NEXTAUTH_URL=http://localhost:3000
 
 ---
 
-## Step 5 — Set environment variables on Netlify (production)
+## Step 5 — Set environment variables on the production Hetzner box
 
-Do this **at the same time** as Step 4 — the GCP OAuth client already lists the Netlify redirect URI, so the production env vars must match or OAuth callbacks will fail on Netlify.
+Do this **at the same time** as Step 4 — the GCP OAuth client already lists the
+production redirect URI, so the production env vars must match or OAuth callbacks
+will fail.
 
-1. Go to the Netlify dashboard → your KarbonLens site → **Site configuration** → **Environment variables**
-2. Add the following variables (production context):
+SSH to the production box and edit `/opt/karbonlens/app/.env.local` as the
+`karbonlens` user (mode 640). Append or update these lines:
 
-   | Variable | Value |
-   |---|---|
-   | `GOOGLE_CLIENT_ID` | same Client ID as above |
-   | `GOOGLE_CLIENT_SECRET` | same Client Secret as above |
-   | `NEXTAUTH_SECRET` | same 32-byte base64 string as above |
-   | `NEXTAUTH_URL` | `https://karbonlens.com` |
+```
+GOOGLE_CLIENT_ID=<same Client ID as above>
+GOOGLE_CLIENT_SECRET=<same Client Secret as above>
+NEXTAUTH_SECRET=<same 32-byte base64 string as above>
+NEXTAUTH_URL=https://karbonlens.com
+```
 
-3. Click **Save**. Netlify will use these on the next deploy.
+Then restart the app service:
 
-> **Note:** `NEXTAUTH_URL` must be `https://karbonlens.com` on Netlify (not `http://localhost:3000`). The local `.env.local` and the Netlify env var have different values — this is expected and correct.
+```bash
+sudo systemctl restart karbonlens-app.service
+```
+
+> **Note:** `NEXTAUTH_URL` must be `https://karbonlens.com` in production (not
+> `http://localhost:3000`). The local `.env.local` and the production `.env.local`
+> have different values — this is expected and correct.
 
 ---
 
