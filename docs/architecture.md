@@ -44,7 +44,7 @@
 └─────────────────────────────────────────────────────────────────────┘
 
 External outbound only:
-  • Netlify app calls Resend API for weekly digest (scheduled via Vercel Cron or GitHub Actions)
+  • App calls Resend API for weekly digest (scheduled via cron)
   • Frontend calls MapLibre + Esri tile URLs directly (browser-side)
 ```
 
@@ -53,81 +53,52 @@ External outbound only:
 - No separate backend service (Next.js API routes are the backend)
 - No job queue (cron + idempotent scrapers)
 - No Docker orchestration (plain systemd + cron)
-- No CDN in front of Postgres (direct connection from Netlify)
-- No paperclip / openclaw integration in v0.1 (planned for v0.2 scraper automation)
+- No external CDN (nginx on the same box serves static assets)
 
 ---
 
 ## 2. Repository layout
 
-Single monorepo at `github.com/talkinandy/karbonlens`.
+Split across two repositories: the public app at `github.com/talkinandy/karbonlens` and the private ingestion pipeline at `github.com/talkinandy/karbonlens-ingest`.
+
+### Public app (`karbonlens`)
 
 ```
 karbonlens/
-├── PRD.md                          # strategy (this handoff)
-├── TASKS.md                        # tactical task playbook
-├── README.md                       # getting-started for a new dev
+├── LICENSE                         # Apache 2.0
+├── NOTICE                          # attribution
+├── CONTRIBUTING.md                 # DCO sign-off + setup
+├── SECURITY.md                     # private disclosure policy
+├── CHANGELOG.md                    # public release notes
+├── README.md                       # getting-started
 ├── docs/
 │   ├── architecture.md             # this file
-│   ├── schema.sql                  # canonical DB schema
-│   ├── scraper-patterns.md         # conventions every scraper follows
-│   └── methodology.md              # score methodology, user-facing later
-├── app/                            # Next.js 15 App Router
+│   ├── PRD.md                      # product requirements
+│   └── runbooks/                   # operational how-tos
+├── app/                            # Next.js 16 App Router
 │   ├── (public)/                   # routes accessible without login
-│   │   ├── page.tsx                # landing
-│   │   └── layout.tsx
 │   ├── (app)/                      # routes requiring Google OAuth
-│   │   ├── projects/
-│   │   │   ├── page.tsx            # projects explorer (table + map tab)
-│   │   │   └── [id]/page.tsx       # project detail
-│   │   ├── prices/page.tsx
-│   │   ├── regulatory/page.tsx
-│   │   ├── alerts/page.tsx
-│   │   └── layout.tsx
-│   └── api/
-│       ├── auth/[...nextauth]/route.ts
-│       ├── projects/route.ts
-│       ├── projects/[id]/route.ts
-│       ├── prices/route.ts
-│       ├── alerts/route.ts
-│       └── digest/route.ts         # weekly digest cron target
+│   └── api/                        # API routes incl. /api/digest cron target
 ├── lib/
 │   ├── db.ts                       # Drizzle client
 │   ├── schema.ts                   # Drizzle schema (TypeScript)
 │   ├── auth.ts                     # NextAuth config
-│   └── score.ts                    # score calculation
-├── components/                     # React components
-│   ├── ui/                         # primitives per design brief
-│   ├── map/                        # MapLibre wrappers
-│   └── ...
-├── scrapers/                       # Python, separate venv
-│   ├── pyproject.toml
-│   ├── common/
-│   │   ├── db.py                   # psycopg helpers
-│   │   ├── config.py               # env var loader
-│   │   └── logging.py
-│   ├── verra/
-│   │   └── fetch.py                # python -m scrapers.verra.fetch
-│   ├── gfw/
-│   │   └── fetch.py
-│   ├── idxcarbon/
-│   │   ├── fetch_monthly.py
-│   │   └── parse_pdf.py
-│   ├── migrations/                 # SQL migrations applied by psql
-│   │   ├── 001_init.sql
-│   │   └── ...
-│   └── scripts/
-│       └── run_all.sh              # cron entry point
+│   ├── admin.ts                    # ADMIN_EMAILS env-driven allowlist
+│   └── score.ts                    # score calculation (mirrors ingest Python)
+├── components/                     # React components (auth, map, ui)
+├── scrapers/
+│   ├── migrations/                 # canonical schema SQL (authority over schema.ts)
+│   └── seed/                       # static reference data (regulatory_events_v1.sql)
+├── drizzle/                        # generated Drizzle metadata
 ├── public/                         # static assets
 ├── .env.example
-├── .env.local                      # local dev, gitignored
 ├── package.json
-├── next.config.ts
-├── tailwind.config.ts
-└── drizzle.config.ts
+└── next.config.ts
 ```
 
-Python scrapers are in the same repo for v0.1 (simpler CI, one git pull). Can be extracted to a separate repo in v0.2 if they grow significantly.
+### Private ingest (`karbonlens-ingest`)
+
+Holds all Python ingestion code (Verra OData scraper, GFW satellite alerts, IDXCarbon PDF parser, daily scoring, cron wrappers, systemd unit, nginx config, install scripts) plus the archived internal project history. Writes directly to the same Postgres as the app.
 
 ---
 
@@ -492,7 +463,7 @@ All routes live under `app/api/`. All return JSON. All server-side fetched from 
 
 ## 7. Environment variables
 
-All in plain `.env` files. Three environments: local dev (`.env.local`), staging (VPS `/opt/karbonlens/.env`), production (same VPS initially, separate box later). Netlify env vars for frontend.
+All in plain `.env` files on the Hetzner box: `/opt/karbonlens/.env` for the scraper user (mode 640, owned by `karbonlens:karbonlens`), `/opt/karbonlens/app/.env.local` for the Next.js service. Local dev uses `.env.local` in the repo root (gitignored).
 
 ```bash
 # Database
@@ -579,8 +550,8 @@ the daily-written `project_scores.components` row and the UI.
 ## 10. Operational notes
 
 ### Staging vs production
-- For v0.1, staging and production are the same Hetzner CX32. "Staging" means `feature/` branches deploy to Netlify preview URLs. Production is `main` → karbonlens.com.
-- When traffic warrants, promote database to a larger Hetzner box (CPX31 or similar), keep the frontend on Netlify (no reason to self-host that).
+- For v0.1, there is no separate staging. Production is `main` deployed to the Hetzner CX32 at karbonlens.com. Feature branches are tested locally before merging.
+- When traffic warrants, promote database to a larger Hetzner box (CPX31 or similar) and split the app off to its own node.
 
 ### Backups
 - `pg_dump` runs nightly via cron, gzipped, to `/var/lib/karbonlens/backups/YYYY-MM-DD.sql.gz`. Keep 14 days.
@@ -589,7 +560,7 @@ the daily-written `project_scores.components` row and the UI.
 ### Monitoring (v0.1 is minimal)
 - Scraper success/failure: check `/var/log/karbonlens/*.log` manually. Automate with Healthchecks.io in v0.2.
 - Database: no monitoring beyond `htop`. Add Prometheus + Grafana when there are paying customers.
-- Frontend: Netlify analytics (built in, free).
+- Frontend: nginx access logs + Sentry for errors.
 - Errors: Sentry (free tier) added in Task 3.
 
 ### Security basics
@@ -634,7 +605,7 @@ These do not block v0.1 but should be revisited:
 
 - [ ] When to split scrapers into their own repo
 - [ ] Whether to add TimescaleDB for `idx_transactions` once we have daily data flowing
-- [x] ~~Whether to move from Netlify to self-hosted when we need more API flexibility~~ — **Resolved 2026-04-22.** Self-hosted on the same Hetzner CX32 that runs Postgres; `karbonlens-app.service` on port 3010 behind nginx + Let's Encrypt. Older sections of this document still reference `karbonlens.com` as historical context; the canonical URL is `karbonlens.com`.
+- [x] ~~Whether to move from Netlify to self-hosted when we need more API flexibility~~ — **Resolved 2026-04-22.** Self-hosted on the same Hetzner CX32 that runs Postgres; `karbonlens-app.service` on port 3010 behind nginx + Let's Encrypt at karbonlens.com.
 - [ ] What the paid Pro tier unlocks beyond "more projects" — API access, raw data export, alert customization, priority email support
 - [ ] Whether to build paperclip / openclaw integrations for scraper orchestration or stick with cron
 - [ ] What additional data buyers will pay for that we can't get cheaply (carbon stock estimates, offtake gossip, CA authorization status)
@@ -647,7 +618,7 @@ These do not block v0.1 but should be revisited:
 
 Deltas between what the architecture specified and what Phase 1 actually shipped. §1–§12 above remain the forward-looking reference; this section records divergences.
 
-- **Next.js version:** §1 diagram labels "Next.js 15"; shipped Next.js 16 (App Router semantics unchanged, per T03 implementation report). No functional impact.
+- **Next.js version:** shipped Next.js 16. App Router semantics unchanged from the 15-era design notes elsewhere in this doc.
 - **Tailwind version:** §2 repo layout references `tailwind.config.ts`; that file does not exist. Tailwind v4 uses CSS-first `@theme` blocks in `app/globals.css`. There is no `tailwind.config.ts`.
 - **Drizzle adapter field-name contract:** after T04's post-audit fix, the `accounts` table Drizzle definition uses snake_case JS keys (`refresh_token`, `access_token`, `expires_at`, `token_type`, `id_token`, `session_state`) because `@auth/drizzle-adapter` v1.11.2 reads them by those exact names. `users.emailVerified` stays camelCase (adapter expects that). SQL column names in §3 are all snake_case and are unchanged.
 - **Adapter table binding:** NextAuth is configured with an explicit table map (`usersTable`, `accountsTable`, `sessionsTable`, `verificationTokensTable`). The adapter's auto-detect looks for singular names (`user`, `account`, …); our plural schema names (`users`, `accounts`, …) require the explicit map.
@@ -754,11 +725,11 @@ Deltas introduced by T19–T22. Sections §1–§12 remain forward-looking; §13
 
 - **Installer patch (`1aba5d8`):** `scripts/install-crontab.sh` was patched post-live-smoke-test to rsync `scrapers/` source and create the Python venv. Fresh installs now fully provision the scraper environment without manual steps.
 
-- **T23 deferred; OQ-1 unchanged.** Netlify production deploy blocked on connectivity strategy. Three options remain open: (a) Tailscale on VPS + Netlify proxy, (b) managed Postgres migration (Neon/Supabase), (c) custom domain pointing directly to VPS. No decision made in Phase 4.
+- **T23 resolved:** Netlify evaluated and dropped. The app is self-hosted on the same Hetzner CX32 as Postgres (`karbonlens-app.service` on port 3010 behind nginx + Let's Encrypt at karbonlens.com), eliminating the Netlify-to-Postgres connectivity question entirely.
 
 - **Current table counts (live DB, 2026-04-21):**
   - projects=64, registries=64, issuances=307, satellite_alerts=247,004
   - idx_monthly_snapshots=10, regulatory_events=8, project_scores=64
   - notifications=60, admin_actions=0
 
-*End of architecture doc. Paired with `PRD.md` (strategy) and `TASKS.md` (tactics).*
+*End of architecture doc. Paired with [`PRD.md`](PRD.md) (strategy) and [`runbooks/`](runbooks/) (operational how-tos).*
