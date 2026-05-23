@@ -37,6 +37,7 @@ export const metadata: Metadata = {
     description:
       "Verra, Gold Standard, CDM, SRN-PPI, IDXCarbon — filter projects by where they're registered.",
   },
+  alternates: { canonical: '/projects/by-registry' },
 };
 
 export default async function ByRegistryIndexPage() {

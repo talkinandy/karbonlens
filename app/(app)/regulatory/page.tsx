@@ -91,6 +91,7 @@ export const metadata: Metadata = {
       'Indonesian carbon-market regulations — bilingual summaries, importance and tags filter.',
     images: ['/og-image.png'],
   },
+  alternates: { canonical: '/regulatory' },
 };
 
 type SearchParamValue = string | string[] | undefined;

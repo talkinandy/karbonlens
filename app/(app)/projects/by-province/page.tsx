@@ -37,6 +37,7 @@ export const metadata: Metadata = {
     description:
       'Filter 200+ Indonesian carbon projects by province — Central Kalimantan, Riau, West Java, and more.',
   },
+  alternates: { canonical: '/projects/by-province' },
 };
 
 export default async function ByProvinceIndexPage() {

@@ -67,6 +67,7 @@ export const metadata: Metadata = {
       '64 Indonesian carbon projects — integrity scores, satellite alerts, issuance history.',
     images: ['/og-image.png'],
   },
+  alternates: { canonical: '/projects' },
 };
 import { getProjectCentroidsFeatureCollection } from '@/lib/queries/map-geojson';
 import { JsonLd } from '@/components/seo/JsonLd';

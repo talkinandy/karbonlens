@@ -84,6 +84,7 @@ export async function generateMetadata({
       title: `${title} · KarbonLens`,
       description,
     },
+    alternates: { canonical: `/projects/by-registry/${slug}` },
   };
 }
 
