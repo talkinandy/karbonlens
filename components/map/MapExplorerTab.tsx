@@ -34,7 +34,7 @@ export default function MapExplorerTab({ features }: MapExplorerTabProps) {
       zoom={4}
       fitBounds={INDONESIA_BOUNDS}
       ariaLabel="Satellite map of Indonesian carbon projects"
-      className="relative w-full rounded-md overflow-hidden"
+      className="relative w-full h-full rounded-md overflow-hidden"
     >
       <EsriBaseLayer />
       <ProjectCentroidLayer features={features} />
