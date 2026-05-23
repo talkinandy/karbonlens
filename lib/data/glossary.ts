@@ -310,6 +310,394 @@ export const GLOSSARY: GlossaryTerm[] = [
     category: 'regulation',
     relatedTerms: ['srn-ppi', 'redd-plus'],
   },
+
+  // ── Phase 2B expansion: Indonesian agencies + instruments ─────────────────
+  {
+    slug: 'klhk',
+    term: 'KLHK',
+    aliases: ['Kementerian Lingkungan Hidup dan Kehutanan', 'Ministry of Environment and Forestry'],
+    short:
+      "Indonesia's Ministry of Environment and Forestry, the line ministry that issues forestry concessions and carbon-trading permits for forestry-based projects.",
+    long:
+      "KLHK — Kementerian Lingkungan Hidup dan Kehutanan, the Ministry of Environment and Forestry — is the Indonesian line ministry with the broadest direct authority over forest-based carbon projects. KLHK issues the underlying concessions (PBPH, IUPHHK, restoration concessions) that anchor REDD+ and ARR projects, and it is the principal author of Permenhut regulations governing how those concessions can monetise carbon. The 2024 ministry split separating Forestry (Kemenhut) from Environment (KLH) is in progress but, at the time of writing, KLHK is still the consolidated ministry referenced in Permenhut 14/2024 and Permenhut 6/2026.\n\nFor any forestry-based Indonesian carbon project, KLHK is the gating regulator: it must register the project in the SRN, authorise any export of credits abroad (Surat Persetujuan), and supervise the underlying land tenure that gives the project its standing.",
+    category: 'regulation',
+    relatedTerms: ['permenhut', 'srn-ppi', 'redd-plus'],
+    authoritySource: {
+      url: 'https://www.menlhk.go.id/',
+      title: 'KLHK — official site',
+    },
+  },
+  {
+    slug: 'ojk',
+    term: 'OJK',
+    aliases: ['Otoritas Jasa Keuangan', 'Financial Services Authority'],
+    short:
+      "Indonesia's Financial Services Authority, the regulator of IDXCarbon and the issuer of POJK 14/2023 which set the carbon-exchange operating rules.",
+    long:
+      "OJK — Otoritas Jasa Keuangan, the Financial Services Authority — is Indonesia's integrated regulator for banking, capital markets, and non-bank financial institutions, modelled on a single-regulator framework. In the carbon context, OJK is the body that licensed and supervises IDXCarbon (the Indonesia Carbon Exchange) and that issued POJK 14/2023 — the operational regulation that defined what may be traded, who may trade, and what disclosures are required.\n\nOJK is the financial-sector counterpart to KLHK in the carbon regulatory stack: KLHK governs the underlying credits and forestry rights, while OJK governs the marketplace and the financial-product status of those credits. Decisions on listing, custody, settlement, and market conduct on IDXCarbon flow from OJK rather than the Ministry of Trade or the Ministry of Finance.",
+    category: 'regulation',
+    relatedTerms: ['idxcarbon', 'pojk', 'kemenkeu'],
+    authoritySource: {
+      url: 'https://www.ojk.go.id/',
+      title: 'OJK — official site',
+    },
+  },
+  {
+    slug: 'kemenkeu',
+    term: 'Kemenkeu',
+    aliases: ['Kementerian Keuangan', 'Ministry of Finance'],
+    short:
+      "Indonesia's Ministry of Finance — sets the carbon tax (introduced under HPP Law 7/2021) and oversees BPDLH, the public body that channels climate finance.",
+    long:
+      "Kemenkeu — Kementerian Keuangan, the Ministry of Finance — owns the fiscal levers of Indonesia's climate policy. The 2021 HPP Law (Undang-Undang Harmonisasi Peraturan Perpajakan) introduced a Rp 30/kgCO₂e carbon tax that Kemenkeu administers (its implementation has been deferred multiple times). Kemenkeu also supervises BPDLH, the Environment Fund Management Agency, and through BPDLH controls the disbursement of REDD+ result-based payments and other climate finance flows.\n\nKemenkeu's role differs from KLHK and OJK: it is the budget and tax authority, not a sectoral regulator of either forestry or financial markets. But it sits behind any cross-ministerial carbon-pricing framework — Perpres 98/2021 and Perpres 110/2025 both require Kemenkeu approval for fiscal measures, and BPDLH cannot disburse without Kemenkeu authorisation.",
+    category: 'regulation',
+    relatedTerms: ['bpdlh', 'perpres'],
+    authoritySource: {
+      url: 'https://www.kemenkeu.go.id/',
+      title: 'Kemenkeu — official site',
+    },
+  },
+  {
+    slug: 'bappenas',
+    term: 'BAPPENAS',
+    aliases: ['Badan Perencanaan Pembangunan Nasional', 'National Development Planning Agency'],
+    short:
+      "Indonesia's national development planning agency, custodian of the long-term low-carbon development plan (LCDI) and the operationalisation of the NDC.",
+    long:
+      "BAPPENAS — Badan Perencanaan Pembangunan Nasional, the National Development Planning Agency — is the central planning body that maintains the five-year RPJMN development plan and the longer-horizon Low Carbon Development Indonesia (LCDI) initiative. Where KLHK operationalises forest-sector policy and Kemenkeu owns the budget, BAPPENAS owns the framework that ties climate targets back to economic planning.\n\nFor the carbon market, BAPPENAS is most visible as the convening agency behind Indonesia's NDC submissions to the UNFCCC and the supporting analytical work (the Long Term Strategy on Low Carbon and Climate Resilience). Its role in any specific carbon project is indirect — projects go through KLHK and OJK — but the targets that drive Indonesia's compliance carbon market design originate in BAPPENAS plans.",
+    category: 'regulation',
+    relatedTerms: ['ndc', 'klhk'],
+    authoritySource: {
+      url: 'https://www.bappenas.go.id/',
+      title: 'BAPPENAS — official site',
+    },
+  },
+  {
+    slug: 'uu',
+    term: 'UU',
+    aliases: ['Undang-Undang', 'law', 'statute'],
+    short:
+      "An Indonesian law, the highest tier of national legislation, passed by the House of Representatives (DPR) and signed by the President.",
+    long:
+      "UU — Undang-Undang — is the standard abbreviation for an Indonesian law: a piece of national legislation passed by the People's Representative Council (DPR-RI) and signed into force by the President. In the legal hierarchy laid out by UU 12/2011, UU sits above Government Regulations (PP), Presidential Regulations (Perpres), and ministerial regulations (Permen).\n\nFor carbon, the most directly relevant UU is UU 7/2021 (Harmonisasi Peraturan Perpajakan, the 2021 tax-harmonisation law) which introduced Indonesia's domestic carbon tax. UU 16/2016 ratified the Paris Agreement, giving Indonesia's NDC its domestic legal anchor. UU 32/2009 (Environmental Protection and Management) provides the umbrella authority under which most KLHK regulations operate.",
+    category: 'regulation',
+    relatedTerms: ['pp', 'perpres', 'permenhut', 'ndc'],
+  },
+  {
+    slug: 'pp',
+    term: 'PP',
+    aliases: ['Peraturan Pemerintah', 'government regulation'],
+    short:
+      "An Indonesian Government Regulation, issued by the President to operationalise a law; sits between UU and Perpres in the legal hierarchy.",
+    long:
+      "PP — Peraturan Pemerintah, a Government Regulation — is the implementation-level legal instrument the President issues to operationalise a specific law (UU). Unlike Perpres, which the President can issue at their own initiative for cross-ministerial policy, a PP is always grounded in delegated authority from a specific UU and is typically drafted by the line ministry charged with implementation.\n\nIn carbon policy, PP 46/2017 (on Environmental Economic Instruments) was an early enabling instrument later superseded for carbon-specific work by Perpres 98/2021. PPs covering forestry concessions (PP 23/2021 on forest management) sit below the umbrella UU 41/1999 (Forestry) and shape what activities a concession holder can run on the land that anchors a forestry carbon project.",
+    category: 'regulation',
+    relatedTerms: ['uu', 'perpres'],
+  },
+  {
+    slug: 'pojk',
+    term: 'POJK',
+    aliases: ['Peraturan OJK', 'OJK regulation'],
+    short:
+      "A regulation issued by Indonesia's Financial Services Authority (OJK); POJK 14/2023 set the operating rules for the IDXCarbon carbon exchange.",
+    long:
+      "POJK — Peraturan Otoritas Jasa Keuangan — is a regulation issued by Indonesia's Financial Services Authority (OJK), the integrated regulator of banking, capital markets, and non-bank finance. POJKs sit below ministerial regulations in the legal hierarchy but, within OJK's jurisdiction, are the binding operational rules.\n\nFor the carbon market the most consequential POJK is POJK 14/2023, the regulation on the organisation of carbon-unit trading on Bursa Karbon. POJK 14/2023 defines who can be a trading participant (registered exchange members), what units may be traded (SPE-GRK and tradeable carbon units registered in SRN-PPI), what disclosures issuers must make, and how clearing and settlement work. Every IDXCarbon trade and listing reference this regulation as its legal basis.",
+    category: 'regulation',
+    relatedTerms: ['ojk', 'idxcarbon', 'spe-grk'],
+  },
+
+  // ── Carbon market core acronyms ───────────────────────────────────────────
+  {
+    slug: 'nek',
+    term: 'NEK',
+    aliases: ['Nilai Ekonomi Karbon', 'carbon economic value'],
+    short:
+      "Indonesia's official term for 'carbon economic value' — the umbrella framework introduced by Perpres 98/2021 that covers pricing, trading, taxes, and result-based payments.",
+    long:
+      "NEK — Nilai Ekonomi Karbon, literally 'carbon economic value' — is the term used in Indonesian regulation to refer to the entire policy framework for monetising carbon emissions and removals. It is the umbrella concept that subsumes four specific mechanisms: cap-and-trade (perdagangan emisi karbon), carbon offsets (offset emisi karbon), result-based payments (pembayaran berbasis kinerja), and the carbon tax (pajak karbon).\n\nPerpres 98/2021 is the founding NEK regulation. It established the legal scope of each of the four mechanisms and assigned coordinating responsibility to KLHK with supporting roles for OJK (financial markets), Kemenkeu (taxation and result-based payments via BPDLH), and BAPPENAS (planning). Perpres 110/2025 extended the NEK framework to authorise international cooperation under Article 6 of the Paris Agreement.",
+    category: 'regulation',
+    relatedTerms: ['perpres', 'spe-grk', 'idxcarbon', 'klhk'],
+  },
+  {
+    slug: 'ndc',
+    term: 'NDC',
+    aliases: ['Nationally Determined Contribution', 'Kontribusi yang Ditetapkan secara Nasional'],
+    short:
+      "A country's pledged emissions-reduction target under the Paris Agreement; Indonesia's current NDC targets 31.89% reduction unconditional, 43.20% with international support, by 2030.",
+    long:
+      "NDC — Nationally Determined Contribution — is the climate target each Paris Agreement signatory submits to the UNFCCC, updated every five years on a ratcheting basis. The NDC sets out the country's emissions-reduction commitments, the sectors covered, and the baseline against which reductions are measured.\n\nIndonesia's Enhanced NDC (submitted 2022) targets a 31.89 % reduction in greenhouse-gas emissions by 2030 against a business-as-usual baseline (unconditional, using domestic resources) and 43.20 % with international support. The forest and land-use sector (FOLU) accounts for the largest share of the target, and Indonesia has set out a separate 'FOLU Net Sink 2030' strategy under which the sector becomes net-negative by 2030. NDC achievement underpins Indonesia's eligibility for Article 6 cooperative-approach revenue and frames the domestic carbon-tax design.",
+    category: 'market',
+    relatedTerms: ['article-6', 'nek', 'klhk', 'bappenas'],
+    authoritySource: {
+      url: 'https://unfccc.int/NDCREG',
+      title: 'UNFCCC NDC Registry',
+    },
+  },
+  {
+    slug: 'mrv',
+    term: 'MRV',
+    aliases: ['Measurement Reporting and Verification', 'Monitoring Reporting Verification'],
+    short:
+      "Measurement, Reporting and Verification — the discipline of quantifying, documenting, and independently checking emissions reductions or removals claimed by a carbon project.",
+    long:
+      "MRV — Measurement, Reporting and Verification — is the foundational discipline that makes carbon credits a tradeable commodity rather than an assertion. Measurement covers the in-field and remote-sensing techniques used to estimate emissions reductions or removals; reporting is the structured documentation submitted to a registry; verification is the independent third-party audit (a VVB — Validation and Verification Body) that confirms the report.\n\nFor forestry projects, MRV typically combines plot-level biomass measurements with satellite imagery (RADD alerts, GLAD, Sentinel) to monitor forest cover, plus modelled baseline projections. Modern Indonesian-relevant methodologies (VM0048, VM0033, VM0047) prescribe specific MRV protocols. ICVCM's Core Carbon Principles set 'robust quantification' criteria that effectively raise the MRV bar for methodologies seeking CCP-eligible status.",
+    category: 'market',
+    relatedTerms: ['icvcm', 'vm0048', 'gfw'],
+  },
+  {
+    slug: 'vcm',
+    term: 'VCM',
+    aliases: ['Voluntary Carbon Market'],
+    short:
+      "The market in which buyers — usually corporates with voluntary net-zero pledges — purchase carbon credits without a regulatory obligation to do so.",
+    long:
+      "The Voluntary Carbon Market (VCM) is the set of trading venues, intermediaries, registries, and standards through which carbon credits flow when the buyer is acting voluntarily — typically a corporate offsetting its operational emissions to meet a net-zero target, rather than a regulated emitter fulfilling a legal cap.\n\nThe VCM and the Compliance Carbon Market (CCM) draw from overlapping methodologies but with very different governance: VCM is governed by private standards-setters (Verra/VCS, Gold Standard, ACR, CAR, plus the integrity bodies ICVCM and VCMI) rather than by a regulator. Indonesian Verra/Gold-Standard projects are VCM credits. The same project may also list its credits in SRN-PPI and trade them on IDXCarbon (which today is hybrid — primarily VCM-style but operating under OJK regulation).",
+    category: 'market',
+    relatedTerms: ['ccm', 'vcs', 'icvcm', 'idxcarbon'],
+  },
+  {
+    slug: 'ccm',
+    term: 'CCM',
+    aliases: ['Compliance Carbon Market'],
+    short:
+      "A carbon market in which regulated emitters are legally required to surrender allowances or eligible offsets to cover their emissions.",
+    long:
+      "A Compliance Carbon Market (CCM) is one in which a regulator imposes a legal cap or obligation on covered emitters, forcing them to surrender allowances or eligible offset credits each compliance period. The EU ETS, UK ETS, California Cap-and-Trade, RGGI, China's national ETS, and South Korea's K-ETS are the largest established compliance markets. The price floor in a CCM is set by the cap stringency and the marginal abatement cost faced by covered emitters.\n\nIndonesia's domestic carbon market is in transition toward a hybrid model: IDXCarbon currently lists both voluntary-style credits (registered through SRN-PPI) and compliance-eligible units (SPE-GRK), with the cap-and-trade phase covering coal-fired power plants under Permendag and KLHK rules. International cooperation under Article 6 — opened by Perpres 110/2025 — also creates demand for Indonesian credits from foreign compliance markets.",
+    category: 'market',
+    relatedTerms: ['vcm', 'idxcarbon', 'article-6', 'spe-grk'],
+  },
+  {
+    slug: 'vcs',
+    term: 'VCS',
+    aliases: ['Verified Carbon Standard'],
+    short:
+      "The carbon-credit standard owned by Verra — the most widely used voluntary-market standard globally, including the bulk of Indonesian project credits.",
+    long:
+      "VCS — the Verified Carbon Standard — is the certification standard owned and operated by Verra, the largest voluntary-market crediting programme by issued volume. A VCS project goes through a full lifecycle: it is registered, validated against an approved methodology (the VM####, VMR####, and AMS-#### families), undergoes verification at intervals, and is issued Verified Carbon Units (VCUs) for each tonne of CO₂e it has reduced or removed.\n\nIndonesian projects on Verra typically use VM0007 (legacy REDD+), VM0048 (consolidated REDD), VM0033 (tidal wetland restoration), or VM0047 (ARR). VCS credits can be 'stacked' with co-benefit standards like CCB (Climate, Community & Biodiversity). VCS-certified credits dominate the Indonesian voluntary supply and increasingly route through IDXCarbon once cross-registered into SRN-PPI.",
+    category: 'registry',
+    relatedTerms: ['vm0007', 'vm0048', 'vcu', 'ccb', 'icvcm'],
+    authoritySource: {
+      url: 'https://verra.org/programs/verified-carbon-standard/',
+      title: 'VCS — Verra',
+    },
+  },
+  {
+    slug: 'vcu',
+    term: 'VCU',
+    aliases: ['Verified Carbon Unit'],
+    short:
+      "The fungible carbon credit issued under Verra's VCS programme — one VCU equals one tonne of CO₂e reduced, avoided, or removed.",
+    long:
+      "A Verified Carbon Unit (VCU) is the credit instrument issued under Verra's Verified Carbon Standard programme. One VCU represents the reduction or removal of one tonne of CO₂-equivalent, verified by an accredited third-party auditor against an approved methodology. VCUs are recorded in the Verra registry under a unique serial number and a vintage (the year of emissions reduction).\n\nVCUs are the most-traded voluntary-market unit globally and the dominant unit type for Indonesian forestry credits issued on Verra. They can be retired (permanently used to offset a tonne of emissions) or transferred between accounts; once retired, the serial number is publicly logged in the Verra registry. Cross-registration into SRN-PPI for IDXCarbon trading converts the unit into an SPE-GRK while leaving the underlying VCU retired in Verra.",
+    category: 'registry',
+    relatedTerms: ['vcs', 'spe-grk', 'srn-ppi'],
+  },
+  {
+    slug: 'itmo',
+    term: 'ITMO',
+    aliases: ['Internationally Transferred Mitigation Outcome'],
+    short:
+      "A Paris Agreement Article 6.2 unit — one tonne CO₂e of emission reduction transferred between countries with corresponding adjustments to both NDCs.",
+    long:
+      "ITMO — Internationally Transferred Mitigation Outcome — is the unit of trade under Article 6.2 of the Paris Agreement, the bilateral cooperation track. When a host country (e.g. Indonesia) authorises the transfer of a mitigation outcome to a buyer country (e.g. Singapore or Japan), the host commits to a corresponding adjustment: adding the transferred tonnes back to its own reported emissions so the credit cannot be counted twice toward both NDCs.\n\nIndonesia's domestic legal anchor for ITMO transfers is Perpres 110/2025, which explicitly opened the NEK framework to international cooperative approaches. Indonesia signed Implementation Agreements with Singapore, Japan, Switzerland, and several others, with KLHK-issued Surat Otorisasi (letters of authorisation) and corresponding-adjustment recording the gating steps. Article 6.4 ITMOs — under the centralised PACM mechanism — are a separate track.",
+    category: 'market',
+    relatedTerms: ['article-6', 'ndc', 'perpres'],
+  },
+  {
+    slug: 'article-6',
+    term: 'Article 6',
+    aliases: ['Article 6 of the Paris Agreement'],
+    short:
+      "The Paris Agreement provisions (6.2, 6.4, 6.8) for international cooperation on mitigation, enabling cross-border carbon-credit transfers between NDCs.",
+    long:
+      "Article 6 of the Paris Agreement defines three mechanisms by which countries can cooperate to meet their NDCs. Article 6.2 covers bilateral cooperative approaches between two or more countries — these generate ITMOs and require corresponding adjustments to prevent double-counting. Article 6.4 establishes a centralised UN mechanism (PACM, the Paris Agreement Crediting Mechanism), the successor to the CDM. Article 6.8 covers non-market approaches (capacity building, technology transfer).\n\nFor Indonesia, Article 6 is the legal hook for any export of carbon credits abroad. Perpres 110/2025 opened the domestic framework to Article 6 cooperation, KLHK issues the Surat Otorisasi authorisations, and BPDLH increasingly handles the financial flows. The Article 6.2 / 6.4 distinction matters because 6.4 PACM-issued credits go through a UN-administered registry while 6.2 transfers remain bilateral and rely on host-country registries (SRN-PPI for Indonesia).",
+    category: 'market',
+    relatedTerms: ['itmo', 'cdm', 'perpres', 'ndc'],
+    authoritySource: {
+      url: 'https://unfccc.int/topics/article-6',
+      title: 'UNFCCC — Article 6',
+    },
+  },
+  {
+    slug: 'icvcm',
+    term: 'ICVCM',
+    aliases: ['Integrity Council for the Voluntary Carbon Market', 'Core Carbon Principles'],
+    short:
+      "The integrity body that assesses voluntary-market methodologies against its Core Carbon Principles (CCPs) and labels CCP-eligible categories.",
+    long:
+      "ICVCM — the Integrity Council for the Voluntary Carbon Market — is an independent governance body launched in 2022 to set quality benchmarks for voluntary-market credits. Its flagship product is the Core Carbon Principles (CCPs): ten high-level principles spanning governance, robust quantification, additionality, permanence, no double counting, and sustainable development. ICVCM assesses individual methodologies category-by-category and either grants or denies CCP-eligible status.\n\nFor Indonesian projects the most consequential ICVCM decisions to date are: (i) VM0048 received CCP-eligible status for several activity modules; (ii) several legacy VM0007 sub-modules (notably some Avoided Unplanned Deforestation variants) did not receive CCP eligibility, contributing to Verra's push toward VM0048 transition. CCP-eligible credits typically command a price premium and are favoured by integrity-conscious corporate buyers.",
+    category: 'market',
+    relatedTerms: ['vm0048', 'vm0007', 'vcs', 'vcm'],
+    authoritySource: {
+      url: 'https://icvcm.org/core-carbon-principles/',
+      title: 'ICVCM Core Carbon Principles',
+    },
+  },
+  {
+    slug: 'srn',
+    term: 'SRN',
+    aliases: ['Sistem Registri Nasional'],
+    short:
+      "Indonesia's National Registry System for climate action — the umbrella registry of which SRN-PPI is the carbon-trading slice operated by KLHK.",
+    long:
+      "SRN — Sistem Registri Nasional — is Indonesia's umbrella National Registry System for recording climate-related actions, including mitigation projects, adaptation actions, and climate finance flows. SRN was established under Permen LHK 71/2017 as the data backbone the country uses to track delivery against its NDC.\n\nSRN-PPI (Pengendalian Perubahan Iklim, Climate Change Control) is the most prominent slice of SRN — it is the carbon-trading-relevant subset that holds project records and unit issuances for credits intended for IDXCarbon trading or international transfer. The broader SRN system also captures non-carbon climate actions (adaptation projects, climate-finance grants). KLHK operates both, with the SRN-PPI portal at apeksi.menlhk.go.id and the broader SRN portal at srn.menlhk.go.id.",
+    category: 'registry',
+    relatedTerms: ['srn-ppi', 'klhk', 'idxcarbon'],
+  },
+
+  // ── Methodologies present in the registry that previously had no entry ────
+  {
+    slug: 'vm0009',
+    term: 'VM0009',
+    aliases: ['Methodology for Avoided Ecosystem Conversion'],
+    short:
+      "Verra methodology for Avoided Ecosystem Conversion — credits projects that prevent the conversion of any natural ecosystem to non-forest land use.",
+    long:
+      "VM0009 is Verra's methodology for Avoided Ecosystem Conversion (AEC) — broader in scope than the forest-only REDD methodologies because it covers grasslands, peatlands, mangroves, and other natural ecosystems threatened by conversion to agriculture or development. Projects must establish a deforestation/conversion baseline using historical and remote-sensing evidence and demonstrate the avoided conversion is both additional and quantifiable.\n\nVM0009 has been used for Indonesian peat-forest and tidal-wetland projects where the activity is broader than canonical REDD — e.g. mangrove conservation areas threatened by aquaculture conversion. As of 2023-2024 Verra has been steering peat-rewetting projects toward VM0033 and grassland projects toward VM0048's broader activity modules, so VM0009 issuances are concentrated in projects already in their crediting period rather than new registrations.",
+    category: 'methodology',
+    relatedTerms: ['vm0007', 'vm0033', 'vm0048'],
+    authoritySource: {
+      url: 'https://verra.org/methodologies/vm0009-methodology-for-avoided-ecosystem-conversion-v3-0/',
+      title: 'VM0009 v3.0 — Verra',
+    },
+  },
+  {
+    slug: 'vm0011',
+    term: 'VM0011',
+    aliases: ['Methodology for Calculating GHG Benefits from Preventing Planned Degradation'],
+    short:
+      "Verra methodology (legacy) for crediting projects that prevent the planned degradation of forests — superseded by VM0048's planned-degradation module.",
+    long:
+      "VM0011 is a legacy Verra methodology for crediting projects that prevent planned forest degradation (e.g. preventing a logging concession from being exercised). It was rarely used compared to its REDD siblings because the eligibility criteria for 'planned degradation' are narrow: the baseline must rest on a documented, legally authorised plan to degrade the forest that the project displaces.\n\nWith the publication of VM0048 in 2023 — the consolidated REDD methodology — Verra is steering new registrations away from VM0011 and toward VM0048's planned-degradation module (forthcoming as part of the VM0048 family). VM0011 issuances are now concentrated in a small set of projects already in their original crediting period; new registrations should expect to use the VM0048 framework instead.",
+    category: 'methodology',
+    relatedTerms: ['vm0048', 'vm0007'],
+    authoritySource: {
+      url: 'https://verra.org/methodologies/vm0011-methodology-for-calculating-ghg-benefits-from-preventing-planned-degradation-v1-0/',
+      title: 'VM0011 v1.0 — Verra',
+    },
+  },
+  {
+    slug: 'vm0042',
+    term: 'VM0042',
+    aliases: ['Improved Agricultural Land Management', 'IALM'],
+    short:
+      "Verra methodology for Improved Agricultural Land Management — credits practices like cover cropping, reduced tillage, and nutrient management that increase soil-carbon stocks.",
+    long:
+      "VM0042 is Verra's methodology for Improved Agricultural Land Management (IALM), launched in 2020. It covers a wide set of soil-carbon and agronomic practices: cover cropping, reduced or no-till, nutrient-management optimisation, crop-rotation diversification, biochar application, and conversion of cropland to perennial cover. Baselines are typically established through region-specific reference-management systems plus on-farm sampling.\n\nVM0042 is increasingly relevant to the Indonesian palm-oil and rice-paddy sectors, where soil-carbon and methane reductions are both eligible. Methane reductions from rice paddies are large in tonnage terms but require strict measurement protocols, often combining tier-3 models with chamber measurements. As of 2024, the bulk of VM0042 projects globally are in the US, Latin America, and Australia; Indonesian adoption has lagged but interest is rising as ICVCM CCP eligibility lifts demand.",
+    category: 'methodology',
+    relatedTerms: ['arr', 'vm0048'],
+    authoritySource: {
+      url: 'https://verra.org/methodologies/vm0042-methodology-for-improved-agricultural-land-management-v2-0/',
+      title: 'VM0042 v2.0 — Verra',
+    },
+  },
+  {
+    slug: 'ar-ams0007',
+    term: 'AR-AMS0007',
+    aliases: ['Small-scale Afforestation and Reforestation on Grasslands or Croplands'],
+    short:
+      "CDM small-scale methodology for Afforestation and Reforestation on grasslands or croplands — covers projects under 16,000 tCO₂e/year of removals.",
+    long:
+      "AR-AMS0007 is a CDM (Clean Development Mechanism) small-scale methodology for Afforestation and Reforestation projects on land that was grassland or cropland at project start. Small-scale CDM methodologies have a removal cap (in this case 16,000 tCO₂e/year) but lower transaction costs than full-scale methodologies, making them suitable for community-led or smallholder-scale tree-planting.\n\nA handful of Indonesian smallholder ARR projects are registered under AR-AMS0007, typically with co-benefit standards (CCB) layered on top. With the Article 6.4 PACM mechanism succeeding the CDM, AR-AMS0007 projects face a transition decision: stay under the legacy CDM (which can no longer issue new credits after the 2024 cutoff), or re-register under PACM or under Verra's VM0047. Most Indonesian registrants are exploring VM0047 as the migration path.",
+    category: 'methodology',
+    relatedTerms: ['arr', 'vm0047', 'cdm', 'article-6'],
+    authoritySource: {
+      url: 'https://cdm.unfccc.int/methodologies/ARmethodologies/approved.html',
+      title: 'CDM A/R Approved Methodologies',
+    },
+  },
+  {
+    slug: 'ams-i-d',
+    term: 'AMS-I.D.',
+    aliases: ['Grid connected renewable electricity generation', 'AMS I D'],
+    short:
+      "CDM small-scale methodology for grid-connected renewable-electricity generation — covers utility-scale solar/wind/hydro up to the 15 MW small-scale cap.",
+    long:
+      "AMS-I.D. is a CDM small-scale methodology for grid-connected renewable electricity, accepting hydroelectric, wind, solar, biomass, and geothermal projects up to 15 MW (the small-scale CDM threshold). The methodology calculates emissions reductions by displacing fossil generation on the connected grid; the displacement factor is the country-specific or regional grid emission factor.\n\nIn Indonesia, AMS-I.D. has been used in particular for small-scale hydro and biomass plants connected to PLN's regional grids. It is often combined with AMS-III.H. (landfill gas / methane recovery) or with biomass-specific methodologies. With the CDM closing to new registrations post-2024, projects are migrating to Verra's VCS framework (VM-class methodologies) or to PACM under Article 6.4. Existing AMS-I.D. issuances continue to trade on the secondary CER market.",
+    category: 'methodology',
+    relatedTerms: ['ams-iii-h', 'cdm', 'article-6'],
+    authoritySource: {
+      url: 'https://cdm.unfccc.int/methodologies/SSCmethodologies/approved.html',
+      title: 'CDM SSC Approved Methodologies',
+    },
+  },
+  {
+    slug: 'acm0001',
+    term: 'ACM0001',
+    aliases: ['Flaring or use of landfill gas'],
+    short:
+      "CDM consolidated large-scale methodology for landfill-gas capture, flaring, or productive use — covers methane recovery from municipal solid-waste landfills.",
+    long:
+      "ACM0001 is a CDM consolidated methodology for the capture, flaring, or productive use of landfill gas — the methane-rich biogas generated by anaerobic decomposition in municipal solid-waste (MSW) landfills. Eligible activities include venting through a flare (methane to CO₂), electricity generation from gas engines, or pipeline injection. Baseline assumes the methane would otherwise vent uncontrolled.\n\nIn Indonesia, ACM0001 has been used at the larger urban landfill sites (Bantar Gebang, Sarimukti, etc.) where the methane volumes are sufficient to make capture economic. Cookstove and palm-oil-mill biogas (POME) projects use different methodologies (AMS-II.G. and AMS-III.H. respectively). With CDM winding down, large-scale landfill-gas projects in Indonesia are migrating to Verra's VM0026 or to PACM under Article 6.4.",
+    category: 'methodology',
+    relatedTerms: ['ams-iii-h', 'cdm', 'pome'],
+    authoritySource: {
+      url: 'https://cdm.unfccc.int/methodologies/LSmethodologies/approved.html',
+      title: 'CDM Large-Scale Approved Methodologies',
+    },
+  },
+
+  // ── Satellite / MRV technical terms ───────────────────────────────────────
+  {
+    slug: 'gfw',
+    term: 'GFW',
+    aliases: ['Global Forest Watch', 'globalforestwatch.org'],
+    short:
+      "World Resources Institute's open-data platform for forest monitoring — KarbonLens pulls weekly satellite-alert layers (RADD, GLAD-S2, VIIRS) from its API.",
+    long:
+      "GFW — Global Forest Watch — is the open-data platform operated by the World Resources Institute (WRI) that aggregates near-real-time satellite forest-monitoring layers and ancillary datasets. Its alert layers (RADD, GLAD-S2, GLAD-L, DIST-ALERT, VIIRS fire detections) are the de facto reference for forest-loss monitoring across the Indonesian forest estate.\n\nKarbonLens uses the GFW Integrated Alerts API on a weekly cron, pulling new alerts intersected with each project's polygon buffer. The alert volume drives the reversal-risk sub-score in the integrity methodology (35% of the composite). API access is free for registered users at globalforestwatch.org/help/developers/; KarbonLens stores the key as GFW_API_KEY and respects the 1 req/sec rate limit. Layer-specific licensing varies: RADD is Wageningen-licensed; GLAD layers are Maryland-licensed; both permit derivative use with attribution.",
+    category: 'technical',
+    relatedTerms: ['radd', 'glad', 'mrv'],
+    authoritySource: {
+      url: 'https://www.globalforestwatch.org/',
+      title: 'Global Forest Watch',
+    },
+  },
+  {
+    slug: 'radd',
+    term: 'RADD',
+    aliases: ['Radar for Detecting Deforestation', 'Wageningen RADD'],
+    short:
+      "Wageningen University's near-real-time radar-based deforestation alert — uses Sentinel-1 SAR to detect tropical forest loss even through cloud cover.",
+    long:
+      "RADD — Radar for Detecting Deforestation — is a near-real-time deforestation alert system developed by Wageningen University, based on Sentinel-1 synthetic-aperture radar (SAR) imagery from the European Space Agency. Unlike optical sensors (Sentinel-2, Landsat), SAR penetrates cloud cover, making RADD particularly valuable in the perpetually-cloudy Indonesian tropics where optical alerts (GLAD-S2) frequently miss the actual disturbance window.\n\nRADD alerts are published to GFW with a typical latency of a few days from the underlying Sentinel-1 acquisition. The product covers Indonesia and the rest of the tropics at 10m resolution. RADD is the highest-priority alert layer in the KarbonLens integrity-score MRV pipeline because of its tropics-focused, cloud-piercing reliability; GLAD-S2 and DIST-ALERT serve as cross-checks.",
+    category: 'technical',
+    relatedTerms: ['gfw', 'glad', 'mrv'],
+    authoritySource: {
+      url: 'https://www.globalforestwatch.org/blog/data-and-research/radd-deforestation-alert/',
+      title: 'GFW — about RADD',
+    },
+  },
+  {
+    slug: 'glad',
+    term: 'GLAD',
+    aliases: ['Global Land Analysis and Discovery', 'GLAD-L', 'GLAD-S2'],
+    short:
+      "Maryland's optical-satellite deforestation alert family — GLAD-L from Landsat (30 m) and GLAD-S2 from Sentinel-2 (10 m), updated multiple times per week.",
+    long:
+      "GLAD — Global Land Analysis and Discovery — is the laboratory at the University of Maryland that produces the GLAD-L (Landsat-based, 30m resolution) and GLAD-S2 (Sentinel-2-based, 10m resolution) deforestation alert layers. Both are optical-imagery products: cloud-free pixels are required, so the alert latency in the Indonesian tropics can extend to weeks during the rainy season.\n\nGLAD alerts complement RADD (radar-based) in the GFW integrated-alerts stack. The combined product flags a pixel as confirmed deforestation once any two of {RADD, GLAD-S2, GLAD-L} have flagged it independently. For the KarbonLens reversal-risk methodology, both unconfirmed (single-source) and confirmed (multi-source) GLAD alerts are recorded; only confirmed alerts within the project buffer contribute to the integrity-score penalty.",
+    category: 'technical',
+    relatedTerms: ['radd', 'gfw', 'mrv'],
+    authoritySource: {
+      url: 'https://glad.umd.edu/',
+      title: 'University of Maryland GLAD Lab',
+    },
+  },
+  {
+    slug: 'corsia',
+    term: 'CORSIA',
+    aliases: ['Carbon Offsetting and Reduction Scheme for International Aviation'],
+    short:
+      "ICAO's global market-based scheme requiring international airlines to offset emissions growth above a baseline using ICAO-approved carbon-credit categories.",
+    long:
+      "CORSIA — the Carbon Offsetting and Reduction Scheme for International Aviation — is the global market-based mechanism agreed by the International Civil Aviation Organization (ICAO) to address international aviation emissions. It requires participating airlines to offset their CO₂ emissions above a baseline (2019 levels for the First Phase, 2024-2026; 85% of 2019 levels for the post-pilot CORSIA Phase). Offsetting must use 'CORSIA Eligible Emissions Units' — credits from registries (Verra, ART/TREES, Gold Standard, ACR, CAR, CDM successors) whose specific programmes have been approved by the ICAO Technical Advisory Body.\n\nFor Indonesian forestry credits, eligibility under CORSIA depends on the specific methodology and vintage: not every VCS credit qualifies, and many Indonesian Verra projects have been outside the CORSIA-eligible date window. Article 6 cooperation has the potential to channel Indonesian credits to CORSIA buyers via ITMO transfers with corresponding adjustments.",
+    category: 'market',
+    relatedTerms: ['itmo', 'article-6', 'vcs', 'icvcm'],
+    authoritySource: {
+      url: 'https://www.icao.int/environmental-protection/CORSIA/',
+      title: 'ICAO CORSIA',
+    },
+  },
 ];
 
 /**
