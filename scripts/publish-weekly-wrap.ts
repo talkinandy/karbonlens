@@ -325,11 +325,31 @@ async function main(): Promise<void> {
     `${base}/news`,
   ]);
 
+  // SEO Phase 1 (B3): trigger /sitemap.xml revalidation so Bing/Google's
+  // next sitemap fetch sees the new /news/<slug>. Fire-and-forget — if
+  // the secret is missing or the endpoint is unreachable, the next ISR
+  // tick (600s) catches up. Failure must not break the publish run.
+  const revalidateSecret = process.env.SITEMAP_REVALIDATE_SECRET;
+  let sitemapRevalidate: { ok: boolean; status: number } = { ok: false, status: 0 };
+  if (revalidateSecret) {
+    try {
+      const res = await fetch(`${base}/api/internal/revalidate-sitemap`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${revalidateSecret}` },
+        signal: AbortSignal.timeout(10_000),
+      });
+      sitemapRevalidate = { ok: res.ok, status: res.status };
+    } catch {
+      sitemapRevalidate = { ok: false, status: 0 };
+    }
+  }
+
   logJson({
     event: 'weekly_wrap_published',
     slug: out.slug,
     id: inserted[0].id,
     indexnow,
+    sitemap_revalidate: sitemapRevalidate,
     alerts: totalNewAlerts,
     issuances: newIssuances.length,
     credits: totalNewIssuedCredits,

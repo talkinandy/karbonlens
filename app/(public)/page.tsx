@@ -21,14 +21,15 @@
  */
 
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 
-import { auth } from '@/lib/auth';
 import {
   getLandingStats,
   isLikelyDbDown,
 } from '@/lib/queries/landing-stats';
 import { getLandingMapData } from '@/lib/queries/landing-map';
 import { HeroSection } from '@/components/landing/HeroSection';
+import { HeroCtaSlot, HeroCtaFallback } from '@/components/landing/HeroCtaSlot';
 import { FeaturedProjects } from '@/components/landing/FeaturedProjects';
 import { DataFreshness } from '@/components/landing/DataFreshness';
 import { Ticker } from '@/components/landing/Ticker';
@@ -36,8 +37,10 @@ import { PipelinesGrid } from '@/components/landing/PipelinesGrid';
 import { RolesGrid } from '@/components/landing/RolesGrid';
 import LandingHeroMap from '@/components/landing/LandingHeroMap';
 
-// CDN cache hint — Next.js App Router leaves the route fully dynamic
-// because auth() reads request cookies. See T25 spec §2.
+// SEO Phase 1: the auth-aware hero CTA is wrapped in <Suspense fallback={
+// <HeroCtaFallback />}> so crawlers index the guest CTA first. This route
+// is structurally ready for a Next 16 cacheComponents rollout; until that
+// flips on, public caching is handled at the nginx layer (see runbook §5).
 export const revalidate = 600;
 
 // Katingan Peatland hero centre — lon, lat.
@@ -74,20 +77,25 @@ export const metadata: Metadata = {
 };
 
 export default async function LandingPage() {
-  const [stats, mapData, session] = await Promise.all([
+  const [stats, mapData] = await Promise.all([
     getLandingStats(),
     getLandingMapData(),
-    auth(),
   ]);
 
   const dbDown = isLikelyDbDown(stats);
+
+  const ctaSlot = (
+    <Suspense fallback={<HeroCtaFallback />}>
+      <HeroCtaSlot />
+    </Suspense>
+  );
 
   return (
     <main>
       {/* ============ HERO ============ */}
       <section className="lp-hero">
         <div className="lp-hero-inner">
-          <HeroSection session={session} stats={stats} />
+          <HeroSection ctaSlot={ctaSlot} stats={stats} />
 
           <div className="lp-hero-right">
             <LandingHeroMap
