@@ -137,7 +137,26 @@ export default function MapLibreBase({
     containerEl.addEventListener('keydown', onKeyDown);
     mapRef.current = instance;
 
+    // When the map mounts inside a Suspense / dynamic-import boundary the
+    // container can transition from 0x0 to its final size *after* MapLibre
+    // initialises. MapLibre's internal observer attaches to its own canvas
+    // and misses parent-driven resizes (the kl-card grows from min-height
+    // 480 once layout settles). Watch the host container directly and
+    // re-project on every change. A debounced rAF avoids cascading layout
+    // thrash if the container animates.
+    let rafId: number | null = null;
+    const resizeObserver = new ResizeObserver(() => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        instance?.resize();
+      });
+    });
+    resizeObserver.observe(containerEl);
+
     return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      resizeObserver.disconnect();
       containerEl.removeEventListener('keydown', onKeyDown);
       instance?.remove();
       mapRef.current = null;
