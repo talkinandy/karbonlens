@@ -698,6 +698,317 @@ export const GLOSSARY: GlossaryTerm[] = [
       title: 'ICAO CORSIA',
     },
   },
+
+  // ── Phase 2D expansion: market quality + retirement/vintage concepts ──────
+  {
+    slug: 'vcmi',
+    term: 'VCMI',
+    aliases: ['Voluntary Carbon Markets Integrity Initiative'],
+    short:
+      "Demand-side integrity body that defines a claims code for corporates using voluntary carbon credits — the buyer-side counterpart to supply-side ICVCM.",
+    long:
+      "VCMI — Voluntary Carbon Markets Integrity Initiative — is the demand-side governance body for the voluntary carbon market, complementing ICVCM (which sets quality criteria for the credits themselves). VCMI's Claims Code of Practice defines what corporates can credibly claim when they retire voluntary carbon credits — covering scope-1/2/3 ambition prerequisites, the share of within-value-chain abatement required, and which CCP-eligible credit types may be used.\n\nVCMI claims tiers (Silver, Gold, Platinum) gate increasingly ambitious retirements and require ICVCM CCP-eligible credits. For Indonesian projects this matters because corporate buyers seeking VCMI-compliant claims will preferentially purchase ICVCM CCP-tagged Indonesian credits (VM0048-based or VM0033-based) over legacy VM0007 issuances. ICVCM + VCMI together are the de-facto integrity layer governing what 'high-quality' means in 2025-2026 VCM.",
+    category: 'market',
+    relatedTerms: ['icvcm', 'vcm', 'vcs'],
+    authoritySource: {
+      url: 'https://vcmintegrity.org/',
+      title: 'VCMI — official site',
+    },
+  },
+  {
+    slug: 'retirement',
+    term: 'Retirement',
+    aliases: ['Carbon credit retirement', 'penghapusan kredit karbon'],
+    short:
+      "The permanent withdrawal of a carbon credit from circulation by recording it in a registry against a specific use claim — the action that turns a credit into an offset.",
+    long:
+      "Retirement is the registry action that permanently removes a carbon credit from circulation by logging it against a specific beneficiary or claim. Each retirement is publicly recorded in the issuing registry (Verra, Gold Standard, SRN-PPI) with the serial number, vintage, retiring entity, and a beneficiary statement (e.g. 'on behalf of <Company> for FY2024 scope-1 emissions').\n\nRetirement is the action that converts a tradeable credit into an actual offset — only retired credits can be claimed against an emissions target. A credit that is held in an account but not retired is still in active circulation and may be re-traded. The cumulative retirement volume per project is one of the canonical signals on a project's integrity dashboard; KarbonLens surfaces it on the project detail page and via the integrity-score transparency sub-component.",
+    category: 'market',
+    relatedTerms: ['vcu', 'vcs', 'idxcarbon'],
+  },
+  {
+    slug: 'vintage',
+    term: 'Vintage',
+    aliases: ['Carbon credit vintage', 'vintage year'],
+    short:
+      "The calendar year in which a carbon credit's emissions reduction or removal occurred — distinct from the year it was issued or sold.",
+    long:
+      "A credit's vintage is the calendar year during which the underlying emissions reduction or removal took place. For an avoidance project (e.g. REDD+), the vintage is the year the avoided deforestation happened against the baseline; for a removal project (e.g. ARR), it's the year of measured biomass growth. Vintage is distinct from both the issuance year (when Verra or SRN-PPI minted the credit) and the retirement year (when the buyer used it).\n\nVintage matters because (a) older vintages generally command lower prices, reflecting concerns about whether the original reduction is still genuinely additional; (b) ICVCM CCP-eligibility and CORSIA eligibility are vintage-bracketed (e.g. CORSIA's First Phase accepts credits only with 2016+ vintages); (c) many corporate buyers prefer credits with vintages close to the year of the emissions they're offsetting. KarbonLens surfaces vintage on the issuance table of each project page and aggregates them on the /projects/by-vintage hub.",
+    category: 'market',
+    relatedTerms: ['vcu', 'vcs', 'corsia', 'icvcm'],
+  },
+  {
+    slug: 'additionality',
+    term: 'Additionality',
+    aliases: ['Additional reduction', 'Adisionalitas'],
+    short:
+      "The principle that a carbon project's emissions reductions must not have happened without the carbon-credit revenue — the foundational integrity test.",
+    long:
+      "Additionality is the central integrity principle of carbon crediting: a project's emissions reductions must be additional to a counterfactual world in which the project did not exist. Without additionality, a credit is just an accounting fiction (the reduction would have happened anyway). The two canonical tests are financial additionality (the project requires carbon revenue to be economically viable) and regulatory additionality (the project goes beyond what is legally required).\n\nAdditionality has been the central critique of legacy REDD+ baselines: if a forest was unlikely to be cleared even without the project, the credits over-state the avoided emissions. ICVCM's CCP framework includes explicit additionality assessment, and the move from VM0007 to VM0048 was partly driven by VM0007's looser additionality tests. KarbonLens reflects the principle in its reversal-risk sub-score: a project with consistent post-issuance forest loss is implicitly suspected of weak baseline additionality.",
+    category: 'market',
+    relatedTerms: ['icvcm', 'vm0048', 'vm0007'],
+  },
+  {
+    slug: 'permanence',
+    term: 'Permanence',
+    aliases: ['Carbon permanence', 'Permanensi karbon'],
+    short:
+      "The requirement that a carbon project's reductions or removals are durable over a specified time horizon (typically 100 years for forestry credits).",
+    long:
+      "Permanence is the requirement that a carbon project's emissions reductions or removals remain in place over a specified time horizon — typically 100 years for forestry and nature-based projects, reflecting CO₂'s atmospheric residence time. A forest that sequesters carbon and is then cleared 30 years later has 'reversed' its claimed reductions, undermining the original credit.\n\nRegistries manage permanence risk through several mechanisms: buffer pools (a percentage of each project's credits set aside to cover future reversals across the registry), monitoring requirements throughout the crediting period, and post-crediting verification cycles. ICVCM CCP-eligibility requires robust permanence management. KarbonLens's reversal-risk sub-score (35 % of the integrity composite) operationalises the permanence concept by tracking satellite-detected forest loss inside project polygons over the prior 90 days.",
+    category: 'market',
+    relatedTerms: ['additionality', 'icvcm', 'mrv'],
+  },
+  {
+    slug: 'leakage',
+    term: 'Leakage',
+    aliases: ['Carbon leakage', 'kebocoran karbon'],
+    short:
+      "When a carbon project displaces emissions to outside its boundary — e.g. avoided deforestation in one province driving increased clearing in another.",
+    long:
+      "Leakage is the indirect emissions displacement that can occur when a carbon project successfully reduces emissions within its boundary but unintentionally drives equivalent (or greater) emissions outside it. For an Indonesian REDD+ project, the canonical leakage concern is that effectively protecting a forest in Central Kalimantan could simply shift logging activity to West Kalimantan or East Kalimantan, leaving net deforestation unchanged.\n\nModern methodologies (VM0048, VM0033) require leakage assessment as part of baseline setting and prescribe leakage deduction factors that scale with project type and ecosystem context. ICVCM CCP-eligible methodologies must demonstrate that leakage is either minimal, monitored, or accounted for. Leakage assessment is one of the harder MRV problems because the counterfactual (where would the activity have shifted to) is inherently unobservable.",
+    category: 'market',
+    relatedTerms: ['additionality', 'mrv', 'vm0048'],
+  },
+
+  // ── Phase 2D: Additional Indonesian legal instruments ─────────────────────
+  {
+    slug: 'permendag',
+    term: 'Permendag',
+    aliases: ['Peraturan Menteri Perdagangan', 'Ministry of Trade regulation'],
+    short:
+      "A regulation issued by Indonesia's Ministry of Trade — the regulator of carbon-trading exchanges and cross-border carbon commerce.",
+    long:
+      "Permendag — Peraturan Menteri Perdagangan, Trade Ministry Regulation — is the operational regulation issued by Indonesia's Ministry of Trade. The most consequential Permendag in the carbon space is Permendag 21/2022 on Trade of Carbon Units, which (in combination with the parent UU 7/2014 on Trade) established the legal basis for treating carbon credits as a tradeable commodity within Indonesian law and authorised the establishment of the carbon exchange (later licensed by OJK as IDXCarbon).\n\nPermendag also governs cross-border carbon commerce: the rules for exporting carbon credits issued in Indonesia, the licensing of importers/exporters, and the customs treatment of foreign-origin carbon units. Indonesian compliance carbon trading thus operates under a stack of overlapping instruments: KLHK's Permenhut for forestry-derived credits, OJK's POJK for exchange operations, and Permendag for cross-border trade in the resulting units.",
+    category: 'regulation',
+    relatedTerms: ['permenhut', 'pojk', 'idxcarbon', 'klhk'],
+  },
+  {
+    slug: 'kemenhut',
+    term: 'Kemenhut',
+    aliases: ['Kementerian Kehutanan', 'Ministry of Forestry'],
+    short:
+      "The post-2024-split Indonesian Ministry of Forestry, separated out from the consolidated KLHK and now the dedicated forestry-sector regulator.",
+    long:
+      "Kemenhut — Kementerian Kehutanan, the Ministry of Forestry — is the dedicated forestry-sector ministry that emerged when the 2024 government reshuffle split the previously-consolidated KLHK (Environment and Forestry) into separate Environment (KLH) and Forestry (Kemenhut) ministries. The transition is still ongoing at the time of writing — Permenhut 14/2024 and Permenhut 6/2026 both reference 'KLHK' rather than 'Kemenhut', and the SRN portal at menlhk.go.id has not been re-pointed.\n\nOnce the split is fully operationalised, Kemenhut will be the dedicated authority for forestry-based carbon projects (REDD+, ARR, mangrove restoration), and KLH will handle non-forestry environmental policy (peatland-rewetting where it sits under environmental law rather than forestry concession). For practical purposes today, KLHK references should be read as the consolidated body; future Permenhut numbering will likely be issued by Kemenhut alone.",
+    category: 'regulation',
+    relatedTerms: ['klhk', 'permenhut', 'srn-ppi'],
+  },
+  {
+    slug: 'jdih',
+    term: 'JDIH',
+    aliases: ['Jaringan Dokumentasi dan Informasi Hukum', 'Legal Documentation and Information Network'],
+    short:
+      "Indonesia's nation-wide legal-document repository network — the primary public source for laws (UU), regulations (PP, Perpres, Permen) cited on KarbonLens.",
+    long:
+      "JDIH — Jaringan Dokumentasi dan Informasi Hukum, the Legal Documentation and Information Network — is the umbrella system through which Indonesian central and regional governments publish their authoritative legal documents. The central portal is peraturan.go.id; individual ministries operate their own JDIH instances (jdih.menlhk.go.id for KLHK, jdih.kemenkeu.go.id for Kemenkeu, jdih.bumn.go.id for the Ministry of SOEs).\n\nFor KarbonLens, JDIH is the canonical citation source for regulatory entries. Every regulatory event on /regulatory links back to its JDIH source. The bilingual EN/ID summaries on KarbonLens are derived from the official JDIH text. JDIH automation (RSS / API ingest) is planned for v0.2; for v0.1, regulatory entries are manually curated.",
+    category: 'regulation',
+    relatedTerms: ['uu', 'pp', 'perpres', 'permenhut'],
+    authoritySource: {
+      url: 'https://peraturan.go.id/',
+      title: 'JDIH — central portal',
+    },
+  },
+
+  // ── Phase 2D: More methodologies present in DB or near-DB ─────────────────
+  {
+    slug: 'ar-acm0003',
+    term: 'AR-ACM0003',
+    aliases: ['Afforestation and reforestation of lands except wetlands'],
+    short:
+      "CDM consolidated large-scale methodology for afforestation and reforestation on non-wetland lands — the most common A/R methodology in CDM project registrations.",
+    long:
+      "AR-ACM0003 is the CDM consolidated large-scale methodology for Afforestation and Reforestation (A/R) on lands that are not wetlands. It covers the planting and growth of trees on land that was previously bare, grassland, or cropland, with carbon stock changes measured through a combination of remote-sensing and ground plots.\n\nA handful of Indonesian A/R projects registered under AR-ACM0003 during the active CDM era (2007-2020). With CDM winding down — no new registrations after 2024, no new credits beyond the existing pipeline — projects are migrating to Verra's VM0047 (the consolidated VCS A/R methodology) or to PACM under Article 6.4. AR-ACM0003 issuances continue to trade on the secondary CER market but volumes have collapsed since 2020.",
+    category: 'methodology',
+    relatedTerms: ['arr', 'vm0047', 'cdm', 'ar-ams0007'],
+    authoritySource: {
+      url: 'https://cdm.unfccc.int/methodologies/ARmethodologies/approved.html',
+      title: 'CDM A/R Approved Methodologies',
+    },
+  },
+  {
+    slug: 'am0029',
+    term: 'AM0029',
+    aliases: ['Baseline Methodology for Grid Connected Electricity Generation from Natural Gas'],
+    short:
+      "CDM baseline methodology for grid-connected natural-gas electricity generation — credits the displacement of higher-carbon coal generation on the connected grid.",
+    long:
+      "AM0029 is a CDM large-scale baseline methodology for new grid-connected electricity generation from natural gas. The methodology credits the emissions reduction from displacing higher-carbon grid generation (typically coal in Indonesia's mix) with combined-cycle gas-fired plants. The reduction depends on the grid emission factor at the time of generation, which Indonesia publishes annually for each interconnected system.\n\nA small number of Indonesian gas-power CDM projects registered under AM0029 during the active CDM era. The methodology is essentially obsolete now — IPCC AR6 framing treats new natural gas as transitional at best, and ICVCM's CCP framework would not grant eligibility to a methodology that simply credits gas-for-coal displacement. AM0029 credits in circulation continue to trade on the secondary CER market for compliance buyers with restrictive eligibility lists.",
+    category: 'methodology',
+    relatedTerms: ['cdm', 'acm0001'],
+    authoritySource: {
+      url: 'https://cdm.unfccc.int/methodologies/LSmethodologies/approved.html',
+      title: 'CDM Large-Scale Approved Methodologies',
+    },
+  },
+  {
+    slug: 'ams-ii-g',
+    term: 'AMS-II.G.',
+    aliases: ['Energy efficiency measures in thermal applications of non-renewable biomass'],
+    short:
+      "CDM small-scale methodology for energy-efficiency measures in non-renewable biomass thermal applications — the standard methodology for clean-cookstove projects.",
+    long:
+      "AMS-II.G. is the CDM small-scale methodology under which the bulk of clean-cookstove carbon projects are registered. It credits the displacement of non-renewable biomass (typically firewood, charcoal) by more-efficient cookstoves, with the reduction calculated from (i) the baseline thermal demand, (ii) the share of demand met by non-renewable biomass, and (iii) the efficiency improvement of the project stove.\n\nA few Indonesian clean-cookstove projects use AMS-II.G., particularly in rural areas of Eastern Indonesia (NTT, NTB, Maluku) where biomass dependence remains high. The methodology has been controversial in recent years — usage-monitoring assumptions have been challenged for over-stating reductions, and ICVCM has not granted CCP eligibility to the cookstove category broadly. Verra's analogue (VMR0006) faced similar critique. Projects are migrating to stricter usage-monitoring protocols.",
+    category: 'methodology',
+    relatedTerms: ['vmr0006', 'cdm', 'ams-i-d'],
+    authoritySource: {
+      url: 'https://cdm.unfccc.int/methodologies/SSCmethodologies/approved.html',
+      title: 'CDM SSC Approved Methodologies',
+    },
+  },
+  {
+    slug: 'ams-ii-h',
+    term: 'AMS-II.H.',
+    aliases: ['Energy efficiency measures through centralization of utility provisions of an industrial facility'],
+    short:
+      "CDM small-scale methodology for industrial energy-efficiency improvements via centralisation of utility provision — niche but used by a handful of Indonesian palm-oil refining projects.",
+    long:
+      "AMS-II.H. is a niche CDM small-scale methodology for industrial energy-efficiency improvements achieved by centralising the provision of utility services (steam, electricity, compressed air) across a multi-process industrial facility. The methodology credits the heat-recovery and load-consolidation gains from replacing distributed boilers and pumps with a single utility plant.\n\nA small number of Indonesian palm-oil refining and pulp-and-paper projects have used AMS-II.H. The methodology overlaps with biogas methodologies for POME (AMS-III.H. covers methane recovery from biogenic waste streams, which can be the energy source for a centralised utility). Both are part of the small-scale CDM portfolio closing to new registrations as the CDM winds down post-2024.",
+    category: 'methodology',
+    relatedTerms: ['ams-iii-h', 'pome'],
+  },
+
+  // ── Phase 2D: Market participants + ratings + adjacent frameworks ─────────
+  {
+    slug: 'sylvera',
+    term: 'Sylvera',
+    aliases: ['Sylvera ratings'],
+    short:
+      "A London-based carbon-credit ratings agency — independent project assessments scored A-D using satellite data, financial analysis, and methodology critique.",
+    long:
+      "Sylvera is a London-based carbon-credit ratings agency that produces independent third-party assessments of voluntary-market projects. Each project is scored on an A-D scale (with sub-grades A+, A-, etc.) across multiple dimensions: additionality, permanence, leakage, co-benefits, and overall integrity. The ratings combine satellite-derived monitoring data with financial and methodology analysis by domain experts.\n\nSylvera has rated a substantial portion of the Indonesian REDD+ portfolio. Sylvera's ratings frequently disagree with the underlying registry's verification, particularly for legacy VM0007 projects where Sylvera applies modern baseline-rigor expectations. KarbonLens's integrity-score methodology is methodologically distinct (it weights satellite reversal-risk and community-flags higher than Sylvera's framework) but consumes broadly similar satellite signals (GFW alerts).",
+    category: 'market',
+    relatedTerms: ['bezero', 'icvcm', 'mrv'],
+    authoritySource: {
+      url: 'https://www.sylvera.com/',
+      title: 'Sylvera — official site',
+    },
+  },
+  {
+    slug: 'bezero',
+    term: 'BeZero',
+    aliases: ['BeZero Carbon ratings'],
+    short:
+      "A London-based carbon-credit ratings agency — assesses projects on an AAA-D scale based on environmental integrity, permanence, and additionality.",
+    long:
+      "BeZero Carbon is one of the two leading third-party carbon-credit ratings agencies (Sylvera being the other). BeZero uses an AAA-D credit-rating-style scale to assess voluntary-market projects on environmental integrity, additionality risk, permanence risk, over-crediting risk, and co-benefits. Ratings are revised on an ongoing basis as new evidence (satellite data, legal disputes, methodology revisions) emerges.\n\nA substantial portion of Indonesian REDD+ projects are rated by BeZero, including the major peatland and biodiversity flagships. Like Sylvera, BeZero ratings frequently disagree with the registry's own validation for legacy VM0007 projects. KarbonLens's integrity-score methodology is independently derived but consumes overlapping inputs (GFW satellite alerts, registry transparency signals, public-record community flags).",
+    category: 'market',
+    relatedTerms: ['sylvera', 'icvcm', 'mrv'],
+    authoritySource: {
+      url: 'https://bezerocarbon.com/',
+      title: 'BeZero Carbon — official site',
+    },
+  },
+  {
+    slug: 'art-trees',
+    term: 'ART/TREES',
+    aliases: ['Architecture for REDD+ Transactions', 'TREES Standard'],
+    short:
+      "Architecture for REDD+ Transactions and its TREES Standard — a jurisdictional REDD+ standard issuing TREES Credits, distinct from Verra's project-level VCS REDD+.",
+    long:
+      "ART — the Architecture for REDD+ Transactions — and its TREES Standard (The REDD+ Environmental Excellence Standard) is a jurisdictional-scale REDD+ crediting framework. Unlike Verra's VCS REDD+ methodologies, which credit individual sub-national projects, ART issues TREES Credits at the jurisdictional level — typically a province or nation — based on the unit's overall avoided deforestation against a country-wide reference level.\n\nART/TREES is the framework backing several major LEAF Coalition agreements (Lowering Emissions by Accelerating Forest finance) — the demand-side coalition led by Amazon, Salesforce, Unilever, and others that pre-commits to purchase verified jurisdictional REDD+ credits. Indonesia has signed LEAF participation letters but has not yet issued ART/TREES credits at scale; CCBA + Verra remain the dominant Indonesian project-level frameworks.",
+    category: 'registry',
+    relatedTerms: ['redd-plus', 'vcs', 'vm0048'],
+    authoritySource: {
+      url: 'https://www.artredd.org/trees/',
+      title: 'ART TREES Standard',
+    },
+  },
+  {
+    slug: 'gold-standard',
+    term: 'Gold Standard',
+    aliases: ['Gold Standard for the Global Goals', 'GS4GG'],
+    short:
+      "Verra's main competitor in the voluntary carbon market — a Swiss-based standard with stricter sustainable-development co-benefit requirements than VCS.",
+    long:
+      "Gold Standard — formally Gold Standard for the Global Goals (GS4GG) since the 2017 expansion — is the second-largest voluntary-market crediting programme by issued volume, founded by WWF and a coalition of NGOs in 2003. Gold Standard issues Verified Emission Reductions (VERs), one per tonne of CO₂e reduced or removed, and is widely seen as the highest-bar voluntary standard for sustainable-development co-benefits and additionality rigor.\n\nA modest number of Indonesian projects register under Gold Standard, particularly clean-cookstove, micro-hydro electricity, and small-scale forestry projects. Gold Standard methodologies overlap with CDM (it accepts CDM methodologies plus its own GS-specific methodologies). KarbonLens cross-references Gold Standard projects in /projects/by-registry/gold-standard.",
+    category: 'registry',
+    relatedTerms: ['vcs', 'vcm', 'icvcm'],
+    authoritySource: {
+      url: 'https://www.goldstandard.org/',
+      title: 'Gold Standard — official site',
+    },
+  },
+  {
+    slug: 'cer',
+    term: 'CER',
+    aliases: ['Certified Emission Reduction'],
+    short:
+      "The unit of CDM trade — one CER equals one tonne of CO₂e reduced under a CDM-registered project, with serialised tracking in the UN CDM registry.",
+    long:
+      "CER — Certified Emission Reduction — is the unit instrument issued under the Clean Development Mechanism (CDM), the Kyoto-era market mechanism that issued credits for emissions reductions in developing countries. One CER equals one tonne of CO₂e reduced under a CDM-registered project, verified by an accredited Designated Operational Entity (DOE) and recorded in the UN CDM registry with a unique serial number.\n\nIndonesia hosted a substantial CDM project portfolio during the 2007-2014 peak period — landfill gas (ACM0001), palm-oil POME methane recovery (AMS-III.H.), micro-hydro electricity (AMS-I.D.), and clean cookstoves (AMS-II.G.). Most of these projects' CER inventories are long since retired or expired, but secondary-market CER trading continues for compliance buyers under restrictive eligibility lists (Brazil ETS, South Korea K-ETS). With CDM winding down post-2024, the successor mechanism is PACM under Article 6.4.",
+    category: 'market',
+    relatedTerms: ['cdm', 'article-6', 'vcu'],
+  },
+  {
+    slug: 'ccba',
+    term: 'CCBA',
+    aliases: ['Climate Community and Biodiversity Alliance', 'CCB Standards'],
+    short:
+      "Multi-stakeholder alliance whose CCB Standard certifies the social and biodiversity co-benefits of land-based carbon projects — often layered on top of VCS.",
+    long:
+      "CCBA — the Climate, Community & Biodiversity Alliance — is the multi-stakeholder body that maintains the CCB Standard, a co-benefit certification frequently layered on top of VCS land-based projects. A project that achieves CCB Gold or Distinct status has demonstrated, through third-party validation, that it produces measurable community and biodiversity outcomes beyond its core carbon reductions.\n\nFor Indonesian REDD+ projects, CCB certification is particularly common — most flagship peatland and biodiversity-rich projects (Katingan Mentaya, Rimba Raya, etc.) are dual-certified VCS+CCB. The premium price differential for CCB-stacked credits has been ~10-30% over plain VCS over the past decade. CCBA was acquired by Verra in 2017; CCB validation is now operationally run by Verra alongside VCS but the standard retains its independent identity.",
+    category: 'registry',
+    relatedTerms: ['ccb', 'vcs', 'vcm'],
+    authoritySource: {
+      url: 'https://verra.org/programs/ccbs/',
+      title: 'CCB Standards — Verra',
+    },
+  },
+
+  // ── Phase 2D: Supply-chain + adjacent integrity frameworks ────────────────
+  {
+    slug: 'rspo',
+    term: 'RSPO',
+    aliases: ['Roundtable on Sustainable Palm Oil'],
+    short:
+      "The leading certification standard for sustainable palm oil — distinct from carbon crediting but adjacent for Indonesian palm-related carbon projects.",
+    long:
+      "RSPO — the Roundtable on Sustainable Palm Oil — is the leading multi-stakeholder certification standard for sustainable palm-oil production. Founded in 2004, RSPO certifies palm-oil mills and supply chains against criteria covering no-deforestation, no-peatland-development, no-exploitation (NDPE), legal compliance, and worker welfare. It is not a carbon crediting standard per se but is highly relevant to Indonesian carbon projects in two ways.\n\nFirst, palm-oil plantations adjacent to or overlapping carbon project areas can either reinforce or undermine the project's reversal-risk profile depending on their RSPO status. Second, RSPO-certified mills with biogas methane-capture systems (POME) often layer carbon crediting (typically AMS-III.H. or VCS analogues) on top of their RSPO certification to monetise the methane reductions. KarbonLens flags RSPO-context where relevant in project descriptions but does not yet expose RSPO data as a first-class field.",
+    category: 'technical',
+    relatedTerms: ['pome', 'ams-iii-h', 'klhk'],
+    authoritySource: {
+      url: 'https://rspo.org/',
+      title: 'RSPO — official site',
+    },
+  },
+  {
+    slug: 'ndpe',
+    term: 'NDPE',
+    aliases: ['No Deforestation, No Peat, No Exploitation'],
+    short:
+      "The supply-chain commitment framework adopted by major palm-oil buyers — no deforestation, no peat-soil development, no exploitation of workers or communities.",
+    long:
+      "NDPE — No Deforestation, No Peat, No Exploitation — is the supply-chain commitment framework that emerged in 2013-2014 when major palm-oil traders (Wilmar, Golden Agri, IOI, Cargill) and end buyers (Unilever, Nestlé, P&G) adopted parallel commitments to source only from suppliers that don't engage in deforestation, peatland development, or worker exploitation. NDPE became the de-facto standard above RSPO for palm-oil supply-chain due diligence.\n\nFor Indonesian carbon projects, NDPE matters in two ways. First, palm-oil concessions surrounding forest-based carbon projects face NDPE-driven scrutiny that aligns with the project's anti-deforestation incentives. Second, the EUDR (EU Deforestation Regulation, effective 2025-2026) operationalises NDPE-equivalent due diligence in EU markets, increasing the demand-side pull on Indonesian forest commodities to maintain consistent deforestation-free supply.",
+    category: 'market',
+    relatedTerms: ['rspo', 'redd-plus', 'eudr'],
+  },
+  {
+    slug: 'eudr',
+    term: 'EUDR',
+    aliases: ['EU Deforestation Regulation', '2023/1115'],
+    short:
+      "EU regulation 2023/1115 banning import of deforestation-linked commodities (palm, soy, beef, cocoa, coffee, rubber, wood) — material for Indonesian export supply chains.",
+    long:
+      "EUDR — the EU Deforestation Regulation (Regulation EU 2023/1115) — is the EU instrument that bans the import and sale of seven commodities (palm oil, soy, beef, cocoa, coffee, rubber, wood) and their derived products into the EU market if they are linked to deforestation after the 2020 cutoff. Importers must conduct due diligence and produce per-shipment geolocation data tracing the commodity to its specific plot of land, verifying that the plot was not forested in 2020 or has not since been deforested.\n\nEUDR took effect in December 2024 (delayed from December 2023) and applies to Indonesian palm-oil, rubber, cocoa, coffee, and wood exports. The geolocation requirement is operationally similar to the polygon-and-baseline approach of REDD+ project MRV — and creates significant demand for the same satellite forest-monitoring data (GFW, RADD, GLAD) that KarbonLens uses for its integrity-score reversal-risk component.",
+    category: 'regulation',
+    relatedTerms: ['ndpe', 'gfw', 'radd'],
+    authoritySource: {
+      url: 'https://eur-lex.europa.eu/eli/reg/2023/1115/oj',
+      title: 'EU Regulation 2023/1115',
+    },
+  },
+  {
+    slug: 'corresponding-adjustment',
+    term: 'Corresponding Adjustment',
+    aliases: ['CA', 'Article 6 corresponding adjustment'],
+    short:
+      "The Article 6 accounting mechanism that prevents double counting — when an ITMO transfers to a buyer country, the host country adds the tonnes back to its reported emissions.",
+    long:
+      "Corresponding adjustment — abbreviated CA — is the accounting mechanism Paris Agreement Article 6.2 uses to prevent double counting. When an Indonesian project authorises the transfer of an ITMO to a buyer country (e.g. Singapore, Japan), Indonesia commits to a corresponding adjustment: adding the transferred tonnes back to its own GHG inventory so the same reduction cannot be credited toward both NDCs.\n\nThe practical operationalisation is technical and slow: the host country must record the transfer in its national registry, the UNFCCC SDA (Subsidiary Body for Scientific and Technological Advice) ratifies the methodology, and both countries report aligned numbers in their Biennial Transparency Report. Indonesia's KLHK Surat Otorisasi (letter of authorisation) is the gating document on the Indonesian side for any CA-bearing transfer. As of 2025-2026, Indonesia has signed Implementation Agreements with Singapore, Japan, Switzerland, and several others.",
+    category: 'market',
+    relatedTerms: ['itmo', 'article-6', 'ndc'],
+  },
 ];
 
 /**

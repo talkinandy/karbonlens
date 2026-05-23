@@ -147,3 +147,82 @@ export async function getDistinctMinistries(): Promise<string[]> {
     .map((r) => r.ministry)
     .filter((m): m is string => typeof m === 'string' && m.length > 0);
 }
+
+// ─── /regulatory/by-year (SEO Phase 2D) ──────────────────────────────────────
+
+export type RegulatoryYearRow = {
+  year: number;
+  eventCount: number;
+  topMinistries: string[];
+};
+
+export async function listRegulatoryYears(): Promise<RegulatoryYearRow[]> {
+  try {
+    const rows = (await db.execute(sql`
+      SELECT
+        EXTRACT(YEAR FROM event_date)::int                              AS year,
+        COUNT(*)::int                                                    AS event_count,
+        ARRAY_AGG(DISTINCT ministry ORDER BY ministry) FILTER (
+          WHERE ministry IS NOT NULL
+        )                                                                AS ministries
+      FROM regulatory_events
+      WHERE is_upcoming = FALSE
+        AND event_date IS NOT NULL
+      GROUP BY EXTRACT(YEAR FROM event_date)
+      ORDER BY EXTRACT(YEAR FROM event_date) DESC
+    `)) as unknown as Array<{
+      year: number;
+      event_count: number;
+      ministries: string[] | null;
+    }>;
+    return rows.map((r) => ({
+      year: Number(r.year),
+      eventCount: Number(r.event_count),
+      topMinistries: (r.ministries ?? []).slice(0, 4),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function getRegulatoryEventsForYear(year: number): Promise<RegulatoryEventRow[]> {
+  try {
+    const rows = await db
+      .select({
+        id: regulatoryEvents.id,
+        eventDate: regulatoryEvents.eventDate,
+        ministry: regulatoryEvents.ministry,
+        documentType: regulatoryEvents.documentType,
+        documentNumber: regulatoryEvents.documentNumber,
+        title: regulatoryEvents.title,
+        documentUrl: regulatoryEvents.documentUrl,
+        summaryEn: regulatoryEvents.summaryEn,
+        summaryId: regulatoryEvents.summaryId,
+        importance: regulatoryEvents.importance,
+        tags: regulatoryEvents.tags,
+        isUpcoming: regulatoryEvents.isUpcoming,
+      })
+      .from(regulatoryEvents)
+      .where(
+        sql`EXTRACT(YEAR FROM ${regulatoryEvents.eventDate}) = ${year}
+            AND ${regulatoryEvents.isUpcoming} = FALSE`,
+      )
+      .orderBy(desc(regulatoryEvents.eventDate));
+    return rows.map((r) => ({
+      id: r.id,
+      eventDate: typeof r.eventDate === 'string' ? r.eventDate : (r.eventDate as Date).toISOString().slice(0, 10),
+      ministry: r.ministry,
+      documentType: r.documentType,
+      documentNumber: r.documentNumber,
+      title: r.title,
+      documentUrl: r.documentUrl,
+      summaryEn: r.summaryEn,
+      summaryId: r.summaryId,
+      importance: r.importance,
+      tags: r.tags ?? null,
+      isUpcoming: r.isUpcoming ?? false,
+    }));
+  } catch {
+    return [];
+  }
+}

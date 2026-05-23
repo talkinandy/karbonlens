@@ -27,8 +27,10 @@ import {
   listDistinctMethodologies,
   listDistinctRegistries,
   listDistinctDevelopers,
+  listVintageYears,
   provinceCanonicalToSlug,
 } from '@/lib/queries/projects-by';
+import { listRegulatoryYears } from '@/lib/queries/regulatory';
 import { listTerms } from '@/lib/data/glossary';
 
 export const revalidate = 600;
@@ -157,8 +159,35 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/projects/by-methodology`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${BASE}/projects/by-registry`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${BASE}/projects/by-developer`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+    // SEO Phase 2D — new programmatic hubs.
+    { url: `${BASE}/projects/by-vintage`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${BASE}/regulatory/by-year`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${BASE}/glossary`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
   ];
+
+  // SEO Phase 2D — per-vintage-year project hubs.
+  let vintageHubEntries: MetadataRoute.Sitemap = [];
+  try {
+    const vintages = await listVintageYears();
+    vintageHubEntries = vintages.map((v) => ({
+      url: `${BASE}/projects/by-vintage/${v.year}`,
+      lastModified: now,
+      changeFrequency: 'yearly' as const,
+      priority: 0.5,
+    }));
+  } catch {}
+
+  // SEO Phase 2D — per-year regulatory roll-ups.
+  let regulatoryYearEntries: MetadataRoute.Sitemap = [];
+  try {
+    const years = await listRegulatoryYears();
+    regulatoryYearEntries = years.map((y) => ({
+      url: `${BASE}/regulatory/by-year/${y.year}`,
+      lastModified: now,
+      changeFrequency: 'yearly' as const,
+      priority: 0.5,
+    }));
+  } catch {}
 
   // SEO Phase 1 (B3): hubs derive lastmod from MAX(p.updated_at) of the
   // underlying slice. `new Date()` here was lying — every request saw a
@@ -280,6 +309,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...methodologyHubEntries,
     ...registryHubEntries,
     ...developerHubEntries,
+    ...vintageHubEntries,
+    ...regulatoryYearEntries,
     ...glossaryEntries,
     ...newsIndexEntry,
     ...newsEntries,

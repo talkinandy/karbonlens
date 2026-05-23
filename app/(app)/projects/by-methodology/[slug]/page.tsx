@@ -13,10 +13,12 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import {
+  getMethodologyHubStats,
   getProjectsByMethodology,
   listDistinctMethodologies,
 } from '@/lib/queries/projects-by';
 import { ProjectHub } from '@/components/projects/ProjectHub';
+import { HubRichContext } from '@/components/projects/HubRichContext';
 import { JsonLd } from '@/components/seo/JsonLd';
 import {
   METHODOLOGY_GLOSSES,
@@ -106,7 +108,10 @@ export default async function ByMethodologyHubPage({ params }: Props) {
   const { slug } = await params;
   const { code, known } = await methSlugToCode(slug);
 
-  const rows = await getProjectsByMethodology(code);
+  const [rows, stats] = await Promise.all([
+    getProjectsByMethodology(code),
+    getMethodologyHubStats(code),
+  ]);
   if (rows.length === 0 && !known) notFound();
 
   const gloss = METHODOLOGY_GLOSSES[code] ?? METHODOLOGY_DEFAULT_GLOSS;
@@ -176,6 +181,14 @@ export default async function ByMethodologyHubPage({ params }: Props) {
         rows={rows}
         backHref="/projects/by-methodology"
         backLabel="All methodologies"
+        richContext={
+          <HubRichContext
+            kind="methodology"
+            label={code}
+            slug={code.toLowerCase().replace(/\./g, '-')}
+            stats={stats}
+          />
+        }
       />
     </>
   );

@@ -14,10 +14,12 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import {
   getProjectsByCanonicalProvince,
+  getProvinceHubStats,
   listCanonicalProvinces,
   provinceCanonicalToSlug,
 } from '@/lib/queries/projects-by';
 import { ProjectHub } from '@/components/projects/ProjectHub';
+import { HubRichContext } from '@/components/projects/HubRichContext';
 import { JsonLd } from '@/components/seo/JsonLd';
 
 type Props = {
@@ -74,7 +76,10 @@ export default async function ByProvinceHubPage({ params }: Props) {
   const canonical = await resolveCanonical(slug);
   if (!canonical) notFound();
 
-  const rows = await getProjectsByCanonicalProvince(canonical);
+  const [rows, stats] = await Promise.all([
+    getProjectsByCanonicalProvince(canonical),
+    getProvinceHubStats(canonical),
+  ]);
   const description = describeProvince(canonical);
   const url = `https://karbonlens.com/projects/by-province/${slug}`;
 
@@ -141,6 +146,9 @@ export default async function ByProvinceHubPage({ params }: Props) {
         rows={rows}
         backHref="/projects/by-province"
         backLabel="All provinces"
+        richContext={
+          <HubRichContext kind="province" label={canonical} slug={slug} stats={stats} />
+        }
       />
     </>
   );
