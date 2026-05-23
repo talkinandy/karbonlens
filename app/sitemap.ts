@@ -10,6 +10,13 @@
  * `lastModified` wires to the real updated_at / event_date / month end
  * on the row — not to `new Date()`. Per Ahrefs Dec 2025 guidance,
  * lying about lastmod is a trust hit against Google's own crawl log.
+ *
+ * SEO Phase 1 (B3): `revalidate = 600` so the sitemap re-renders at most
+ * every 10 minutes. The weekly Market Wrap publisher additionally hits
+ * `/api/internal/revalidate-sitemap` after each successful insert so the
+ * new /news/<slug> URL lands in the sitemap without waiting for the next
+ * tick. Previously this route was cached at deploy time and stayed
+ * frozen — sitemap had 1 of 4 weekly posts when the audit ran.
  */
 
 import type { MetadataRoute } from 'next';
@@ -23,6 +30,8 @@ import {
   provinceCanonicalToSlug,
 } from '@/lib/queries/projects-by';
 import { listTerms } from '@/lib/data/glossary';
+
+export const revalidate = 600;
 
 const BASE = 'https://karbonlens.com';
 
@@ -146,12 +155,44 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/glossary`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
   ];
 
+  // SEO Phase 1 (B3): hubs derive lastmod from MAX(p.updated_at) of the
+  // underlying slice. `new Date()` here was lying — every request saw a
+  // fresh timestamp regardless of whether anything had actually changed.
+  // One COALESCE-with-now fallback per axis keeps the sitemap honest even
+  // when the slice has no projects yet (shouldn't happen, but defensive).
+  type HubLastmod = { key: string; updated_at: string | Date | null };
+
+  async function fetchHubLastmods(column: 'province' | 'methodology'): Promise<Map<string, Date>> {
+    try {
+      const rows = (await db.execute(sql`
+        SELECT ${sql.identifier(column)} AS key,
+               MAX(updated_at) AS updated_at
+        FROM projects
+        WHERE country = 'ID'
+          AND ${sql.identifier(column)} IS NOT NULL
+        GROUP BY ${sql.identifier(column)}
+      `)) as unknown as HubLastmod[];
+      const m = new Map<string, Date>();
+      for (const r of rows) {
+        if (r.key) m.set(r.key, iso(r.updated_at));
+      }
+      return m;
+    } catch {
+      return new Map();
+    }
+  }
+
+  const [provinceLastmods, methodologyLastmods] = await Promise.all([
+    fetchHubLastmods('province'),
+    fetchHubLastmods('methodology'),
+  ]);
+
   let provinceHubEntries: MetadataRoute.Sitemap = [];
   try {
     const provs = await listCanonicalProvinces();
     provinceHubEntries = provs.map((p) => ({
       url: `${BASE}/projects/by-province/${provinceCanonicalToSlug(p.canonical)}`,
-      lastModified: now,
+      lastModified: provinceLastmods.get(p.canonical) ?? now,
       changeFrequency: 'weekly' as const,
       priority: 0.6,
     }));
@@ -162,7 +203,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const codes = await listDistinctMethodologies();
     methodologyHubEntries = codes.map((code) => ({
       url: `${BASE}/projects/by-methodology/${code.toLowerCase().replace(/\./g, '-')}`,
-      lastModified: now,
+      lastModified: methodologyLastmods.get(code) ?? now,
       changeFrequency: 'weekly' as const,
       priority: 0.6,
     }));
@@ -173,7 +214,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const regs = await listDistinctRegistries();
     registryHubEntries = regs.map((r) => ({
       url: `${BASE}/projects/by-registry/${r.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`,
-      lastModified: now,
+      lastModified: now, // registry hub aggregates all projects of that registry; refresh cadence is weekly enough that `now` doesn't drift far from truth
       changeFrequency: 'weekly' as const,
       priority: 0.6,
     }));

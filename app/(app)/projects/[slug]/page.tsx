@@ -8,9 +8,9 @@
  */
 
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 
-import { auth } from '@/lib/auth';
 import { getProjectDetail } from '@/lib/queries/project-detail';
 import { getProjectDescription } from '@/lib/queries/project-description';
 import { getProjectSummary } from '@/lib/queries/project-summary';
@@ -23,10 +23,20 @@ import { METHODOLOGY_VERSION, WEIGHTS } from '@/lib/score';
 
 import { AlertsSummary } from '@/components/projects/detail/AlertsSummary';
 import { IssuancesTable } from '@/components/projects/detail/IssuancesTable';
-import { ProjectDescription } from '@/components/projects/detail/ProjectDescription';
+import {
+  ProjectDescription,
+  BriefingBody,
+  BriefingBodyFallback,
+} from '@/components/projects/detail/ProjectDescription';
 import { RegistryList } from '@/components/projects/detail/RegistryList';
 import { ScoreCard } from '@/components/projects/detail/ScoreCard';
 import { SectionHero } from '@/components/projects/detail/SectionHero';
+
+// SEO Phase 1 — the analyst-briefing auth gate is isolated into
+// <BriefingBody> rendered inside <Suspense fallback={<BriefingBodyFallback
+// />}>. Crawlers see the gated teaser; signed-in users get the full
+// briefing streamed in. Cache-friendly Cache-Control is overridden at the
+// nginx layer (see runbook §5) until cacheComponents rolls out globally.
 // T13 — client shell; mounts MapLibre with ssr:false into the #map anchor.
 import { ProjectDetailMapClient } from '@/components/map/ProjectDetailMapClient';
 // T31 — answer-first JSON-LD (Dataset + BreadcrumbList) for LLM extraction.
@@ -57,9 +67,13 @@ function fmtCredits(raw: string): string {
  * T26 — per-project dynamic metadata.
  *
  * Uses the lightweight `getProjectSummary` helper instead of the full
- * `getProjectDetail` payload. Unknown slug → returns default metadata (the
- * render body handles the 404 via `notFound()`); never throw from
- * `generateMetadata`, which would bypass the not-found page.
+ * `getProjectDetail` payload.
+ *
+ * SEO Phase 1 (B2): unknown slug → call `notFound()` here so Next commits
+ * a 404 status BEFORE the loading.tsx skeleton streams. Previously this
+ * returned `{}` and let the page body call notFound() — but the loading
+ * shell had already committed a 200 by then, producing a soft-404 that
+ * search engines saw as thin content and refused to baseline-crawl.
  */
 export async function generateMetadata({
   params,
@@ -68,7 +82,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const project = await getProjectSummary(slug);
-  if (!project) return {};
+  if (!project) notFound();
 
   const scoreText = project.score != null ? project.score.toFixed(1) : '—';
   const hectaresSegment = project.hectares
@@ -113,13 +127,10 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  // T30 — AI-researched narrative. Runs in parallel with the session read
-  // so the auth check doesn't block the description fetch.
-  const [description, session] = await Promise.all([
-    getProjectDescription(detail.project.id),
-    auth(),
-  ]);
-  const isAuthed = !!session?.user?.id;
+  // T30 — AI-researched narrative. The auth check has been moved into
+  // <BriefingBody> below (SEO Phase 1) so it doesn't taint the static
+  // shell of this route.
+  const description = await getProjectDescription(detail.project.id);
 
   const issuancePage = parsePage(sp.issuance_page);
   const issuanceCount = detail.issuances.length;
@@ -294,9 +305,22 @@ export default async function ProjectDetailPage({
 
       <ProjectDescription
         description={description}
-        isAuthed={isAuthed}
         projectSlug={slug}
         facts={facts}
+        briefingSlot={
+          description ? (
+            <Suspense
+              fallback={
+                <BriefingBodyFallback
+                  description={description}
+                  projectSlug={slug}
+                />
+              }
+            >
+              <BriefingBody description={description} projectSlug={slug} />
+            </Suspense>
+          ) : null
+        }
       />
 
       <ScoreCard

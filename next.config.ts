@@ -2,7 +2,15 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // SEO Phase 1 note: we considered enabling `experimental.ppr =
+  // 'incremental'` here, but Next 16.2 retired per-route PPR opt-in in
+  // favour of the broader `cacheComponents` model — see
+  // docs/runbooks/seo-search-engine-onboarding.md. For Phase 1 we keep
+  // the route shapes (Suspense-bounded auth islands in
+  // app/(public)/page.tsx and app/(app)/projects/[slug]/page.tsx) so
+  // they're ready for a future cacheComponents rollout, and we override
+  // Cache-Control at the nginx layer for the public paths (runbook §5).
+  // Flipping cacheComponents on globally is tracked as a Phase-1.5 task.
 };
 
 // Sentry webpack plugin options. `authToken` gates source-map upload: if

@@ -17,13 +17,11 @@
  * by the parent page.
  */
 
-import Link from 'next/link';
-import type { Session } from 'next-auth';
-import { SignInButton } from '@/components/auth/SignInButton';
+import type { ReactNode } from 'react';
 import type { LandingStats } from '@/lib/queries/landing-stats';
 
 export type HeroSectionProps = {
-  session: Session | null;
+  ctaSlot: ReactNode;
   stats: LandingStats;
 };
 
@@ -31,11 +29,7 @@ function dash(v: string | null | undefined): string {
   return v === null || v === undefined || v === '' ? '—' : v;
 }
 
-export function HeroSection({ session, stats }: HeroSectionProps) {
-  const isSignedIn = Boolean(session?.user);
-
-  const primaryLabel = isSignedIn ? 'Open your dashboard →' : 'Open the terminal →';
-
+export function HeroSection({ ctaSlot, stats }: HeroSectionProps) {
   const projectsFormatted = stats.projectCount.toLocaleString('en-US');
   const priceLabel = stats.latestPeriod
     ? `IDXCarbon avg · ${stats.latestPeriod}`
@@ -70,25 +64,7 @@ export function HeroSection({ session, stats }: HeroSectionProps) {
         dan pemantauan satelit dalam <em>satu layar</em>.
       </p>
 
-      <div className="lp-cta">
-        <Link href="/projects" className="kl-btn kl-btn--primary">
-          {primaryLabel}
-        </Link>
-        <Link
-          href="/regulatory?focus=permenhut-6-2026"
-          className="kl-btn"
-        >
-          Read Permenhut 6/2026
-        </Link>
-      </div>
-
-      {!isSignedIn ? (
-        <div style={{ marginBottom: 28 }}>
-          <SignInButton className="kl-btn">
-            Sign in with Google to save alerts
-          </SignInButton>
-        </div>
-      ) : null}
+      {ctaSlot}
 
       <div className="lp-hero-stats">
         <div>

@@ -17,6 +17,7 @@
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  bigserial,
   boolean,
   char,
   check,
@@ -30,6 +31,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
@@ -436,4 +438,90 @@ export const projectDescriptions = pgTable(
       .defaultNow(),
   },
   (t) => [index('idx_proj_desc_generated').on(t.generatedAt.desc())],
+);
+
+// ─── SEO Phase 1 — dashboard tracking tables ─────────────────────────────────
+// See scrapers/migrations/008_seo_tracking.sql for the SQL source of truth.
+// Read by app/admin/seo, written by scripts/seo/fetch-* cron jobs.
+
+export type SeoIndexationStraggler = {
+  url: string;
+  last_crawled?: string;
+  reason?: string;
+};
+
+export const seoIndexationSnapshots = pgTable(
+  'seo_indexation_snapshots',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    source: text('source').notNull(), // 'gsc' | 'bwt' | 'yandex'
+    observedAt: timestamp('observed_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    indexed: integer('indexed').notNull(),
+    submitted: integer('submitted').notNull(),
+    stragglers: jsonb('stragglers')
+      .$type<SeoIndexationStraggler[]>()
+      .notNull()
+      .default([]),
+    raw: jsonb('raw'),
+  },
+  (t) => [index('idx_seo_indexation_source_time').on(t.source, t.observedAt.desc())],
+);
+
+export const seoBacklinks = pgTable(
+  'seo_backlinks',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    referringHost: text('referring_host').notNull(),
+    referringUrl: text('referring_url').notNull(),
+    targetUrl: text('target_url').notNull(),
+    anchorText: text('anchor_text'),
+    rel: text('rel'),
+    firstSeen: timestamp('first_seen', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastSeen: timestamp('last_seen', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    source: text('source').notNull().default('ahrefs_wmt'),
+    raw: jsonb('raw'),
+  },
+  (t) => [
+    uniqueIndex('uq_seo_backlinks_host_target').on(t.referringHost, t.targetUrl),
+    index('idx_seo_backlinks_last_seen').on(t.lastSeen.desc()),
+  ],
+);
+
+export const seoKeywordRanks = pgTable(
+  'seo_keyword_ranks',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    observedDate: date('observed_date').notNull(),
+    query: text('query').notNull(),
+    page: text('page').notNull(),
+    position: numeric('position', { precision: 5, scale: 2 }).notNull(),
+    impressions: integer('impressions').notNull(),
+    clicks: integer('clicks').notNull(),
+    ctr: numeric('ctr', { precision: 5, scale: 4 }).notNull(),
+    source: text('source').notNull().default('gsc'),
+  },
+  (t) => [
+    uniqueIndex('uq_seo_keyword_ranks_date_query_page').on(t.observedDate, t.query, t.page),
+    index('idx_seo_keyword_ranks_query').on(t.query, t.observedDate.desc()),
+  ],
+);
+
+export type SeoTaskStatus = 'pending' | 'in_progress' | 'completed' | 'wontfix';
+
+export const seoTasks = pgTable(
+  'seo_tasks',
+  {
+    code: text('code').primaryKey(),
+    status: text('status').$type<SeoTaskStatus>().notNull().default('pending'),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    closedBy: text('closed_by'),
+    notes: text('notes'),
+  },
+  (t) => [index('idx_seo_tasks_status').on(t.status)],
 );

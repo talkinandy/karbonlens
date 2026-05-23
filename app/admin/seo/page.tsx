@@ -35,6 +35,21 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { isAdmin } from '@/lib/admin';
 import { getSeoMetrics } from '@/lib/queries/seo-metrics';
+import {
+  getIndexationSnapshot,
+  getBacklinksSummary,
+  getTopKeywords,
+  getPunchList,
+  summarisePunchList,
+  getContentCadence,
+  type PunchListRow,
+  type KeywordRankRow,
+  type IndexationRow,
+  type BacklinksSummary,
+  type ContentCadence,
+} from '@/lib/queries/seo/dashboard';
+import type { SeoTaskPriority } from '@/lib/seo/plan';
+import { updateSeoTaskStatus } from './punch-list-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -122,7 +137,7 @@ function StatRow({
   label,
   value,
 }: {
-  label: string;
+  label: ReactNode;
   value: ReactNode;
 }) {
   return (
@@ -164,10 +179,17 @@ export default async function SeoDashboardPage() {
     redirect('/');
   }
 
-  const [metrics, sitemap] = await Promise.all([
-    getSeoMetrics(),
-    fetchSitemapStats(),
-  ]);
+  const [metrics, sitemap, indexation, backlinks, topKeywords, punchList, cadence] =
+    await Promise.all([
+      getSeoMetrics(),
+      fetchSitemapStats(),
+      getIndexationSnapshot(),
+      getBacklinksSummary(),
+      getTopKeywords(),
+      getPunchList(),
+      getContentCadence(),
+    ]);
+  const punchSummary = summarisePunchList(punchList);
 
   const { contentInventory: inv, freshnessAlerts: fa } = metrics;
   const allFresh =
@@ -446,6 +468,18 @@ export default async function SeoDashboardPage() {
           )}
         </section>
 
+        {/* ── Tile A: Indexation (SEO Phase 1) ──────────────────────────── */}
+        <IndexationTile rows={indexation} />
+
+        {/* ── Tile B: Backlinks (SEO Phase 1) ───────────────────────────── */}
+        <BacklinksTile summary={backlinks} />
+
+        {/* ── Tile C: Content cadence (SEO Phase 1) ─────────────────────── */}
+        <ContentCadenceTile cadence={cadence} />
+
+        {/* ── Tile D: Top keywords (SEO Phase 1) ────────────────────────── */}
+        <TopKeywordsTile rows={topKeywords} />
+
         {/* ── Card 5: Indexation hints ──────────────────────────────────── */}
         <section className="kl-card" aria-labelledby="seo-indexation-h">
           <div className="kl-section-label" id="seo-indexation-h">
@@ -496,6 +530,32 @@ export default async function SeoDashboardPage() {
           </ul>
         </section>
       </div>
+
+      {/* ── Tile E: SEO punch list (full-width) ─────────────────────────── */}
+      <section
+        className="kl-card"
+        aria-labelledby="seo-punch-h"
+        style={{ marginTop: 16 }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
+          <div className="kl-section-label" id="seo-punch-h">
+            SEO punch list
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+            P0 {punchSummary.byPriority.P0.completed}/{punchSummary.byPriority.P0.total}
+            {' · '}P1 {punchSummary.byPriority.P1.completed}/{punchSummary.byPriority.P1.total}
+            {' · '}P2 {punchSummary.byPriority.P2.completed}/{punchSummary.byPriority.P2.total}
+          </div>
+        </div>
+        <PunchListTable rows={punchList} />
+      </section>
     </main>
   );
 }
@@ -551,5 +611,323 @@ function FreshnessAlert({
         {explanation}
       </p>
     </div>
+  );
+}
+
+// ─── SEO Phase 1 tiles ───────────────────────────────────────────────────────
+
+function IndexationTile({ rows }: { rows: IndexationRow[] }) {
+  const anyData = rows.some((r) => r.indexed !== null);
+  return (
+    <section className="kl-card" aria-labelledby="seo-indexation-tile-h">
+      <div className="kl-section-label" id="seo-indexation-tile-h">
+        Indexation
+      </div>
+      {!anyData ? (
+        <p
+          style={{
+            margin: '12px 0 0',
+            fontSize: 12,
+            color: 'var(--text-3)',
+          }}
+        >
+          No data yet — wire <code>GSC_SERVICE_ACCOUNT_JSON_BASE64</code> and{' '}
+          <code>BWT_API_KEY</code> per{' '}
+          <a href="/docs/runbooks/seo-search-engine-onboarding" style={{ color: 'var(--text-2)' }}>
+            the onboarding runbook
+          </a>{' '}
+          to populate this tile.
+        </p>
+      ) : (
+        <div style={{ marginTop: 8 }}>
+          {rows.map((r) => (
+            <StatRow
+              key={r.source}
+              label={
+                <span>
+                  {r.source.toUpperCase()}
+                  {r.observedAt ? (
+                    <span style={{ color: 'var(--text-3)', marginLeft: 8, fontSize: 12 }}>
+                      ({fmtRelativeDays(r.observedAt)})
+                    </span>
+                  ) : null}
+                </span>
+              }
+              value={
+                r.indexed === null ? (
+                  <span style={{ color: 'var(--text-3)' }}>pending</span>
+                ) : (
+                  <span>
+                    {r.indexed.toLocaleString()}
+                    {r.submitted ? `/${r.submitted.toLocaleString()}` : null}
+                    {r.delta7d !== null ? (
+                      <span
+                        style={{
+                          color: r.delta7d > 0 ? 'var(--success-fg, var(--text-1))' : 'var(--text-3)',
+                          marginLeft: 8,
+                          fontSize: 12,
+                        }}
+                      >
+                        {r.delta7d >= 0 ? '+' : ''}
+                        {r.delta7d} / 7d
+                      </span>
+                    ) : null}
+                  </span>
+                )
+              }
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function BacklinksTile({ summary }: { summary: BacklinksSummary }) {
+  return (
+    <section className="kl-card" aria-labelledby="seo-backlinks-h">
+      <div className="kl-section-label" id="seo-backlinks-h">
+        Backlinks
+      </div>
+      {summary.referringDomains === null || summary.referringDomains === 0 ? (
+        <p
+          style={{
+            margin: '12px 0 0',
+            fontSize: 12,
+            color: 'var(--text-3)',
+          }}
+        >
+          No data yet — wire <code>AHREFS_WMT_TOKEN</code> in{' '}
+          <code>scripts/seo/fetch-ahrefs.ts</code>.
+        </p>
+      ) : (
+        <div style={{ marginTop: 8 }}>
+          <StatRow
+            label="Referring domains"
+            value={summary.referringDomains.toLocaleString()}
+          />
+          <StatRow
+            label="Total backlinks"
+            value={(summary.totalBacklinks ?? 0).toLocaleString()}
+          />
+          {summary.newLast7d.length > 0 ? (
+            <div style={{ marginTop: 8 }}>
+              <div className="kl-section-label" style={{ fontSize: 12 }}>
+                New / last 7d
+              </div>
+              <ul style={{ listStyle: 'none', padding: 0, margin: '6px 0 0', fontSize: 12 }}>
+                {summary.newLast7d.map((b) => (
+                  <li key={b.referringHost} style={{ color: 'var(--text-2)', padding: '2px 0' }}>
+                    {b.referringHost}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {summary.lastFetched ? (
+            <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>
+              Last refresh: {fmtIsoDate(summary.lastFetched)} ({fmtRelativeDays(summary.lastFetched)})
+            </p>
+          ) : null}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ContentCadenceTile({ cadence }: { cadence: ContentCadence }) {
+  return (
+    <section className="kl-card" aria-labelledby="seo-cadence-h">
+      <div className="kl-section-label" id="seo-cadence-h">
+        Content cadence
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <StatRow
+          label="Last Market Wrap"
+          value={
+            cadence.lastMarketWrap ? (
+              <a
+                href={`/news/${cadence.lastMarketWrap.slug}`}
+                style={{ color: 'var(--info-fg)', textDecoration: 'none' }}
+              >
+                {fmtIsoDate(cadence.lastMarketWrap.publishedAt)}
+              </a>
+            ) : (
+              <span style={{ color: 'var(--text-3)' }}>never</span>
+            )
+          }
+        />
+        <StatRow
+          label="Next Market Wrap"
+          value={fmtIsoDate(cadence.nextMarketWrap)}
+        />
+        <StatRow
+          label="Glossary entries"
+          value={
+            <span>
+              {cadence.glossaryEntries}/{cadence.glossaryTarget}
+              <span style={{ color: 'var(--text-3)', marginLeft: 8, fontSize: 12 }}>
+                (P1-glossary-expand)
+              </span>
+            </span>
+          }
+        />
+      </div>
+    </section>
+  );
+}
+
+function TopKeywordsTile({ rows }: { rows: KeywordRankRow[] }) {
+  return (
+    <section className="kl-card" aria-labelledby="seo-keywords-h">
+      <div className="kl-section-label" id="seo-keywords-h">
+        Top keywords (last 7d)
+      </div>
+      {rows.length === 0 ? (
+        <p
+          style={{
+            margin: '12px 0 0',
+            fontSize: 12,
+            color: 'var(--text-3)',
+          }}
+        >
+          No data yet — populated by <code>scripts/seo/fetch-gsc.ts</code> once
+          GSC service account is configured.
+        </p>
+      ) : (
+        <ul
+          style={{
+            listStyle: 'none',
+            padding: 0,
+            margin: '8px 0 0',
+            fontSize: 13,
+          }}
+        >
+          {rows.map((r) => (
+            <li
+              key={`${r.query}::${r.page}`}
+              style={{
+                padding: '6px 0',
+                borderBottom: '0.5px solid var(--border)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
+            >
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {r.query}
+              </span>
+              <span style={{ color: 'var(--text-3)', fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
+                pos {r.positionLatest.toFixed(1)}
+                {r.trend === 'up' ? ' ▲' : r.trend === 'down' ? ' ▼' : r.trend === 'new' ? ' ✦' : ''}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function PunchListTable({ rows }: { rows: PunchListRow[] }) {
+  const byPriority: Record<SeoTaskPriority, PunchListRow[]> = { P0: [], P1: [], P2: [] };
+  for (const r of rows) byPriority[r.priority].push(r);
+
+  return (
+    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {(['P0', 'P1', 'P2'] as SeoTaskPriority[]).map((p) =>
+        byPriority[p].length === 0 ? null : (
+          <div key={p}>
+            <div
+              className="kl-section-label"
+              style={{ fontSize: 12, marginBottom: 6 }}
+            >
+              {p}
+            </div>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              {byPriority[p].map((r) => (
+                <PunchListRowView key={r.code} row={r} />
+              ))}
+            </ul>
+          </div>
+        ),
+      )}
+    </div>
+  );
+}
+
+function PunchListRowView({ row }: { row: PunchListRow }) {
+  const done = row.status === 'completed' || row.status === 'wontfix';
+  return (
+    <li
+      style={{
+        padding: '8px 0',
+        borderBottom: '0.5px solid var(--border)',
+        display: 'grid',
+        gridTemplateColumns: 'auto 1fr auto',
+        gap: 12,
+        alignItems: 'baseline',
+        fontSize: 13,
+      }}
+    >
+      <form action={updateSeoTaskStatus}>
+        <input type="hidden" name="code" value={row.code} />
+        <input
+          type="hidden"
+          name="status"
+          value={done ? 'pending' : 'completed'}
+        />
+        <button
+          type="submit"
+          aria-label={done ? `Reopen ${row.code}` : `Mark ${row.code} done`}
+          style={{
+            width: 16,
+            height: 16,
+            border: '1px solid var(--border)',
+            borderRadius: 3,
+            background: done ? 'var(--info-fg)' : 'transparent',
+            cursor: 'pointer',
+            padding: 0,
+            color: 'white',
+            fontSize: 11,
+            lineHeight: '14px',
+          }}
+        >
+          {done ? '✓' : ''}
+        </button>
+      </form>
+      <div style={{ minWidth: 0 }}>
+        <div
+          style={{
+            color: done ? 'var(--text-3)' : 'var(--text-1)',
+            textDecoration: done ? 'line-through' : 'none',
+          }}
+        >
+          <code style={{ color: 'var(--text-3)', marginRight: 8 }}>{row.code}</code>
+          {row.title}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+          {row.description}
+          {row.closedAt ? (
+            <span style={{ marginLeft: 8 }}>
+              · closed {fmtIsoDate(row.closedAt)}
+              {row.closedBy ? ` by ${row.closedBy}` : ''}
+            </span>
+          ) : null}
+        </div>
+      </div>
+      <span
+        className={`kl-pill ${
+          done
+            ? 'kl-pill--success'
+            : row.status === 'in_progress'
+              ? 'kl-pill--info'
+              : 'kl-pill--neutral'
+        }`}
+        style={{ fontSize: 11 }}
+      >
+        {row.kind}
+      </span>
+    </li>
   );
 }

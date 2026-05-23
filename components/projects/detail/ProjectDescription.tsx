@@ -31,9 +31,64 @@
  */
 
 import Link from 'next/link';
+import { auth } from '@/lib/auth';
 import { JsonLd } from '@/components/seo/JsonLd';
 import type { ProjectDescription as ProjectDescriptionRow } from '@/lib/queries/project-description';
 import type { ScoreComponents } from '@/lib/score';
+
+/**
+ * SEO Phase 1 — auth-aware briefing island.
+ *
+ * Wrap this in <Suspense> from the page so the static shell of the project
+ * detail route can be PPR-prerendered while the auth gate (full briefing for
+ * signed-in users, teaser + sign-in CTA for guests) streams in. Crawlers see
+ * the guest fallback rendered inside the suspense boundary — that's the
+ * intended SEO surface.
+ */
+export async function BriefingBody({
+  description,
+  projectSlug,
+}: {
+  description: ProjectDescriptionRow;
+  projectSlug: string;
+}) {
+  const session = await auth();
+  const isAuthed = !!session?.user?.id;
+  const paragraphs = splitParagraphs(description.detailMd);
+
+  if (isAuthed) {
+    return (
+      <>
+        <FullBriefing paragraphs={paragraphs} citations={description.citations} />
+        <CitationsList citations={description.citations} />
+      </>
+    );
+  }
+  return (
+    <GatedBriefing
+      paragraphs={paragraphs}
+      citations={description.citations}
+      projectSlug={projectSlug}
+    />
+  );
+}
+
+export function BriefingBodyFallback({
+  description,
+  projectSlug,
+}: {
+  description: ProjectDescriptionRow;
+  projectSlug: string;
+}) {
+  const paragraphs = splitParagraphs(description.detailMd);
+  return (
+    <GatedBriefing
+      paragraphs={paragraphs}
+      citations={description.citations}
+      projectSlug={projectSlug}
+    />
+  );
+}
 
 // T31 — typed shape the page hands us. Every nullable field can be missing
 // from the source data; the renderer skips missing rows rather than printing
@@ -57,14 +112,20 @@ export type ProjectFacts = {
 
 type Props = {
   description: ProjectDescriptionRow | null;
-  isAuthed: boolean;
+  /**
+   * Auth-aware analyst briefing slot. The page wraps a server component
+   * that calls `auth()` in <Suspense> and passes it here, so that this
+   * component (and its parent route's static shell) can be prerendered
+   * via PPR without touching cookies. See app/(app)/projects/[slug]/page.tsx.
+   */
+  briefingSlot: React.ReactNode;
   projectSlug: string;
   facts: ProjectFacts;
 };
 
 export function ProjectDescription({
   description,
-  isAuthed,
+  briefingSlot,
   projectSlug,
   facts,
 }: Props) {
@@ -98,21 +159,7 @@ export function ProjectDescription({
 
       <div className="kl-desc-briefing">
         <h2 className="kl-section-label">Analyst briefing</h2>
-        {isAuthed ? (
-          <>
-            <FullBriefing
-              paragraphs={paragraphs}
-              citations={description.citations}
-            />
-            <CitationsList citations={description.citations} />
-          </>
-        ) : (
-          <GatedBriefing
-            paragraphs={paragraphs}
-            citations={description.citations}
-            projectSlug={projectSlug}
-          />
-        )}
+        {briefingSlot}
 
         <Disclosure
           generatedAt={description.generatedAt}
