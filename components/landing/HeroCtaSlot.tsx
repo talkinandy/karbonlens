@@ -2,10 +2,12 @@
  * components/landing/HeroCtaSlot.tsx — auth-aware CTA island for the
  * landing hero (SEO Phase 1).
  *
- * Isolates the only `auth()` call on the landing page into its own server
- * component so the parent route can be PPR-prerendered with this slot
- * streamed in dynamically. Static crawlers see the guest CTAs in the
- * prerendered shell — that's the correct SEO surface.
+ * Isolates the only `auth()` call on the landing page into its own
+ * Suspense-rendered server component. The page hands a <Suspense
+ * fallback={<HeroCtaFallback />}> over to <HeroSection>; crawlers and
+ * cold-cache visitors see the guest fallback first, then the personalised
+ * CTA streams in. Sets up the route for a future Next 16 cacheComponents
+ * rollout without changing user-visible behaviour today.
  */
 
 import Link from 'next/link';

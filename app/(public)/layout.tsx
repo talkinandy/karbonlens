@@ -12,9 +12,10 @@ import { SignInButton } from "@/components/auth/SignInButton";
  * anonymous visitors and the user's avatar + sign-out when signed in).
  *
  * SEO Phase 1: UserMenu calls `auth()` and is wrapped in <Suspense> so the
- * surrounding layout shell can be PPR-prerendered. The fallback renders
- * the guest SignInButton — what crawlers see — until the dynamic island
- * streams in.
+ * auth read is an isolated island rather than a route-wide taint. The
+ * fallback renders the guest SignInButton — what crawlers see in the
+ * streamed HTML — until the dynamic island resolves. Ready for a future
+ * Next 16 cacheComponents rollout.
  */
 export default function PublicLayout({
   children,

@@ -29,7 +29,7 @@ export const SEO_PLAN: SeoTaskDef[] = [
     kind: 'tech',
     title: 'Cache-Control: private on public pages',
     description:
-      'Every public page emits Cache-Control: private, no-cache. Isolate auth() into Suspense islands and opt-in to PPR so the static shell is publicly cacheable.',
+      'Every public page emits Cache-Control: private, no-cache because auth() taints the whole route. Isolate auth() into Suspense islands so a future cacheComponents rollout can cache the static shell; meanwhile override Cache-Control at nginx for known-public paths.',
   },
   {
     code: 'B2',

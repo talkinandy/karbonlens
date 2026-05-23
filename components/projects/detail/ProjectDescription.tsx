@@ -39,11 +39,11 @@ import type { ScoreComponents } from '@/lib/score';
 /**
  * SEO Phase 1 — auth-aware briefing island.
  *
- * Wrap this in <Suspense> from the page so the static shell of the project
- * detail route can be PPR-prerendered while the auth gate (full briefing for
- * signed-in users, teaser + sign-in CTA for guests) streams in. Crawlers see
- * the guest fallback rendered inside the suspense boundary — that's the
- * intended SEO surface.
+ * Wrap this in <Suspense fallback={<BriefingBodyFallback />}> from the
+ * page so the auth read is isolated from the rest of the route's render
+ * tree. Crawlers see the gated teaser rendered in the streamed HTML
+ * (the fallback); signed-in users get the full briefing streamed in.
+ * Ready for a future Next 16 cacheComponents rollout.
  */
 export async function BriefingBody({
   description,
@@ -114,9 +114,9 @@ type Props = {
   description: ProjectDescriptionRow | null;
   /**
    * Auth-aware analyst briefing slot. The page wraps a server component
-   * that calls `auth()` in <Suspense> and passes it here, so that this
-   * component (and its parent route's static shell) can be prerendered
-   * via PPR without touching cookies. See app/(app)/projects/[slug]/page.tsx.
+   * that calls `auth()` in <Suspense> and passes it here, isolating the
+   * cookie read so the rest of this component renders without touching
+   * the session. See app/(app)/projects/[slug]/page.tsx.
    */
   briefingSlot: React.ReactNode;
   projectSlug: string;

@@ -90,11 +90,12 @@ curl -X POST https://api.indexnow.org/IndexNow \
 Open `/admin/seo` (Indexation tile, SEO Phase 1) — once GSC API integration
 ships, the indexed-pages count starts populating from the live property data.
 
-## 5. nginx-side Cache-Control override (defence in depth)
+## 5. nginx-side Cache-Control override
 
-Even with PPR enabled (SEO Phase 1, B1), Next.js may still emit
-`Cache-Control: private` on routes during build edge cases. Set an nginx
-override for known-public paths to make crawlers cache-friendly:
+This is the primary mechanism for B1 in SEO Phase 1. Next 16.2 retired
+the per-route `experimental_ppr` opt-in in favour of the broader
+`cacheComponents` model — until we flip that on globally, public caching
+has to be applied at the nginx layer for known-public paths:
 
 ```nginx
 # /etc/nginx/sites-available/karbonlens — inside the server block
