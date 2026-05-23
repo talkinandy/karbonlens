@@ -37,6 +37,13 @@ type Props = {
   rows: ProjectHubRow[];
   backHref: string;
   backLabel: string;
+  /**
+   * SEO Phase 2D — optional rich-context block rendered between the header
+   * subtitle and the project table. Province and methodology hubs pass a
+   * stats grid + auto-generated paragraph here; registry/developer hubs
+   * leave it undefined so their rendering is unchanged.
+   */
+  richContext?: React.ReactNode;
 };
 
 function adaptRow(r: ProjectHubRow): ProjectRow {
@@ -65,6 +72,7 @@ export function ProjectHub({
   rows,
   backHref,
   backLabel,
+  richContext,
 }: Props) {
   const count = rows.length;
   const adapted = rows.map(adaptRow);
@@ -101,6 +109,8 @@ export function ProjectHub({
           </p>
         </div>
       </header>
+
+      {richContext}
 
       {count > 0 ? (
         <>

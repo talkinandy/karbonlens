@@ -273,3 +273,228 @@ export function provinceSlugToCanonical(slug: string): string | null {
   // and do the matching at the caller.
   return null; // kept as a placeholder — callers use listCanonicalProvinces()
 }
+
+// ─── Hub-thickening stats (SEO Phase 2D) ─────────────────────────────────────
+// Each hub-slug page calls one of these to densify its header with
+// data-derived stats (count, hectares, methodology mix, alerts).
+
+export type HubStats = {
+  projectCount: number;
+  totalHectares: number | null;
+  totalIssuanceCredits: number | null;
+  alertsLast90d: number | null;
+  topMethodologies: Array<{ code: string; count: number }>;
+  topDevelopers: Array<{ name: string; count: number }>;
+  topProvinces?: Array<{ canonical: string; count: number }>;
+};
+
+const ZERO_STATS: HubStats = {
+  projectCount: 0,
+  totalHectares: null,
+  totalIssuanceCredits: null,
+  alertsLast90d: null,
+  topMethodologies: [],
+  topDevelopers: [],
+};
+
+async function fetchHubStats(
+  whereClause: ReturnType<typeof sql>,
+  includeProvinces: boolean,
+): Promise<HubStats> {
+  try {
+    // One CTE: pull the slice into a temp set, then aggregate all stats.
+    // includeProvinces toggles between province-irrelevant (province hub) and
+    // province-aware (methodology hub) breakdowns.
+    const aggregatesRow = (await db.execute(sql`
+      WITH slice AS (
+        SELECT p.id, p.hectares, p.total_vcus_available, p.methodology, p.developer, p.province
+        FROM projects p
+        WHERE p.country = 'ID' AND ${whereClause}
+      )
+      SELECT
+        (SELECT COUNT(*)::int FROM slice)                                                           AS project_count,
+        (SELECT COALESCE(SUM(hectares::numeric), 0)::text FROM slice)                                AS total_hectares,
+        (SELECT COALESCE(SUM(total_vcus_available::numeric), 0)::text FROM slice)                    AS total_credits,
+        (SELECT COUNT(*)::int FROM satellite_alerts sa
+           JOIN slice s ON sa.project_id = s.id
+           WHERE sa.alert_date >= CURRENT_DATE - INTERVAL '90 days')                                 AS alerts_90d
+    `)) as unknown as Array<{
+      project_count: number;
+      total_hectares: string;
+      total_credits: string;
+      alerts_90d: number;
+    }>;
+
+    const a = aggregatesRow[0];
+    const projectCount = Number(a?.project_count ?? 0);
+    const totalHectares = a?.total_hectares ? Number(a.total_hectares) : 0;
+    const totalCredits = a?.total_credits ? Number(a.total_credits) : 0;
+    const alerts90d = a?.alerts_90d != null ? Number(a.alerts_90d) : null;
+
+    // Methodology mix — explode comma-joined methodology lists.
+    const methRows = (await db.execute(sql`
+      SELECT UPPER(TRIM(code)) AS code, COUNT(*)::int AS count
+      FROM (
+        SELECT unnest(regexp_split_to_array(COALESCE(p.methodology, ''), '[,]')) AS code
+        FROM projects p
+        WHERE p.country = 'ID' AND ${whereClause}
+      ) x
+      WHERE TRIM(code) <> ''
+      GROUP BY UPPER(TRIM(code))
+      ORDER BY count DESC, code
+      LIMIT 4
+    `)) as unknown as Array<{ code: string; count: number }>;
+
+    // Top developers (skip null + "Multiple Proponents" which is a sentinel).
+    const devRows = (await db.execute(sql`
+      SELECT p.developer AS name, COUNT(*)::int AS count
+      FROM projects p
+      WHERE p.country = 'ID' AND ${whereClause}
+        AND p.developer IS NOT NULL
+        AND p.developer <> ''
+        AND p.developer <> 'Multiple Proponents'
+      GROUP BY p.developer
+      ORDER BY count DESC, p.developer
+      LIMIT 3
+    `)) as unknown as Array<{ name: string; count: number }>;
+
+    const topProvinces = includeProvinces
+      ? await (async () => {
+          const rows = (await db.execute(sql`
+            SELECT p.province AS province, COUNT(*)::int AS count
+            FROM projects p
+            WHERE p.country = 'ID' AND ${whereClause}
+              AND p.province IS NOT NULL
+            GROUP BY p.province
+            ORDER BY count DESC, p.province
+            LIMIT 5
+          `)) as unknown as Array<{ province: string; count: number }>;
+          // Roll up raw province strings into canonical labels.
+          const byCanonical = new Map<string, number>();
+          for (const r of rows) {
+            const canonical = toCanonicalProvince(r.province);
+            if (!canonical) continue;
+            byCanonical.set(
+              canonical,
+              (byCanonical.get(canonical) ?? 0) + Number(r.count),
+            );
+          }
+          return Array.from(byCanonical.entries())
+            .map(([canonical, count]) => ({ canonical, count }))
+            .sort((a, b) => b.count - a.count || a.canonical.localeCompare(b.canonical))
+            .slice(0, 3);
+        })()
+      : undefined;
+
+    return {
+      projectCount,
+      totalHectares: totalHectares > 0 ? totalHectares : null,
+      totalIssuanceCredits: totalCredits > 0 ? totalCredits : null,
+      alertsLast90d: alerts90d,
+      topMethodologies: methRows.map((r) => ({ code: r.code, count: Number(r.count) })),
+      topDevelopers: devRows.map((r) => ({ name: r.name, count: Number(r.count) })),
+      topProvinces,
+    };
+  } catch {
+    return { ...ZERO_STATS };
+  }
+}
+
+export async function getProvinceHubStats(canonical: string): Promise<HubStats> {
+  const rawVariants = expandCanonicalToRaw(canonical);
+  if (rawVariants.length === 0) return { ...ZERO_STATS };
+  return fetchHubStats(
+    sql`p.province IN (${sql.join(
+      rawVariants.map((v) => sql`${v}`),
+      sql`, `,
+    )})`,
+    false,
+  );
+}
+
+export async function getMethodologyHubStats(code: string): Promise<HubStats> {
+  const upper = code.toUpperCase();
+  return fetchHubStats(
+    sql`UPPER(COALESCE(p.methodology, '')) ~ ('(^|[,[:space:]])' || ${upper} || '([,[:space:]]|$)')`,
+    true,
+  );
+}
+
+// ─── by-vintage (SEO Phase 2D) ───────────────────────────────────────────────
+// Vintage year = issuances.vintage_year. Index lists every year with ≥1
+// issuance row; per-year page lists projects that issued credits in that
+// vintage with totals.
+
+export type VintageYearRow = {
+  year: number;
+  projectCount: number;
+  issuanceCount: number;
+  totalCredits: number;
+};
+
+export async function listVintageYears(): Promise<VintageYearRow[]> {
+  try {
+    const rows = (await db.execute(sql`
+      SELECT
+        i.vintage_year                                          AS year,
+        COUNT(DISTINCT i.project_id)::int                       AS project_count,
+        COUNT(*)::int                                           AS issuance_count,
+        COALESCE(SUM(i.credits::numeric), 0)::text              AS total_credits
+      FROM issuances i
+      JOIN projects p ON p.id = i.project_id
+      WHERE p.country = 'ID'
+        AND i.vintage_year IS NOT NULL
+        AND i.vintage_year >= 1990
+        AND i.vintage_year <= EXTRACT(YEAR FROM NOW())::int
+      GROUP BY i.vintage_year
+      ORDER BY i.vintage_year DESC
+    `)) as unknown as Array<{
+      year: number;
+      project_count: number;
+      issuance_count: number;
+      total_credits: string;
+    }>;
+    return rows.map((r) => ({
+      year: Number(r.year),
+      projectCount: Number(r.project_count),
+      issuanceCount: Number(r.issuance_count),
+      totalCredits: Number(r.total_credits ?? 0),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export type VintageProjectRow = ProjectHubRow & {
+  vintageIssuanceCount: number;
+  vintageCredits: number;
+};
+
+export async function getProjectsByVintageYear(year: number): Promise<VintageProjectRow[]> {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        ${SELECT_SHAPE},
+        agg.vintage_issuance_count,
+        agg.vintage_credits::text AS vintage_credits
+      FROM projects p
+      JOIN (
+        SELECT i.project_id,
+               COUNT(*)::int                                  AS vintage_issuance_count,
+               COALESCE(SUM(i.credits::numeric), 0)            AS vintage_credits
+        FROM issuances i
+        WHERE i.vintage_year = ${year}
+        GROUP BY i.project_id
+      ) agg ON agg.project_id = p.id
+      WHERE p.country = 'ID'
+      ORDER BY agg.vintage_credits DESC NULLS LAST, p.name_canonical
+    `);
+    return (result as unknown as Record<string, unknown>[]).map((raw) => ({
+      ...mapRow(raw),
+      vintageIssuanceCount: Number(raw.vintage_issuance_count ?? 0),
+      vintageCredits: Number(raw.vintage_credits ?? 0),
+    }));
+  } catch {
+    return [];
+  }
+}
