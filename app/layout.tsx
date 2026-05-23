@@ -8,9 +8,10 @@ import { JsonLd } from "@/components/seo/JsonLd";
 /**
  * Site-wide schema.org blocks (T31). Single Organization + WebSite pair
  * renders on every page so LLMs and Google can resolve the publisher
- * across any entry URL. `sameAs` is intentionally empty for v0.1 — add
- * Wikipedia/LinkedIn/Crunchbase URLs as they go live to compound the
- * E-E-A-T signal.
+ * across any entry URL. `sameAs` carries the canonical external
+ * identifiers — start with the open-source GitHub repo (the closest
+ * thing KarbonLens has to a public "about" URL today) and extend with
+ * Wikipedia / Crunchbase / LinkedIn entries as they're added.
  */
 const ORGANIZATION_SCHEMA = {
   "@context": "https://schema.org",
@@ -21,7 +22,9 @@ const ORGANIZATION_SCHEMA = {
   description:
     "Indonesian carbon-market intelligence — reconciled SRN-PPI, IDXCarbon, Verra, Gold Standard, Sentinel (RADD / VIIRS / NDVI), and JDIH into a single workspace.",
   areaServed: "ID",
-  sameAs: [] as string[],
+  sameAs: [
+    "https://github.com/talkinandy/karbonlens",
+  ],
 };
 const WEBSITE_SCHEMA = {
   "@context": "https://schema.org",

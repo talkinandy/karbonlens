@@ -74,6 +74,7 @@ export const metadata: Metadata = {
       'Satellite MRV, prices, reversal alerts, and regulatory tracking — unified across Verra, SRN-PPI, Gold Standard, and IDXCarbon.',
     images: ['/og-image.png'],
   },
+  alternates: { canonical: '/' },
 };
 
 export default async function LandingPage() {

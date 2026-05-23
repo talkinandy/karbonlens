@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { getPriceHistory } from '@/lib/queries/prices';
 import { PriceChart } from '@/components/prices/PriceChart';
 import { MonthlyTable } from '@/components/prices/MonthlyTable';
+import { JsonLd } from '@/components/seo/JsonLd';
 
 // T26 — page-level metadata. Short title → "Prices · KarbonLens".
 export const metadata: Metadata = {
@@ -29,6 +30,7 @@ export const metadata: Metadata = {
       'IDXCarbon monthly volume, value, and average price — last 10 months.',
     images: ['/og-image.png'],
   },
+  alternates: { canonical: '/prices' },
 };
 
 function formatPeriod(dateStr: string): string {
@@ -129,6 +131,57 @@ export default async function PricesPage() {
     { label: 'Participants', value: latest.registeredParticipants?.toLocaleString('en-US') ?? '—', delta: participantsDelta },
   ];
 
+  // SEO Phase 2A — Dataset JSON-LD. Google's Dataset rich-result and the
+  // LLM dataset crawlers consume this. Each monthly snapshot is exposed as
+  // a DataDownload pointing at the corresponding /prices/[YYYY-MM] page.
+  const oldest = rows[rows.length - 1];
+  const datasetSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Dataset',
+    name: 'IDXCarbon Monthly Price Snapshots — Indonesia',
+    description:
+      'Monthly volume, total value, and average price per tCO₂e for IDXCarbon, Indonesia\'s regulated carbon exchange. Derived from IDXCarbon\'s public monthly reports.',
+    url: 'https://karbonlens.com/prices',
+    identifier: 'karbonlens-idxcarbon-monthly',
+    isAccessibleForFree: true,
+    creator: {
+      '@type': 'Organization',
+      name: 'KarbonLens',
+      url: 'https://karbonlens.com',
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'KarbonLens',
+      url: 'https://karbonlens.com',
+    },
+    spatialCoverage: {
+      '@type': 'Place',
+      name: 'Indonesia',
+      address: { '@type': 'PostalAddress', addressCountry: 'ID' },
+    },
+    temporalCoverage: `${oldest.periodMonth.slice(0, 7)}/${latest.periodMonth.slice(0, 7)}`,
+    variableMeasured: [
+      { '@type': 'PropertyValue', name: 'Total volume', unitText: 'tCO2e' },
+      { '@type': 'PropertyValue', name: 'Total value', unitText: 'IDR' },
+      { '@type': 'PropertyValue', name: 'Average price', unitText: 'IDR/tCO2e' },
+      { '@type': 'PropertyValue', name: 'Registered participants', unitText: 'count' },
+    ],
+    citation: 'Source: IDXCarbon monthly reports (idxcarbon.co.id/data-monthly)',
+    license: 'https://karbonlens.com/terms',
+    isPartOf: {
+      '@type': 'DataCatalog',
+      name: 'KarbonLens Indonesian Carbon Market Datasets',
+      url: 'https://karbonlens.com',
+    },
+    dateModified: latest.periodMonth,
+    distribution: rows.map((r) => ({
+      '@type': 'DataDownload',
+      name: `IDXCarbon ${formatPeriod(r.periodMonth)} snapshot`,
+      contentUrl: `https://karbonlens.com/prices/${r.periodMonth.slice(0, 7)}`,
+      encodingFormat: 'text/html',
+    })),
+  };
+
   return (
     <main className="kl-page">
       <header className="kl-page-header">
@@ -179,6 +232,8 @@ export default async function PricesPage() {
         . Reports typically published ~1 week after month-end. Historical coverage limited to
         IDXCarbon&apos;s current archive (10 months).
       </p>
+
+      <JsonLd id="ld-prices-dataset" data={datasetSchema} />
     </main>
   );
 }

@@ -28,6 +28,7 @@ export const metadata: Metadata = {
     description:
       'Filter Indonesian carbon projects by Verra/CDM methodology — REDD+ (VM0007, VM0048), A/R (VM0047, AR-ACM0003), cookstoves, and more.',
   },
+  alternates: { canonical: '/projects/by-methodology' },
 };
 
 export const METHODOLOGY_GLOSSES: Record<string, string> = {

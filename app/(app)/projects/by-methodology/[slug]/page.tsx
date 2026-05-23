@@ -98,6 +98,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: `${code} — ${gloss} · KarbonLens`,
       description,
     },
+    alternates: { canonical: `/projects/by-methodology/${slug}` },
   };
 }
 

@@ -37,6 +37,7 @@ export const metadata: Metadata = {
     description:
       "PT Rimba Makmur Utama, InfiniteEARTH, Forest Carbon, Fairatmos, KIS Group — filter projects by who's building them.",
   },
+  alternates: { canonical: '/projects/by-developer' },
 };
 
 export default async function ByDeveloperIndexPage() {
