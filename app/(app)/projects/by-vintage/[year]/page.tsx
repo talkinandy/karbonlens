@@ -18,6 +18,7 @@ import {
   listVintageYears,
   type VintageProjectRow,
 } from '@/lib/queries/projects-by';
+import { getPriceContextForYear } from '@/lib/queries/prices';
 import { JsonLd } from '@/components/seo/JsonLd';
 
 export const revalidate = 3600;
@@ -79,9 +80,10 @@ export default async function ByVintageYearPage({ params }: Props) {
   const yearNum = parseYear(year);
   if (yearNum === null) notFound();
 
-  const [rows, allVintages] = await Promise.all([
+  const [rows, allVintages, priceContext] = await Promise.all([
     getProjectsByVintageYear(yearNum),
     listVintageYears(),
+    getPriceContextForYear(yearNum),
   ]);
 
   if (rows.length === 0) notFound();
@@ -184,13 +186,57 @@ export default async function ByVintageYearPage({ params }: Props) {
 
         <p style={{ fontSize: 14, lineHeight: 1.7, maxWidth: 720, marginBottom: 12 }}>
           Vintage {yearNum} reflects emissions reductions or removals that occurred
-          during the {yearNum} calendar year. IDXCarbon market context for this
-          year is available in the{' '}
-          <Link href={`/prices/${yearNum}-01`}>/prices archive</Link> where
-          KarbonLens has snapshot coverage. Vintage credits typically trade
-          alongside same-or-newer-vintage credits in the secondary market; older
-          vintages may attract a discount.
+          during the {yearNum} calendar year. See{' '}
+          <Link href="/glossary/vintage">/glossary/vintage</Link> for why this
+          matters for pricing and eligibility.
         </p>
+
+        {priceContext ? (
+          <div
+            style={{
+              marginBottom: 16,
+              padding: 12,
+              background: 'var(--surface-2, transparent)',
+              border: '0.5px solid var(--border)',
+              borderRadius: 4,
+              fontSize: 13,
+            }}
+          >
+            <p
+              className="kl-section-label"
+              style={{ fontSize: 11, marginBottom: 6 }}
+            >
+              IDXCarbon market context for {yearNum}
+            </p>
+            <p style={{ margin: '0 0 4px', lineHeight: 1.6 }}>
+              Across <strong>{priceContext.monthsCovered}</strong> tracked month
+              {priceContext.monthsCovered === 1 ? '' : 's'}{' '}
+              ({priceContext.firstMonth} – {priceContext.lastMonth}), IDXCarbon
+              recorded{' '}
+              <strong>{fmtCredits(priceContext.totalVolumeTco2e)} tCO₂e</strong>{' '}
+              of total traded volume at a volume-weighted average of{' '}
+              <strong>
+                Rp {Math.round(priceContext.avgPriceIdr / 1000).toLocaleString('en-US')}k
+              </strong>{' '}
+              / tCO₂e (total value Rp{' '}
+              {(priceContext.totalValueIdr / 1_000_000_000).toFixed(1)}B).
+            </p>
+            <p style={{ margin: 0, color: 'var(--text-3)', fontSize: 12 }}>
+              <Link href={`/prices/${priceContext.firstMonth}`}>
+                Open first snapshot →
+              </Link>
+            </p>
+          </div>
+        ) : (
+          <p
+            className="kl-muted"
+            style={{ fontSize: 12, marginBottom: 12 }}
+          >
+            No IDXCarbon snapshots for {yearNum} — Indonesia&apos;s carbon
+            exchange launched in late 2023, so pre-2024 vintages have no
+            on-exchange price history.
+          </p>
+        )}
 
         <div
           style={{

@@ -59,7 +59,7 @@ export function HeroSection({ ctaSlot, stats }: HeroSectionProps) {
         single workspace for the people building — and buying from —
         Indonesia&apos;s carbon market.
       </p>
-      <p className="lp-tag-id">
+      <p className="lp-tag-id" lang="id">
         Platform intelijen pasar karbon Indonesia. Registri, harga, regulasi,
         dan pemantauan satelit dalam <em>satu layar</em>.
       </p>
