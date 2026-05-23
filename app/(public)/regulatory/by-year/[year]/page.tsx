@@ -37,6 +37,75 @@ function eventSlug(e: RegulatoryEventRow): string {
     .replace(/^-+|-+$/g, '');
 }
 
+/**
+ * Compose a 1-3 sentence narrative paragraph from the year's event list.
+ * Deterministic so Google sees consistent content across crawls.
+ */
+function buildYearSummary(
+  year: number,
+  events: RegulatoryEventRow[],
+): string {
+  if (events.length === 0) {
+    return `No tracked Indonesian carbon-market regulatory events in ${year}.`;
+  }
+
+  const docTypes = new Map<string, number>();
+  const ministries = new Map<string, number>();
+  let criticalCount = 0;
+  let highCount = 0;
+  for (const e of events) {
+    if (e.documentType) {
+      docTypes.set(e.documentType, (docTypes.get(e.documentType) ?? 0) + 1);
+    }
+    if (e.ministry) {
+      ministries.set(e.ministry, (ministries.get(e.ministry) ?? 0) + 1);
+    }
+    if (e.importance === 'critical') criticalCount += 1;
+    else if (e.importance === 'high') highCount += 1;
+  }
+
+  const topDocType = Array.from(docTypes.entries()).sort((a, b) => b[1] - a[1])[0];
+  const topMinistry = Array.from(ministries.entries()).sort(
+    (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+  )[0];
+
+  const parts: string[] = [];
+
+  const noun = events.length === 1 ? 'event' : 'events';
+  parts.push(
+    `${events.length} Indonesian carbon-market regulatory ${noun} in ${year}${
+      topDocType
+        ? `, dominated by ${topDocType[1]} ${topDocType[0]} instrument${topDocType[1] === 1 ? '' : 's'}`
+        : ''
+    }${topMinistry ? ` from ${topMinistry[0]}` : ''}.`,
+  );
+
+  if (criticalCount + highCount > 0) {
+    parts.push(
+      `${criticalCount + highCount} of the ${events.length} ${
+        criticalCount + highCount === 1 ? 'event was' : 'events were'
+      } flagged ${criticalCount > 0 ? 'critical' : 'high'} importance — material to project developers and traders operating in the Indonesian voluntary or compliance markets.`,
+    );
+  }
+
+  // Surface the title of the highest-importance, newest event as a hook.
+  const headlineCandidate =
+    events.find((e) => e.importance === 'critical') ??
+    events.find((e) => e.importance === 'high') ??
+    events[0];
+  if (headlineCandidate) {
+    parts.push(
+      `Headline item: ${
+        headlineCandidate.documentType && headlineCandidate.documentNumber
+          ? `${headlineCandidate.documentType} ${headlineCandidate.documentNumber} — `
+          : ''
+      }${headlineCandidate.title}.`,
+    );
+  }
+
+  return parts.join(' ');
+}
+
 export async function generateStaticParams() {
   const years = await listRegulatoryYears();
   return years.map((y) => ({ year: String(y.year) }));
@@ -142,6 +211,17 @@ export default async function RegulatoryByYearPage({ params }: Props) {
             {events.length} Indonesian carbon-market regulatory event
             {events.length === 1 ? '' : 's'} in {yearNum}
             {ministriesSorted.length > 0 ? `, spanning ${ministriesSorted.length} ministr${ministriesSorted.length === 1 ? 'y' : 'ies'} or agencies.` : '.'}
+          </p>
+          <p
+            style={{
+              fontSize: 14,
+              lineHeight: 1.7,
+              maxWidth: 720,
+              marginTop: 16,
+              color: 'var(--text-2)',
+            }}
+          >
+            {buildYearSummary(yearNum, events)}
           </p>
         </div>
       </header>

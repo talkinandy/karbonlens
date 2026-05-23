@@ -1009,6 +1009,100 @@ export const GLOSSARY: GlossaryTerm[] = [
     category: 'market',
     relatedTerms: ['itmo', 'article-6', 'ndc'],
   },
+
+  // ── Phase 2E expansion: 73 → 80 ───────────────────────────────────────────
+  {
+    slug: 'iuphhk',
+    term: 'IUPHHK',
+    aliases: [
+      'Izin Usaha Pemanfaatan Hasil Hutan Kayu',
+      'Timber Forest Product Utilisation Business Permit',
+    ],
+    short:
+      "Indonesia's pre-2021 timber forest-product utilisation permit (HA / HT / RE variants) — the land-tenure instrument that anchors many legacy REDD+ projects.",
+    long:
+      "IUPHHK — Izin Usaha Pemanfaatan Hasil Hutan Kayu — was Indonesia's primary timber-forest-product utilisation business permit prior to the 2021 Job Creation Law (UU 11/2020) and its omnibus successor framework. It came in three principal sub-types: IUPHHK-HA (natural forest), IUPHHK-HT (industrial plantation forest), and IUPHHK-RE (ecosystem restoration). The IUPHHK-RE permit, in particular, was the legal vehicle for restoration-focused REDD+ projects — Katingan Mentaya, Rimba Raya, and most other Indonesian ecosystem-restoration carbon projects sit on IUPHHK-RE concessions.\n\nThe 2021 reforms collapsed IUPHHK into the broader PBPH (Perizinan Berusaha Pemanfaatan Hutan) framework. Existing IUPHHK permits remain valid until their original expiry but new permits are issued under PBPH. For carbon projects, the legal continuity is significant: an IUPHHK-RE issuer can convert to or operate under PBPH without invalidating the underlying carbon-rights claim.",
+    category: 'regulation',
+    relatedTerms: ['pbph', 'klhk', 'redd-plus'],
+  },
+  {
+    slug: 'pbph',
+    term: 'PBPH',
+    aliases: ['Perizinan Berusaha Pemanfaatan Hutan', 'Forest Utilisation Business License'],
+    short:
+      "Indonesia's post-2021 unified forest-utilisation business license framework — successor to the IUPHHK-HA/HT/RE permits.",
+    long:
+      "PBPH — Perizinan Berusaha Pemanfaatan Hutan, Forest Utilisation Business License — is the unified forest-utilisation permit framework introduced by PP 23/2021 (the successor regulation to the 2021 Job Creation Law's forestry provisions). PBPH consolidates the former IUPHHK-HA, IUPHHK-HT, and IUPHHK-RE permits into a single business-license framework, and is the standard land-tenure instrument under which new Indonesian forestry concessions — including carbon-project concessions — are issued.\n\nFor REDD+ project developers, PBPH represents both simplification (one permit framework instead of three) and concentration of regulatory authority (the licensing process is more KLHK-centralised). Existing IUPHHK-RE projects can continue to operate under their original permits but new restoration projects register under PBPH-Restorasi. The carbon-rights subset of PBPH is governed by Permenhut 14/2024 and now Permenhut 6/2026.",
+    category: 'regulation',
+    relatedTerms: ['iuphhk', 'permenhut', 'klhk', 'redd-plus'],
+  },
+  {
+    slug: 'gcf',
+    term: 'GCF',
+    aliases: ['Green Climate Fund'],
+    short:
+      "The UNFCCC-affiliated multilateral fund channelling climate finance from developed to developing countries — a major source of REDD+ result-based payments to Indonesia.",
+    long:
+      "GCF — the Green Climate Fund — is the multilateral fund established under the UNFCCC to channel climate finance from developed to developing countries. Operational since 2015 and headquartered in Songdo, South Korea, GCF disburses through two main windows: a project-funding window (grants and concessional loans) and a result-based-payments window for REDD+ achievements.\n\nIndonesia is one of GCF's larger Asia-Pacific recipients. The headline carbon-relevant disbursement to date is the 2019 USD 103.8 million result-based payment for verified REDD+ emissions reductions during the 2014-2017 period, channelled via BPDLH. This was Indonesia's largest single REDD+ payment under the UNFCCC framework. Additional GCF approvals cover peatland restoration, mangrove conservation, and adaptation work. GCF finance is distinct from voluntary-market credit revenue — it is grant-style climate finance that does not generate transferable carbon units.",
+    category: 'market',
+    relatedTerms: ['bpdlh', 'redd-plus', 'ndc'],
+    authoritySource: {
+      url: 'https://www.greenclimate.fund/',
+      title: 'Green Climate Fund — official site',
+    },
+  },
+  {
+    slug: 'leaf-coalition',
+    term: 'LEAF Coalition',
+    aliases: ['Lowering Emissions by Accelerating Forest finance', 'LEAF'],
+    short:
+      "Public-private buyer coalition pre-committing to purchase verified jurisdictional REDD+ credits at scale — the largest demand-side signal for ART/TREES.",
+    long:
+      "LEAF Coalition — Lowering Emissions by Accelerating Forest finance — is a public-private buyer coalition launched in 2021 that pre-commits to purchase verified jurisdictional REDD+ credits from tropical-forest countries. Anchor public-sector participants include the US, UK, Norway, and Korea; corporate participants include Amazon, Salesforce, Unilever, Nestlé, McKinsey, and others. The coalition commits to purchase credits at a USD 10/tCO₂e floor price from jurisdictions whose programmes meet the ART TREES Standard.\n\nIndonesia signed a LEAF Participation Letter and is one of the larger eligible jurisdictions, but as of 2026 has not yet issued ART/TREES credits at scale. The interaction between Indonesia's domestic SRN-PPI / NEK framework and LEAF's jurisdictional approach is still being worked out — KLHK is the principal counterparty on the host side. LEAF represents the largest single demand-side signal for high-quality jurisdictional REDD+ globally.",
+    category: 'market',
+    relatedTerms: ['art-trees', 'redd-plus', 'klhk'],
+    authoritySource: {
+      url: 'https://leafcoalition.org/',
+      title: 'LEAF Coalition — official site',
+    },
+  },
+  {
+    slug: 'doe',
+    term: 'DOE',
+    aliases: ['Designated Operational Entity'],
+    short:
+      "Accredited third-party CDM auditor — the body that independently validates CDM project designs and verifies emissions reductions before CERs are issued.",
+    long:
+      "DOE — Designated Operational Entity — is the accredited third-party auditor under the Clean Development Mechanism (CDM) framework. DOEs perform two distinct functions: validation (assessing whether a proposed project meets CDM eligibility criteria before registration) and verification (independently confirming that the claimed emissions reductions actually occurred before CERs are issued). Major DOEs include TÜV NORD, TÜV SÜD, DNV, SGS, and Bureau Veritas — all accredited by the CDM Executive Board.\n\nDOEs are the CDM analogue of Verra's VVBs (Validation and Verification Bodies) in the voluntary market. For Indonesian projects, DOEs typically performed both functions during the active 2008-2014 CDM era; current Verra-registered Indonesian projects use VVBs in the same dual-function role. With CDM winding down, DOEs are gradually shifting to PACM (Article 6.4) accreditation and to expanded voluntary-market work.",
+    category: 'market',
+    relatedTerms: ['cdm', 'cer', 'mrv'],
+  },
+  {
+    slug: 'ccp',
+    term: 'CCP',
+    aliases: ['Core Carbon Principles', 'CCP-eligible'],
+    short:
+      "ICVCM's ten high-level principles defining a high-integrity carbon credit — assessed methodology-by-methodology, with category-level eligibility labels.",
+    long:
+      "CCP — Core Carbon Principles — are the ten high-level principles ICVCM uses to assess voluntary-market methodologies for high-integrity carbon crediting. The principles span effective governance, tracking and registry function, transparency, robust independent third-party validation/verification, additionality, permanence, robust quantification of emissions reductions, no double counting, sustainable development benefits, and contribution to net-zero transition.\n\nICVCM assesses methodologies (not individual projects) for CCP eligibility. A 'CCP-Eligible' label is granted at the category level — e.g. VM0048's avoided unplanned deforestation activity module is CCP-Eligible, but legacy VM0007 sub-modules are not. CCP-Eligible status materially impacts a credit's market value: VCMI-compliant corporate claims require CCP-Eligible credits, and integrity-conscious buyers concentrate demand into the eligible categories.",
+    category: 'market',
+    relatedTerms: ['icvcm', 'vcmi', 'vm0048'],
+    authoritySource: {
+      url: 'https://icvcm.org/core-carbon-principles/',
+      title: 'ICVCM Core Carbon Principles',
+    },
+  },
+  {
+    slug: 'folu-net-sink',
+    term: 'FOLU Net Sink 2030',
+    aliases: ['Forestry and Other Land Uses Net Sink 2030', 'FOLU Net Sink'],
+    short:
+      "Indonesia's strategic plan for the forestry and land-use sector to become a net-negative emissions sink by 2030 — the centrepiece of the enhanced NDC.",
+    long:
+      "FOLU Net Sink 2030 — Forestry and Other Land Uses Net Sink 2030 — is Indonesia's strategic plan for the forestry and land-use sector to become a net-negative emissions source by 2030. Issued by KLHK in 2022 as Permenhut 168/2022 and updated through subsequent implementation regulations, it commits Indonesia to absorbing 540 million tonnes of CO₂-equivalent per year more than the sector emits, achieved through a combination of reduced deforestation, peatland restoration, mangrove rehabilitation, and afforestation/reforestation programmes.\n\nFOLU Net Sink 2030 is the sectoral spine of Indonesia's enhanced NDC (the 31.89 % / 43.20 % targets are conditioned on FOLU achieving net-negative status by 2030). Most carbon-relevant policy work at KLHK is now framed in FOLU terms — Permenhut 14/2024 and Permenhut 6/2026 both reference FOLU Net Sink eligibility as a gating criterion for project authorisation. Critics note the baseline reference assumptions are aggressive and the implementation pace lags the policy ambition.",
+    category: 'regulation',
+    relatedTerms: ['ndc', 'klhk', 'permenhut', 'redd-plus'],
+  },
 ];
 
 /**
