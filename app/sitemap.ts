@@ -58,6 +58,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/prices`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${BASE}/regulatory`, lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${BASE}/methodology`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
+    // SEO Phase 2B (E-E-A-T): /data-sources + /methodology/changelog. Both
+    // are citation/auditability surfaces that journalists and academic
+    // papers link into — high SEO value despite low traffic.
+    { url: `${BASE}/data-sources`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${BASE}/methodology/changelog`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${BASE}/privacy`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
     { url: `${BASE}/terms`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
   ];
