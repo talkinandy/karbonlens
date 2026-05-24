@@ -232,7 +232,14 @@ export default async function ProjectsPage({
       : null;
 
   return (
-    <main className="kl-page">
+    // Map mode forces width:100% so the page reaches its max-width 1200
+    // (flexbox would otherwise leave <main> shrunk to ~736px because of
+    // the map's explicit pixel-width canvas inside). The .kl-map-fullbleed
+    // wrapper below then breaks the map out further to viewport width.
+    <main
+      className="kl-page"
+      style={tab === 'map' ? { width: '100%' } : undefined}
+    >
       <JsonLd data={dataCatalogSchema} id="ld-datacatalog" />
       <JsonLd data={projectsBreadcrumbSchema} id="ld-breadcrumb" />
       <header className="kl-page-header">
@@ -291,9 +298,11 @@ export default async function ProjectsPage({
 
       {/* Body — map (T13) or table (T11 default). */}
       {tab === 'map' ? (
-        <div className="kl-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ height: '60vh', minHeight: 480 }}>
-            <MapExplorerTabClient features={centroidsGeoJSON!} />
+        <div className="kl-map-fullbleed">
+          <div className="kl-card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="kl-map-host">
+              <MapExplorerTabClient features={centroidsGeoJSON!} />
+            </div>
           </div>
         </div>
       ) : rows.length === 0 ? (

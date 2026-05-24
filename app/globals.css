@@ -478,6 +478,28 @@ button {
   margin-bottom: 16px;
 }
 
+/* ── Map full-bleed wrapper ────────────────────────────────────────────────
+   Used by /projects?tab=map to let the explorer map break out of the
+   kl-page max-width (1200px) and reach as close to the viewport edges as
+   ~1500px, while the page header / filters above it stay in the narrow
+   reading column. Math: prefer "viewport width minus a 32 px gutter"
+   unless that exceeds the 1500 px cap, in which case keep the map
+   centred at 1500 px.
+   The header, filters, and tab row above keep their original kl-page
+   width — only this block breaks out. */
+.kl-map-fullbleed {
+  margin-inline: max(calc(50% - 50vw + 16px), calc((100% - 1500px) / 2));
+}
+
+.kl-map-host {
+  height: clamp(480px, 65vh, 720px);
+}
+
+@media (max-width: 768px) {
+  .kl-map-fullbleed { margin-inline: 0; }
+  .kl-map-host { height: clamp(360px, 60vh, 560px); }
+}
+
 .kl-tab {
   padding: 6px 14px;
   border-radius: 6px;
