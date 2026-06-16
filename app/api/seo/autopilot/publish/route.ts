@@ -20,18 +20,97 @@
 
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { seoJobs } from '@/lib/schema';
+import { seoJobs, type SeoJobQa, type SeoJobType } from '@/lib/schema';
 import { authorizeAutopilot } from '@/lib/seo/autopilot/auth';
 import { runEditorialGate } from '@/lib/seo/autopilot/gate';
-import type { EditorialArtifact, GroundingFact } from '@/lib/seo/autopilot/types';
+import { runNewsBriefGate } from '@/lib/seo/autopilot/news-gate';
+import type {
+  EditorialArtifact,
+  NewsBriefArtifact,
+  GroundingFact,
+} from '@/lib/seo/autopilot/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type PublishBody = EditorialArtifact & { grounding?: GroundingFact[] };
+type PublishBody =
+  | (EditorialArtifact & { grounding?: GroundingFact[] })
+  | NewsBriefArtifact;
+
+type BaseRow = {
+  jobType: SeoJobType;
+  targetQuery: string | null;
+  targetUrl: string | null;
+  title: string;
+  payload: Record<string, unknown>;
+  grounding: Record<string, unknown>;
+  qa: SeoJobQa;
+  llmModel: string | null;
+  tokensIn: number | null;
+  tokensOut: number | null;
+  externalId: string | null;
+};
+
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const ALLOWED_EDITORIAL_KINDS = [
+  'explainer', 'evergreen', 'comparison', 'investigation', 'market_report',
+];
 
 function bad(detail: string, status = 400): Response {
   return NextResponse.json({ ok: false, error: detail }, { status });
+}
+
+/** Validate + gate an editorial artifact, returning the seo_jobs base row. */
+async function prepEditorial(body: EditorialArtifact & { grounding?: GroundingFact[] }): Promise<BaseRow | Response> {
+  for (const f of ['slug', 'title', 'summary', 'bodyMd', 'kind'] as const) {
+    if (!body[f]) return bad(`Missing required field '${String(f)}'`);
+  }
+  // Harden `kind`: coerce off-list LLM labels to a safe default rather than 400.
+  if (!ALLOWED_EDITORIAL_KINDS.includes(body.kind)) body.kind = 'explainer';
+  if (!SLUG_RE.test(body.slug)) return bad(`Slug '${body.slug}' must be lowercase kebab-case`);
+
+  const art = { ...body, claims: body.claims ?? [], grounding: body.grounding ?? [] } as EditorialArtifact;
+  const qa = await runEditorialGate(art as EditorialArtifact & { grounding: GroundingFact[] });
+  return {
+    jobType: 'editorial',
+    targetQuery: body.targetQuery ?? null,
+    targetUrl: `/news/${body.slug}`,
+    title: body.title,
+    payload: { ...body },
+    grounding: { facts: body.grounding ?? [] },
+    qa,
+    llmModel: body.llmModel ?? null,
+    tokensIn: body.tokensIn ?? null,
+    tokensOut: body.tokensOut ?? null,
+    externalId: body.externalId ?? null,
+  };
+}
+
+/** Validate + citation-gate a Carbon News Brief artifact. */
+async function prepNewsBrief(body: NewsBriefArtifact): Promise<BaseRow | Response> {
+  for (const f of ['slug', 'title', 'summary', 'bodyMd'] as const) {
+    if (!body[f]) return bad(`Missing required field '${String(f)}'`);
+  }
+  if (!Array.isArray(body.sources) || body.sources.length === 0) {
+    return bad('news_brief requires a non-empty sources[] of cited article URLs');
+  }
+  if (!SLUG_RE.test(body.slug)) return bad(`Slug '${body.slug}' must be lowercase kebab-case`);
+  body.kind = 'news_brief';
+
+  const qa = await runNewsBriefGate(body);
+  return {
+    jobType: 'news_brief',
+    targetQuery: body.targetQuery ?? 'carbon-news-brief',
+    targetUrl: `/news/${body.slug}`,
+    title: body.title,
+    payload: { ...body },
+    grounding: { sources: body.sources },
+    qa,
+    llmModel: body.llmModel ?? null,
+    tokensIn: body.tokensIn ?? null,
+    tokensOut: body.tokensOut ?? null,
+    externalId: body.externalId ?? null,
+  };
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -45,69 +124,37 @@ export async function POST(request: Request): Promise<Response> {
     return bad('Invalid JSON body');
   }
 
-  if (body.jobType !== 'editorial') {
+  let prepared: BaseRow | Response;
+  if (body.jobType === 'editorial') {
+    prepared = await prepEditorial(body);
+  } else if (body.jobType === 'news_brief') {
+    prepared = await prepNewsBrief(body);
+  } else {
+    const jt = (body as { jobType?: string }).jobType;
     return bad(
-      `Apply surface for job_type '${body.jobType}' is not enabled yet — only 'editorial' publishes today.`,
+      `Apply surface for job_type '${jt}' is not enabled yet — only 'editorial' and 'news_brief' publish today.`,
     );
   }
+  if (prepared instanceof Response) return prepared;
 
-  // Minimal shape validation before the (heavier) gate runs.
-  const required: Array<keyof EditorialArtifact> = ['slug', 'title', 'summary', 'bodyMd', 'kind'];
-  for (const f of required) {
-    if (!body[f]) return bad(`Missing required field '${String(f)}'`);
-  }
-  // Harden `kind`: LLMs occasionally emit an off-list label (e.g. "guide").
-  // Rather than 400 and lose the whole generation, coerce unknown kinds to a
-  // safe default so the gate still decides on the substance.
-  const ALLOWED_KINDS = ['explainer', 'evergreen', 'comparison', 'investigation', 'market_report'];
-  if (!ALLOWED_KINDS.includes(body.kind)) {
-    body.kind = 'explainer';
-  }
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(body.slug)) {
-    return bad(`Slug '${body.slug}' must be lowercase kebab-case`);
-  }
-
-  // Run the gate. It reads art.grounding for claim verification + DB reverify.
-  const art = { ...body, claims: body.claims ?? [], grounding: body.grounding ?? [] } as EditorialArtifact;
-  const qa = await runEditorialGate(art as EditorialArtifact & { grounding: GroundingFact[] });
-
-  const baseRow = {
-    jobType: 'editorial' as const,
-    targetQuery: body.targetQuery ?? null,
-    targetUrl: `/news/${body.slug}`,
-    title: body.title,
-    payload: { ...body } as Record<string, unknown>,
-    grounding: { facts: body.grounding ?? [] } as Record<string, unknown>,
-    qa,
-    llmModel: body.llmModel ?? null,
-    tokensIn: body.tokensIn ?? null,
-    tokensOut: body.tokensOut ?? null,
-    externalId: body.externalId ?? null,
-  };
+  const baseRow = prepared;
+  const qa = baseRow.qa;
 
   if (!qa.passed) {
     await db.insert(seoJobs).values({ ...baseRow, status: 'qa_failed' });
     return NextResponse.json({ ok: false, published: false, qa }, { status: 422 });
   }
 
-  // Gate passed — but the autopilot no longer auto-publishes (WS2a). Park the
-  // artifact as qa_passed for a human to Approve/Reject on /admin/seo. The
-  // full artifact lives in payload; approval inserts news_posts + revalidates +
-  // pings IndexNow (see app/admin/seo/autopilot-actions.ts).
+  // Gate passed — park as qa_passed for human Approve/Reject on /admin/seo
+  // (WS2a). Approval inserts news_posts + revalidates + pings IndexNow, and for
+  // news briefs marks the cited carbon_news_items used (autopilot-actions.ts).
   const [job] = await db
     .insert(seoJobs)
     .values({ ...baseRow, status: 'qa_passed' })
     .returning({ id: seoJobs.id });
 
   return NextResponse.json(
-    {
-      ok: true,
-      published: false,
-      queuedForReview: true,
-      status: 'qa_passed',
-      jobId: job?.id ?? null,
-      qa,
-    },
+    { ok: true, published: false, queuedForReview: true, status: 'qa_passed', jobId: job?.id ?? null, qa },
     { status: 202 },
   );
 }

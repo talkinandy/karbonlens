@@ -476,6 +476,77 @@ export async function dataReportOpportunities(limit = 4): Promise<Opportunity[]>
   return out.slice(0, limit);
 }
 
+// ── Carbon News Brief: summarise fresh ingested news, cite + link out (WS3) ──
+
+const NEWS_BRIEF_MIN_ITEMS = 6;
+
+export async function newsBriefOpportunity(): Promise<Opportunity[]> {
+  // Weekly cadence: skip if a brief was attempted (any non-error status) in 7d.
+  const recent = (await db.execute(sql`
+    SELECT 1 FROM seo_jobs
+    WHERE job_type = 'news_brief'
+      AND status IN ('queued', 'generating', 'qa_passed', 'qa_failed', 'published', 'rejected', 'skipped')
+      AND created_at >= NOW() - INTERVAL '7 days'
+    LIMIT 1
+  `)) as unknown as unknown[];
+  if (recent.length > 0) return [];
+
+  const rows = (await db.execute(sql`
+    SELECT id, url, source_name, title, snippet,
+           TO_CHAR(COALESCE(published_at, fetched_at), 'YYYY-MM-DD') AS dt
+    FROM carbon_news_items
+    WHERE used_at IS NULL
+    ORDER BY COALESCE(published_at, fetched_at) DESC
+    LIMIT 12
+  `)) as unknown as Array<{
+    id: number;
+    url: string;
+    source_name: string | null;
+    title: string;
+    snippet: string | null;
+    dt: string | null;
+  }>;
+  if (rows.length < NEWS_BRIEF_MIN_ITEMS) return [];
+
+  const items = rows.map((r) => ({
+    source: r.source_name ?? 'Source',
+    title: r.title,
+    url: r.url,
+    snippet: r.snippet ?? '',
+    date: r.dt,
+  }));
+  // Grounding = the candidate items (the gate independently re-verifies cited urls).
+  const grounding: GroundingFact[] = rows.map((r) => ({
+    key: `news:${r.id}`,
+    label: `${r.source_name ?? 'Source'}: ${r.title}`,
+    value: r.url,
+  }));
+
+  const brief =
+    `Compile the KarbonLens Carbon News Brief from the items below. Open with a one-paragraph ` +
+    `intro on the week in Indonesia’s (and relevant global) carbon market. Then, for each item you ` +
+    `include, write a 1–2 sentence ORIGINAL summary in your own words — never copy the source wording — ` +
+    `and attribute it with a Markdown link: [Source name](url). Group related items under short ## headings. ` +
+    `Do NOT state precise figures as fact; attribute any number to its source. Only link to the exact URLs ` +
+    `in this list (plus on-site /prices, /projects, /regulatory where relevant). Return kind "news_brief" and ` +
+    `a "sources" array listing the exact url of every item you cite. Items:\n` +
+    JSON.stringify(items, null, 2);
+
+  return [
+    {
+      jobType: 'news_brief',
+      ref: 'report:carbon-news-brief',
+      score: 70000,
+      reason: `${rows.length} fresh carbon-news items un-briefed — compile the weekly Carbon News Brief.`,
+      targetQuery: 'carbon-news-brief',
+      targetUrl: '/news',
+      brief,
+      grounding,
+      hints: { suggestedKind: 'news_brief', relatedUrls: ['/prices', '/projects', '/regulatory'] },
+    },
+  ];
+}
+
 export type OpportunityBundle = {
   generatedAt: string;
   counts: Record<string, number>;
@@ -484,19 +555,21 @@ export type OpportunityBundle = {
 
 /** Top opportunities across all live detectors, ranked by score. */
 export async function allOpportunities(perType = 8): Promise<OpportunityBundle> {
-  const [report, editorial, meta, glossary] = await Promise.all([
+  const [report, newsBrief, editorial, meta, glossary] = await Promise.all([
     dataReportOpportunities(perType),
+    newsBriefOpportunity(),
     editorialOpportunities(perType),
     metaOpportunities(perType),
     glossaryOpportunities(perType),
   ]);
-  const opportunities = [...report, ...editorial, ...meta, ...glossary].sort(
+  const opportunities = [...report, ...newsBrief, ...editorial, ...meta, ...glossary].sort(
     (a, b) => b.score - a.score,
   );
   return {
     generatedAt: new Date().toISOString(),
     counts: {
       report: report.length,
+      news_brief: newsBrief.length,
       editorial: editorial.length,
       meta: meta.length,
       glossary: glossary.length,

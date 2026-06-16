@@ -10,12 +10,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 import { auth } from '@/lib/auth';
 import { isAdmin } from '@/lib/admin';
 import { db } from '@/lib/db';
-import { newsPosts, seoJobs } from '@/lib/schema';
+import { carbonNewsItems, newsPosts, seoJobs } from '@/lib/schema';
 import { pingIndexNow } from '@/lib/seo/indexnow';
 import { DEFAULT_AUTHOR_SLUG } from '@/lib/authors';
 
@@ -90,6 +90,20 @@ export async function approveAutopilotJob(formData: FormData): Promise<void> {
     .update(seoJobs)
     .set({ status: 'published', resultRef: slug, updatedAt: new Date() })
     .where(eq(seoJobs.id, id));
+
+  // For a Carbon News Brief: mark the cited items used so the next brief only
+  // covers fresh news.
+  if (job.jobType === 'news_brief') {
+    const sources = Array.isArray(p.sources)
+      ? (p.sources as unknown[]).filter((u): u is string => typeof u === 'string')
+      : [];
+    if (sources.length > 0) {
+      await db
+        .update(carbonNewsItems)
+        .set({ usedAt: new Date() })
+        .where(inArray(carbonNewsItems.url, sources));
+    }
+  }
 
   revalidatePath('/admin/seo');
 }

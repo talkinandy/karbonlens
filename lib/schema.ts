@@ -533,7 +533,13 @@ export const seoTasks = pgTable(
 // truth. Written by the publish endpoint (app/api/seo/autopilot/publish), read
 // by app/admin/seo. One row per unit of autopilot work.
 
-export type SeoJobType = 'editorial' | 'meta' | 'internal_link' | 'glossary' | 'programmatic';
+export type SeoJobType =
+  | 'editorial'
+  | 'meta'
+  | 'internal_link'
+  | 'glossary'
+  | 'programmatic'
+  | 'news_brief';
 export type SeoJobStatus =
   | 'queued'
   | 'generating'

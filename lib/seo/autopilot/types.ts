@@ -37,7 +37,13 @@ export type Opportunity = {
   grounding: GroundingFact[];
   /** For editorial: suggested kind + internal-link anchors that exist. */
   hints?: {
-    suggestedKind?: 'explainer' | 'evergreen' | 'comparison' | 'investigation' | 'market_report';
+    suggestedKind?:
+      | 'explainer'
+      | 'evergreen'
+      | 'comparison'
+      | 'investigation'
+      | 'market_report'
+      | 'news_brief';
     relatedUrls?: string[];
   };
 };
@@ -82,4 +88,23 @@ export type MetaArtifact = {
   description: string;
 };
 
-export type AutopilotArtifact = EditorialArtifact | MetaArtifact;
+/** A Carbon News Brief: original summaries of ingested news, citing + linking out. */
+export type NewsBriefArtifact = {
+  jobType: 'news_brief';
+  ref: string;
+  externalId?: string;
+  llmModel?: string;
+  tokensIn?: number;
+  tokensOut?: number;
+  kind: 'news_brief';
+  targetQuery?: string | null;
+  slug: string;
+  title: string;
+  summary: string;
+  bodyMd: string;
+  /** Source article URLs cited — each must be an ingested carbon_news_items url. */
+  sources: string[];
+  internalLinks?: string[];
+};
+
+export type AutopilotArtifact = EditorialArtifact | MetaArtifact | NewsBriefArtifact;
