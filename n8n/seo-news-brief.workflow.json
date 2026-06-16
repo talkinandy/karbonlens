@@ -1,0 +1,215 @@
+{
+  "name": "KarbonLens — Carbon News Brief",
+  "meta": {
+    "description": "Weekly Carbon News Brief — pulls fresh ingested carbon news, writes original summaries with source citations, posts to the citation-gated publish endpoint (review queue). See docs/runbooks/seo-autopilot.md."
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true
+  },
+  "nodes": [
+    {
+      "id": "trigger",
+      "name": "Schedule (Wed 07:00)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -360,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 7 * * 3"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "get_opps",
+      "name": "Get Opportunities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -140,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://karbonlens.com/api/seo/opportunities",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "type",
+              "value": "news_brief"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "KarbonLens Autopilot"
+        }
+      }
+    },
+    {
+      "id": "build_prompt",
+      "name": "Pick Top + Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const res = $input.first().json;\nconst opps = (res.opportunities || []).filter(o => o.jobType === 'news_brief');\nif (opps.length === 0) { return []; }\nconst opp = opps[0];\nconst system = [\n  'You are the editor of the KarbonLens Carbon News Brief, an Indonesian carbon-market intelligence publication.',\n  'RULES:',\n  '- Write ORIGINAL 1-2 sentence summaries in your own words. NEVER copy phrasing from the source text.',\n  '- Cite each item with a Markdown link [Source](exact-url-from-the-list). Only use URLs from the provided list.',\n  '- Do not state precise figures as fact; attribute any number to its source.',\n  '- On-site links must be root-relative (/prices, /projects, /regulatory). Avoid AI-tell phrases. No raw HTML.',\n  '- Title <= 80 chars, summary <= 320, slug lowercase kebab-case.',\n  'Return ONLY JSON: { \\\"kind\\\":\\\"news_brief\\\", \\\"slug\\\",\\\"title\\\",\\\"summary\\\",\\\"bodyMd\\\", \\\"sources\\\":[every url you cite] }.'\n].join('\\n');\nconst openaiBody = { model: 'gpt-5.5', response_format: { type: 'json_object' }, messages: [ { role: 'system', content: system }, { role: 'user', content: opp.brief } ] };\nreturn [{ json: { opp, openaiBody } }];"
+      }
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI — Generate Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.openaiBody) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "OpenAI Autopilot"
+        }
+      }
+    },
+    {
+      "id": "build_payload",
+      "name": "Build Publish Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const prev = $('Pick Top + Build Prompt').first().json;\nconst opp = prev.opp;\nconst ai = $input.first().json;\nconst content = ai.choices && ai.choices[0] && ai.choices[0].message ? ai.choices[0].message.content : '{}';\nlet artifact; try { artifact = JSON.parse(content); } catch (e) { throw new Error('OpenAI did not return JSON: ' + String(content).slice(0,200)); }\nconst usage = ai.usage || {};\nreturn [{ json: { jobType:'news_brief', ref:opp.ref, externalId:String($execution.id), llmModel:prev.openaiBody.model, tokensIn:usage.prompt_tokens, tokensOut:usage.completion_tokens, targetQuery:opp.targetQuery, kind:'news_brief', slug:artifact.slug, title:artifact.title, summary:artifact.summary, bodyMd:artifact.bodyMd, sources:artifact.sources || [] } }];"
+      }
+    },
+    {
+      "id": "publish",
+      "name": "Publish (gated)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        740,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://karbonlens.com/api/seo/autopilot/publish",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "KarbonLens Autopilot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Get Opportunities": {
+      "main": [
+        [
+          {
+            "node": "Pick Top + Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Top + Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenAI — Generate Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI — Generate Draft": {
+      "main": [
+        [
+          {
+            "node": "Build Publish Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Publish Payload": {
+      "main": [
+        [
+          {
+            "node": "Publish (gated)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule (Wed 07:00)": {
+      "main": [
+        [
+          {
+            "node": "Get Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
