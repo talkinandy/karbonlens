@@ -431,12 +431,14 @@ export async function dataReportOpportunities(limit = 4): Promise<Opportunity[]>
         targetQuery: key,
         targetUrl: '/prices',
         brief:
-          `Write the KarbonLens IDXCarbon monthly market report for ${latest.month}. Lead with the headline ` +
-          `average price, then a compact Markdown table comparing the latest two months' average price, traded ` +
-          `volume, and traded value, followed by 2–4 short paragraphs of analysis on the trend and what it means ` +
-          `for Indonesian carbon-market participants. Use ONLY the exact numbers in the grounding facts — do not ` +
-          `compute new figures (no percentages, growth rates, or totals that aren't provided); describe direction ` +
-          `in words. Link to /prices and /projects. Set kind to "market_report".`,
+          `Write the KarbonLens IDXCarbon monthly market report for ${latest.month}. Aim for 2,200–4,500 ` +
+          `characters of substantive Markdown. Structure: (1) lead with the headline average price; (2) a Markdown ` +
+          `table comparing the latest two months' average price, traded volume, and traded value; (3) a "Price" ` +
+          `section; (4) a "Liquidity (volume & value)" section; (5) a "What it means for participants" section for ` +
+          `buyers, sellers, and policymakers; (6) close by situating the month against KarbonLens's tracked ` +
+          `coverage (projects tracked, total credits issued). Use ONLY the exact numbers in the grounding facts — ` +
+          `do NOT compute new figures (no percentages, growth rates, or totals that aren't provided); describe ` +
+          `direction and magnitude in words. Link to /prices and /projects. Set kind to "market_report".`,
         grounding,
         hints: { suggestedKind: 'market_report', relatedUrls: ['/prices', '/projects'] },
       });
@@ -458,11 +460,13 @@ export async function dataReportOpportunities(limit = 4): Promise<Opportunity[]>
         targetQuery: key,
         targetUrl: '/projects',
         brief:
-          `Write the KarbonLens ${year} Q${q} league table of Indonesia's largest carbon projects by credits issued. ` +
-          `Present a ranked Markdown table (rank · project · credits issued) using ONLY the projects and exact ` +
-          `issued-credit numbers in the grounding facts, then 2–3 paragraphs on what the ranking shows. Do NOT ` +
-          `compute shares, sums, or any figure not in grounding. Link to /projects and each project's page where ` +
-          `relevant. Set kind to "market_report".`,
+          `Write the KarbonLens ${year} Q${q} league table of Indonesia's largest carbon projects by credits ` +
+          `issued. Aim for 2,200–4,500 characters of substantive Markdown. Structure: (1) a one-paragraph intro; ` +
+          `(2) a ranked Markdown table (rank · project · credits issued) using ONLY the projects and exact ` +
+          `issued-credit numbers in the grounding facts; (3) 3–4 paragraphs on what the ranking shows — the scale ` +
+          `of the leaders, the spread across the field, and what it signals for Indonesia's market. Do NOT ` +
+          `compute shares, sums, averages, or any figure not in grounding; describe magnitude in words. Link to ` +
+          `/projects. Set kind to "market_report".`,
         grounding,
         hints: { suggestedKind: 'market_report', relatedUrls: ['/projects'] },
       });
