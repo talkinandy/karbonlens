@@ -40,6 +40,21 @@ function resolveAuthor(slug: string): Author | null {
   return Object.prototype.hasOwnProperty.call(AUTHORS, slug) ? AUTHORS[slug] : null;
 }
 
+/** Human label for a sameAs profile URL (e.g. LinkedIn, Medium, GitHub). */
+function profileLabel(href: string): string {
+  let host = href;
+  try {
+    host = new URL(href).hostname.replace(/^www\./, '');
+  } catch {
+    /* keep raw */
+  }
+  if (host.includes('linkedin')) return 'LinkedIn';
+  if (host.includes('medium')) return 'Medium';
+  if (host.includes('github')) return 'GitHub';
+  if (host.includes('twitter') || host === 'x.com') return 'X';
+  return host;
+}
+
 export const revalidate = 3600;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -116,6 +131,21 @@ export default async function AuthorPage({ params }: Props) {
           <p style={{ fontSize: 15, lineHeight: 1.7, color: 'var(--text-2)', margin: 0 }}>
             {author.bio}
           </p>
+          {author.sameAs && author.sameAs.length > 0 && (
+            <p style={{ fontSize: 13, margin: '12px 0 0', display: 'flex', gap: 14 }}>
+              {author.sameAs.map((href) => (
+                <a
+                  key={href}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer me"
+                  style={{ color: 'var(--info-fg)', textDecoration: 'none' }}
+                >
+                  {profileLabel(href)}
+                </a>
+              ))}
+            </p>
+          )}
         </header>
 
         <h2
