@@ -19,6 +19,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { JsonLd } from '@/components/seo/JsonLd';
+import { getAuthor, authorPath } from '@/lib/authors';
 import { listNewsPosts, type NewsPost } from '@/lib/queries/news';
 
 const BASE = 'https://karbonlens.com';
@@ -113,6 +114,11 @@ export default async function NewsIndexPage() {
       url: `${BASE}/news/${p.slug}`,
       datePublished: p.publishedAt.toISOString(),
       description: p.summary,
+      author: {
+        '@type': 'Person',
+        name: getAuthor(p.authorSlug).name,
+        url: `${BASE}${authorPath(getAuthor(p.authorSlug).slug)}`,
+      },
     })),
   };
 
@@ -159,6 +165,8 @@ export default async function NewsIndexPage() {
                   <time dateTime={p.publishedAt.toISOString()}>
                     {formatDateShort(p.publishedAt)}
                   </time>
+                  {' · By '}
+                  {getAuthor(p.authorSlug).name}
                 </p>
                 <h2
                   style={{

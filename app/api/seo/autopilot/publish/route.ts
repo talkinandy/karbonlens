@@ -24,6 +24,7 @@ import { db } from '@/lib/db';
 import { newsPosts, seoJobs } from '@/lib/schema';
 import { pingIndexNow } from '@/lib/seo/indexnow';
 import { authorizeAutopilot } from '@/lib/seo/autopilot/auth';
+import { DEFAULT_AUTHOR_SLUG } from '@/lib/authors';
 import { runEditorialGate } from '@/lib/seo/autopilot/gate';
 import type { EditorialArtifact, GroundingFact } from '@/lib/seo/autopilot/types';
 
@@ -98,6 +99,7 @@ export async function POST(request: Request): Promise<Response> {
       title: body.title,
       summary: body.summary,
       bodyMd: body.bodyMd,
+      authorSlug: DEFAULT_AUTHOR_SLUG,
       factsJson: { autopilot: true, targetQuery: body.targetQuery ?? null } as Record<
         string,
         unknown

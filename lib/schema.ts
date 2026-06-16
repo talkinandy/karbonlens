@@ -409,6 +409,8 @@ export const newsPosts = pgTable(
     summary: text('summary').notNull(),
     bodyMd: text('body_md').notNull(),
     factsJson: jsonb('facts_json').$type<NewsPostFacts>().notNull().default({}),
+    // Named author for E-E-A-T; references a key in lib/authors.ts. See migration 013.
+    authorSlug: text('author_slug').notNull().default('andy-fajar-handika'),
     publishedAt: timestamp('published_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

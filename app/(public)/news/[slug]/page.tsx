@@ -22,6 +22,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { JsonLd } from '@/components/seo/JsonLd';
+import { getAuthor, authorPath } from '@/lib/authors';
 import {
   getNewsPostBySlug,
   type NewsPost,
@@ -387,6 +388,7 @@ export default async function NewsPostPage({ params }: Props) {
 
   const dateLong = formatDateLong(post.publishedAt);
   const isoPublished = post.publishedAt.toISOString();
+  const author = getAuthor(post.authorSlug);
 
   const articleSchema = {
     '@context': 'https://schema.org',
@@ -396,8 +398,11 @@ export default async function NewsPostPage({ params }: Props) {
     dateModified: isoPublished,
     description: post.summary,
     author: {
-      '@type': 'Organization',
-      name: 'KarbonLens',
+      '@type': 'Person',
+      name: author.name,
+      jobTitle: author.jobTitle,
+      url: `${BASE}${authorPath(author.slug)}`,
+      ...(author.sameAs && author.sameAs.length > 0 ? { sameAs: author.sameAs } : {}),
     },
     publisher: {
       '@type': 'Organization',
@@ -462,10 +467,18 @@ export default async function NewsPostPage({ params }: Props) {
             className="kl-muted"
             style={{ fontSize: 13, margin: 0 }}
           >
-            Published{' '}
+            By{' '}
+            <Link
+              href={authorPath(author.slug)}
+              rel="author"
+              style={{ color: 'var(--info-fg)', textDecoration: 'none' }}
+            >
+              {author.name}
+            </Link>
+            {', '}
+            {author.jobTitle}
+            {' · Published '}
             <time dateTime={isoPublished}>{dateLong}</time>
-            {' · '}
-            Auto-composed from the week&apos;s data refresh
           </p>
         </header>
 

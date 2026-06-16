@@ -19,6 +19,7 @@ export type NewsPost = {
   summary: string;
   bodyMd: string;
   factsJson: Record<string, unknown>;
+  authorSlug: string;
   publishedAt: Date;
 };
 
@@ -27,6 +28,23 @@ export async function listNewsPosts(limit = 50): Promise<NewsPost[]> {
     const rows = await db
       .select()
       .from(newsPosts)
+      .orderBy(desc(newsPosts.publishedAt))
+      .limit(limit);
+    return rows.map(mapRow);
+  } catch {
+    return [];
+  }
+}
+
+export async function listNewsPostsByAuthor(
+  authorSlug: string,
+  limit = 100,
+): Promise<NewsPost[]> {
+  try {
+    const rows = await db
+      .select()
+      .from(newsPosts)
+      .where(eq(newsPosts.authorSlug, authorSlug))
       .orderBy(desc(newsPosts.publishedAt))
       .limit(limit);
     return rows.map(mapRow);
@@ -58,6 +76,7 @@ function mapRow(row: typeof newsPosts.$inferSelect): NewsPost {
     summary: row.summary,
     bodyMd: row.bodyMd,
     factsJson: row.factsJson,
+    authorSlug: row.authorSlug,
     publishedAt: row.publishedAt,
   };
 }
