@@ -16,7 +16,8 @@ hard-gated publish endpoint. No Claude Code session is in the loop.
         claims-grounded · numbers-declared · grounding-reverify (fresh DB read)
         · dedup · slop-lint · links-valid
                                          ▼
-        pass → insert news_posts · revalidate /sitemap.xml + /news · IndexNow
+        pass → seo_jobs status='qa_passed' (202) → /admin/seo review queue →
+               human Approve → insert news_posts · revalidate + IndexNow
         fail → seo_jobs row status='qa_failed' (422), nothing ships
                                          ▼
                  /admin/seo "Autopilot" tile shows the whole pipeline
@@ -106,8 +107,16 @@ Auth: same bearer. Body = the artifact **plus the grounding it was given**:
   "grounding": [ /* echo the exact array from the opportunity */ ]
 }
 ```
-Responses: `200` published, `422` gate rejected (body has the per-check `qa`
-report), `409` duplicate slug, `400` bad shape, `401/503` auth/config.
+Responses: `202` gate passed → **queued for human review** (body has
+`{queuedForReview:true, status:"qa_passed", jobId, qa}`; nothing is live yet),
+`422` gate rejected (body has the per-check `qa` report), `400` bad shape,
+`401/503` auth/config.
+
+> **Human-in-the-loop (WS2a):** the autopilot no longer auto-publishes. A
+> gate-passed artifact is parked as `seo_jobs.status='qa_passed'` and appears in
+> the **Review queue** on `/admin/seo`, where an admin clicks **Approve &
+> publish** (→ inserts `news_posts`, revalidates, pings IndexNow) or **Reject**
+> (→ `rejected`). Duplicate-slug races are caught at approval time (→ `skipped`).
 
 > Phase 1 publishes **editorial** only. `meta` and `glossary` opportunities are
 > surfaced for visibility but their apply-surfaces (meta-override table,

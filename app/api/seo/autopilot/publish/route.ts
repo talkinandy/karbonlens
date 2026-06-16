@@ -19,12 +19,9 @@
  */
 
 import { NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
-import { newsPosts, seoJobs } from '@/lib/schema';
-import { pingIndexNow } from '@/lib/seo/indexnow';
+import { seoJobs } from '@/lib/schema';
 import { authorizeAutopilot } from '@/lib/seo/autopilot/auth';
-import { DEFAULT_AUTHOR_SLUG } from '@/lib/authors';
 import { runEditorialGate } from '@/lib/seo/autopilot/gate';
 import type { EditorialArtifact, GroundingFact } from '@/lib/seo/autopilot/types';
 
@@ -89,60 +86,24 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ ok: false, published: false, qa }, { status: 422 });
   }
 
-  // Gate passed — publish. Dedupe via ON CONFLICT (slug). An empty returning
-  // means a concurrent publish already took the slug.
-  const inserted = await db
-    .insert(newsPosts)
-    .values({
-      slug: body.slug,
-      kind: body.kind,
-      title: body.title,
-      summary: body.summary,
-      bodyMd: body.bodyMd,
-      authorSlug: DEFAULT_AUTHOR_SLUG,
-      factsJson: { autopilot: true, targetQuery: body.targetQuery ?? null } as Record<
-        string,
-        unknown
-      >,
-    })
-    .onConflictDoNothing()
-    .returning({ id: newsPosts.id, slug: newsPosts.slug });
+  // Gate passed — but the autopilot no longer auto-publishes (WS2a). Park the
+  // artifact as qa_passed for a human to Approve/Reject on /admin/seo. The
+  // full artifact lives in payload; approval inserts news_posts + revalidates +
+  // pings IndexNow (see app/admin/seo/autopilot-actions.ts).
+  const [job] = await db
+    .insert(seoJobs)
+    .values({ ...baseRow, status: 'qa_passed' })
+    .returning({ id: seoJobs.id });
 
-  if (inserted.length === 0) {
-    await db.insert(seoJobs).values({
-      ...baseRow,
-      status: 'skipped',
-      error: 'slug already published (conflict)',
-    });
-    return NextResponse.json({ ok: false, published: false, reason: 'duplicate slug' }, { status: 409 });
-  }
-
-  // Make the new post crawlable now: refresh sitemap + the news surfaces, then
-  // ping IndexNow (fire-and-forget semantics; failure must not fail the publish).
-  revalidatePath('/sitemap.xml');
-  revalidatePath('/news');
-  revalidatePath(`/news/${body.slug}`);
-
-  const base = process.env.NEXTAUTH_URL ?? 'https://karbonlens.com';
-  let indexnow: unknown = null;
-  try {
-    indexnow = await pingIndexNow([`${base}/news/${body.slug}`, `${base}/news`]);
-  } catch {
-    indexnow = { ok: false };
-  }
-
-  await db.insert(seoJobs).values({
-    ...baseRow,
-    status: 'published',
-    resultRef: body.slug,
-  });
-
-  return NextResponse.json({
-    ok: true,
-    published: true,
-    slug: body.slug,
-    url: `${base}/news/${body.slug}`,
-    qa,
-    indexnow,
-  });
+  return NextResponse.json(
+    {
+      ok: true,
+      published: false,
+      queuedForReview: true,
+      status: 'qa_passed',
+      jobId: job?.id ?? null,
+      qa,
+    },
+    { status: 202 },
+  );
 }

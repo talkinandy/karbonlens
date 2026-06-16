@@ -304,15 +304,31 @@ export type AutopilotJobRow = {
   createdAt: Date;
 };
 
+/** A gate-passed artifact awaiting human Approve/Reject (WS2a). */
+export type AutopilotReviewRow = {
+  id: number;
+  title: string | null;
+  slug: string | null;
+  summary: string | null;
+  kind: string | null;
+  targetQuery: string | null;
+  bodyChars: number;
+  createdAt: Date;
+};
+
 export type AutopilotSummary = {
   /** Per-status counts over the trailing 30 days. */
   counts: Record<string, number>;
   published30d: number;
   qaFailed30d: number;
-  /** Pass rate over jobs that reached the gate (published / (published+qa_failed)). */
+  /** Number of gate-passed artifacts awaiting human review (all-time, qa_passed). */
+  pendingReview: number;
+  /** Gate pass rate = gate-passed / (gate-passed + gate-failed) over 30 days. */
   passRate: number | null;
   lastRunAt: Date | null;
   recent: AutopilotJobRow[];
+  /** Oldest-first so reviewers clear the backlog in order. */
+  reviewQueue: AutopilotReviewRow[];
 };
 
 export async function getAutopilotSummary(): Promise<AutopilotSummary> {
@@ -327,7 +343,10 @@ export async function getAutopilotSummary(): Promise<AutopilotSummary> {
   for (const r of countRows) counts[r.status] = Number(r.n);
   const published30d = counts['published'] ?? 0;
   const qaFailed30d = counts['qa_failed'] ?? 0;
-  const gateTotal = published30d + qaFailed30d;
+  // Anything that cleared the gate, whatever a human later did with it.
+  const gatePassed30d =
+    (counts['qa_passed'] ?? 0) + published30d + (counts['rejected'] ?? 0) + (counts['skipped'] ?? 0);
+  const gateTotal = gatePassed30d + qaFailed30d;
 
   const recentRows = (await db.execute(sql`
     SELECT id, job_type, status, title, target_query, result_ref, qa, created_at
@@ -345,11 +364,27 @@ export async function getAutopilotSummary(): Promise<AutopilotSummary> {
     created_at: string;
   }>;
 
+  // The review backlog: gate-passed, not yet approved/rejected. Oldest first.
+  const reviewRows = (await db.execute(sql`
+    SELECT id, title, target_query, payload, created_at
+    FROM seo_jobs
+    WHERE status = 'qa_passed'
+    ORDER BY created_at ASC
+    LIMIT 50
+  `)) as unknown as Array<{
+    id: number;
+    title: string | null;
+    target_query: string | null;
+    payload: Record<string, unknown> | null;
+    created_at: string;
+  }>;
+
   return {
     counts,
     published30d,
     qaFailed30d,
-    passRate: gateTotal > 0 ? published30d / gateTotal : null,
+    pendingReview: counts['qa_passed'] ?? 0,
+    passRate: gateTotal > 0 ? gatePassed30d / gateTotal : null,
     lastRunAt: recentRows[0] ? new Date(recentRows[0].created_at) : null,
     recent: recentRows.map((r) => ({
       id: Number(r.id),
@@ -361,5 +396,18 @@ export async function getAutopilotSummary(): Promise<AutopilotSummary> {
       qa: r.qa && typeof r.qa === 'object' && 'passed' in r.qa ? r.qa : null,
       createdAt: new Date(r.created_at),
     })),
+    reviewQueue: reviewRows.map((r) => {
+      const p = (r.payload ?? {}) as Record<string, unknown>;
+      return {
+        id: Number(r.id),
+        title: r.title,
+        slug: typeof p.slug === 'string' ? p.slug : null,
+        summary: typeof p.summary === 'string' ? p.summary : null,
+        kind: typeof p.kind === 'string' ? p.kind : null,
+        targetQuery: r.target_query,
+        bodyChars: typeof p.bodyMd === 'string' ? p.bodyMd.length : 0,
+        createdAt: new Date(r.created_at),
+      };
+    }),
   };
 }

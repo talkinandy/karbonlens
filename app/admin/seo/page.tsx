@@ -52,6 +52,7 @@ import {
 } from '@/lib/queries/seo/dashboard';
 import type { SeoTaskPriority } from '@/lib/seo/plan';
 import { updateSeoTaskStatus } from './punch-list-actions';
+import { approveAutopilotJob, rejectAutopilotJob } from './autopilot-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -836,11 +837,14 @@ function TopKeywordsTile({ rows }: { rows: KeywordRankRow[] }) {
 }
 
 function AutopilotTile({ autopilot }: { autopilot: AutopilotSummary }) {
-  const { counts, published30d, qaFailed30d, passRate, lastRunAt, recent } = autopilot;
+  const { counts, published30d, qaFailed30d, pendingReview, passRate, lastRunAt, recent, reviewQueue } =
+    autopilot;
   const statusColor: Record<string, string> = {
     published: 'var(--success, #16a34a)',
     applied: 'var(--success, #16a34a)',
+    qa_passed: 'var(--info-fg, #2563eb)',
     qa_failed: 'var(--danger, #dc2626)',
+    rejected: 'var(--danger, #dc2626)',
     error: 'var(--danger, #dc2626)',
     skipped: 'var(--text-3)',
     queued: 'var(--text-3)',
@@ -852,6 +856,7 @@ function AutopilotTile({ autopilot }: { autopilot: AutopilotSummary }) {
         Autopilot (N8N · LLM)
       </div>
       <div style={{ marginTop: 8 }}>
+        <StatRow label="Awaiting review" value={pendingReview.toLocaleString()} />
         <StatRow label="Published (30d)" value={published30d.toLocaleString()} />
         <StatRow label="Rejected by gate (30d)" value={qaFailed30d.toLocaleString()} />
         <StatRow
@@ -863,6 +868,82 @@ function AutopilotTile({ autopilot }: { autopilot: AutopilotSummary }) {
           value={lastRunAt ? lastRunAt.toISOString().slice(0, 16).replace('T', ' ') : 'never'}
         />
       </div>
+
+      {reviewQueue.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div className="kl-section-label" style={{ fontSize: 12, marginBottom: 6 }}>
+            Review queue — gate passed, awaiting publish ({reviewQueue.length})
+          </div>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 13 }}>
+            {reviewQueue.map((r) => (
+              <li
+                key={r.id}
+                style={{ padding: '10px 0', borderBottom: '0.5px solid var(--border)' }}
+              >
+                <div style={{ fontWeight: 500 }}>{r.title ?? r.slug ?? `job ${r.id}`}</div>
+                {r.summary && (
+                  <div style={{ fontSize: 12, color: 'var(--text-2)', margin: '2px 0 4px' }}>
+                    {r.summary}
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                  {r.kind ?? 'editorial'} · {r.bodyChars.toLocaleString()} chars
+                  {r.targetQuery ? ` · “${r.targetQuery}”` : ''}
+                  {r.slug ? (
+                    <>
+                      {' · '}
+                      <a
+                        href={`/news/${r.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: 'var(--info-fg)' }}
+                      >
+                        preview
+                      </a>
+                    </>
+                  ) : null}
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <form action={approveAutopilotJob}>
+                    <input type="hidden" name="id" value={r.id} />
+                    <button
+                      type="submit"
+                      style={{
+                        fontSize: 12,
+                        padding: '4px 10px',
+                        border: '1px solid var(--success, #16a34a)',
+                        borderRadius: 4,
+                        background: 'var(--success, #16a34a)',
+                        color: 'white',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Approve &amp; publish
+                    </button>
+                  </form>
+                  <form action={rejectAutopilotJob}>
+                    <input type="hidden" name="id" value={r.id} />
+                    <button
+                      type="submit"
+                      style={{
+                        fontSize: 12,
+                        padding: '4px 10px',
+                        border: '1px solid var(--border)',
+                        borderRadius: 4,
+                        background: 'transparent',
+                        color: 'var(--danger, #dc2626)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Reject
+                    </button>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {recent.length === 0 ? (
         <p style={{ margin: '12px 0 0', fontSize: 12, color: 'var(--text-3)' }}>
           No jobs yet — N8N posts here once the autopilot workflow runs. See{' '}
@@ -911,8 +992,8 @@ function AutopilotTile({ autopilot }: { autopilot: AutopilotSummary }) {
         </ul>
       )}
       <p style={{ margin: '10px 0 0', fontSize: 11, color: 'var(--text-3)' }}>
-        Queued {counts['queued'] ?? 0} · generating {counts['generating'] ?? 0} · skipped{' '}
-        {counts['skipped'] ?? 0} · error {counts['error'] ?? 0}
+        Queued {counts['queued'] ?? 0} · generating {counts['generating'] ?? 0} · rejected{' '}
+        {counts['rejected'] ?? 0} · skipped {counts['skipped'] ?? 0} · error {counts['error'] ?? 0}
       </p>
     </section>
   );

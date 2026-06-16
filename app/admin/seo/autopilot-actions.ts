@@ -1,0 +1,105 @@
+/**
+ * Server actions for the SEO Autopilot review queue (admin only, WS2a).
+ *
+ * The publish endpoint parks gate-passed artifacts as seo_jobs.status =
+ * 'qa_passed'. These actions are the human gate: Approve inserts the post into
+ * news_posts (then revalidates + pings IndexNow, exactly as the old auto-publish
+ * path did), Reject marks it 'rejected'. Both are admin-gated.
+ */
+
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { eq } from 'drizzle-orm';
+
+import { auth } from '@/lib/auth';
+import { isAdmin } from '@/lib/admin';
+import { db } from '@/lib/db';
+import { newsPosts, seoJobs } from '@/lib/schema';
+import { pingIndexNow } from '@/lib/seo/indexnow';
+import { DEFAULT_AUTHOR_SLUG } from '@/lib/authors';
+
+async function requireAdmin() {
+  const session = await auth();
+  if (!isAdmin(session)) throw new Error('Forbidden');
+}
+
+function jobId(formData: FormData): number {
+  const id = Number(String(formData.get('id') ?? '').trim());
+  if (!Number.isInteger(id) || id <= 0) throw new Error('Invalid job id');
+  return id;
+}
+
+export async function approveAutopilotJob(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = jobId(formData);
+
+  const [job] = await db.select().from(seoJobs).where(eq(seoJobs.id, id)).limit(1);
+  if (!job) throw new Error('Job not found');
+  if (job.status !== 'qa_passed') throw new Error(`Job ${id} is not awaiting review (${job.status})`);
+
+  const p = job.payload as Record<string, unknown>;
+  const slug = String(p.slug ?? '');
+  const kind = String(p.kind ?? '');
+  const title = String(p.title ?? '');
+  const summary = String(p.summary ?? '');
+  const bodyMd = String(p.bodyMd ?? '');
+  if (!slug || !kind || !title || !summary || !bodyMd) {
+    throw new Error('Stored artifact is incomplete');
+  }
+
+  // Insert the post; ON CONFLICT (slug) guards a slug taken since the gate ran.
+  const inserted = await db
+    .insert(newsPosts)
+    .values({
+      slug,
+      kind,
+      title,
+      summary,
+      bodyMd,
+      authorSlug: DEFAULT_AUTHOR_SLUG,
+      factsJson: { autopilot: true, targetQuery: job.targetQuery ?? null } as Record<
+        string,
+        unknown
+      >,
+    })
+    .onConflictDoNothing()
+    .returning({ id: newsPosts.id });
+
+  if (inserted.length === 0) {
+    await db
+      .update(seoJobs)
+      .set({ status: 'skipped', error: 'slug already published (conflict)', updatedAt: new Date() })
+      .where(eq(seoJobs.id, id));
+    revalidatePath('/admin/seo');
+    return;
+  }
+
+  // Make it crawlable, then ping IndexNow (failure must not fail the approval).
+  revalidatePath('/sitemap.xml');
+  revalidatePath('/news');
+  revalidatePath(`/news/${slug}`);
+  const base = process.env.NEXTAUTH_URL ?? 'https://karbonlens.com';
+  try {
+    await pingIndexNow([`${base}/news/${slug}`, `${base}/news`]);
+  } catch {
+    // non-fatal
+  }
+
+  await db
+    .update(seoJobs)
+    .set({ status: 'published', resultRef: slug, updatedAt: new Date() })
+    .where(eq(seoJobs.id, id));
+
+  revalidatePath('/admin/seo');
+}
+
+export async function rejectAutopilotJob(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = jobId(formData);
+  await db
+    .update(seoJobs)
+    .set({ status: 'rejected', updatedAt: new Date() })
+    .where(eq(seoJobs.id, id));
+  revalidatePath('/admin/seo');
+}

@@ -537,9 +537,11 @@ export type SeoJobType = 'editorial' | 'meta' | 'internal_link' | 'glossary' | '
 export type SeoJobStatus =
   | 'queued'
   | 'generating'
+  | 'qa_passed'
   | 'qa_failed'
   | 'published'
   | 'applied'
+  | 'rejected'
   | 'skipped'
   | 'error';
 
