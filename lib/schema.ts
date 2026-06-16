@@ -578,3 +578,29 @@ export const seoJobs = pgTable(
     index('idx_seo_jobs_query').on(t.targetQuery),
   ],
 );
+
+// ─── carbon_news_items ───────────────────────────────────────────────────────
+// WS3 Carbon News Brief ingest store. Metadata only (title/source/link/snippet),
+// never full text — the brief links out with attribution. See migration 016.
+export type CarbonNewsCategory = 'google_news' | 'outlet' | 'specialist' | 'gov_registry';
+
+export const carbonNewsItems = pgTable(
+  'carbon_news_items',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    url: text('url').notNull().unique(),
+    sourceName: text('source_name'),
+    sourceCategory: text('source_category').$type<CarbonNewsCategory>().notNull(),
+    feed: text('feed'),
+    title: text('title').notNull(),
+    snippet: text('snippet'),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('idx_carbon_news_published').on(t.publishedAt.desc()),
+    index('idx_carbon_news_used').on(t.usedAt),
+    index('idx_carbon_news_fetched').on(t.fetchedAt.desc()),
+  ],
+);
