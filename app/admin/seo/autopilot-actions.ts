@@ -10,12 +10,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 
 import { auth } from '@/lib/auth';
 import { isAdmin } from '@/lib/admin';
 import { db } from '@/lib/db';
-import { carbonNewsItems, newsPosts, seoJobs } from '@/lib/schema';
+import { carbonNewsItems, newsPosts, regulatoryEvents, seoJobs } from '@/lib/schema';
 import { pingIndexNow } from '@/lib/seo/indexnow';
 import { DEFAULT_AUTHOR_SLUG } from '@/lib/authors';
 
@@ -39,6 +39,47 @@ export async function approveAutopilotJob(formData: FormData): Promise<void> {
   if (job.status !== 'qa_passed') throw new Error(`Job ${id} is not awaiting review (${job.status})`);
 
   const p = job.payload as Record<string, unknown>;
+
+  // Regulatory jobs insert into regulatory_events (not news_posts).
+  if (job.jobType === 'regulatory') {
+    const events = Array.isArray(p.events) ? (p.events as Array<Record<string, unknown>>) : [];
+    let insertedCount = 0;
+    for (const e of events) {
+      const title = String(e.title ?? '').trim();
+      const eventDate = String(e.eventDate ?? '').trim();
+      if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) continue;
+      const docNum = e.documentNumber ? String(e.documentNumber).trim() : '';
+      const dup = (await db.execute(sql`
+        SELECT 1 FROM regulatory_events
+        WHERE (${docNum} <> '' AND lower(document_number) = lower(${docNum}))
+           OR lower(title) = lower(${title})
+        LIMIT 1
+      `)) as unknown as unknown[];
+      if (dup.length > 0) continue;
+      await db.insert(regulatoryEvents).values({
+        eventDate,
+        ministry: e.ministry ? String(e.ministry) : null,
+        documentType: e.documentType ? String(e.documentType) : null,
+        documentNumber: docNum || null,
+        title,
+        documentUrl: e.documentUrl ? String(e.documentUrl) : null,
+        summaryEn: e.summaryEn ? String(e.summaryEn) : null,
+        summaryId: e.summaryId ? String(e.summaryId) : null,
+        importance: e.importance ? String(e.importance) : null,
+        tags: Array.isArray(e.tags) ? (e.tags as unknown[]).map(String) : null,
+        isUpcoming: e.isUpcoming === true,
+      });
+      insertedCount += 1;
+    }
+    await db
+      .update(seoJobs)
+      .set({ status: 'published', resultRef: `${insertedCount} events`, updatedAt: new Date() })
+      .where(eq(seoJobs.id, id));
+    revalidatePath('/regulatory');
+    revalidatePath('/admin/seo');
+    return;
+  }
+
   const slug = String(p.slug ?? '');
   const kind = String(p.kind ?? '');
   const title = String(p.title ?? '');

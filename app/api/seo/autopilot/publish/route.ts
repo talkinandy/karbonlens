@@ -24,9 +24,11 @@ import { seoJobs, type SeoJobQa, type SeoJobType } from '@/lib/schema';
 import { authorizeAutopilot } from '@/lib/seo/autopilot/auth';
 import { runEditorialGate } from '@/lib/seo/autopilot/gate';
 import { runNewsBriefGate } from '@/lib/seo/autopilot/news-gate';
+import { runRegulatoryGate } from '@/lib/seo/autopilot/regulatory-gate';
 import type {
   EditorialArtifact,
   NewsBriefArtifact,
+  RegulatoryArtifact,
   GroundingFact,
 } from '@/lib/seo/autopilot/types';
 
@@ -35,7 +37,8 @@ export const dynamic = 'force-dynamic';
 
 type PublishBody =
   | (EditorialArtifact & { grounding?: GroundingFact[] })
-  | NewsBriefArtifact;
+  | NewsBriefArtifact
+  | RegulatoryArtifact;
 
 type BaseRow = {
   jobType: SeoJobType;
@@ -113,6 +116,31 @@ async function prepNewsBrief(body: NewsBriefArtifact): Promise<BaseRow | Respons
   };
 }
 
+/** Validate + gate a batch of extracted regulatory events. */
+async function prepRegulatory(body: RegulatoryArtifact): Promise<BaseRow | Response> {
+  if (!Array.isArray(body.events) || body.events.length === 0) {
+    return bad('regulatory requires a non-empty events[]');
+  }
+  const qa = await runRegulatoryGate(body);
+  // Human-readable digest into summary so the review card shows every event.
+  const digest = body.events
+    .map((e) => `• ${e.eventDate} — ${e.title}${e.documentNumber ? ` (${e.documentNumber})` : ''} [${e.documentUrl}]`)
+    .join('\n');
+  return {
+    jobType: 'regulatory',
+    targetQuery: body.targetQuery ?? 'regulatory-update',
+    targetUrl: '/regulatory',
+    title: `Regulatory update — ${body.events.length} event(s)`,
+    payload: { ...body, kind: 'regulatory', summary: digest },
+    grounding: { events: body.events.length },
+    qa,
+    llmModel: body.llmModel ?? null,
+    tokensIn: body.tokensIn ?? null,
+    tokensOut: body.tokensOut ?? null,
+    externalId: body.externalId ?? null,
+  };
+}
+
 export async function POST(request: Request): Promise<Response> {
   const auth = authorizeAutopilot(request);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -129,10 +157,12 @@ export async function POST(request: Request): Promise<Response> {
     prepared = await prepEditorial(body);
   } else if (body.jobType === 'news_brief') {
     prepared = await prepNewsBrief(body);
+  } else if (body.jobType === 'regulatory') {
+    prepared = await prepRegulatory(body);
   } else {
     const jt = (body as { jobType?: string }).jobType;
     return bad(
-      `Apply surface for job_type '${jt}' is not enabled yet — only 'editorial' and 'news_brief' publish today.`,
+      `Apply surface for job_type '${jt}' is not enabled yet — only 'editorial', 'news_brief', and 'regulatory' publish today.`,
     );
   }
   if (prepared instanceof Response) return prepared;

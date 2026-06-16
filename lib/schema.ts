@@ -539,7 +539,8 @@ export type SeoJobType =
   | 'internal_link'
   | 'glossary'
   | 'programmatic'
-  | 'news_brief';
+  | 'news_brief'
+  | 'regulatory';
 export type SeoJobStatus =
   | 'queued'
   | 'generating'

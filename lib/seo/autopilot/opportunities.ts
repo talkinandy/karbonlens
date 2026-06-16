@@ -547,6 +547,82 @@ export async function newsBriefOpportunity(): Promise<Opportunity[]> {
   ];
 }
 
+// ── Regulatory: extract structured events from gov/registry news (WS4) ───────
+
+const REGULATORY_MIN_ITEMS = 3;
+
+export async function regulatoryOpportunity(): Promise<Opportunity[]> {
+  // Weekly cadence.
+  const recent = (await db.execute(sql`
+    SELECT 1 FROM seo_jobs
+    WHERE job_type = 'regulatory'
+      AND status IN ('queued', 'generating', 'qa_passed', 'qa_failed', 'published', 'rejected', 'skipped')
+      AND created_at >= NOW() - INTERVAL '7 days'
+    LIMIT 1
+  `)) as unknown as unknown[];
+  if (recent.length > 0) return [];
+
+  // Recent gov/registry news as extraction candidates (dedup is at the
+  // regulatory_events level, so we don't gate on used_at here).
+  const rows = (await db.execute(sql`
+    SELECT id, url, source_name, title, snippet,
+           TO_CHAR(COALESCE(published_at, fetched_at), 'YYYY-MM-DD') AS dt
+    FROM carbon_news_items
+    WHERE source_category = 'gov_registry'
+      AND COALESCE(published_at, fetched_at) >= NOW() - INTERVAL '21 days'
+    ORDER BY COALESCE(published_at, fetched_at) DESC
+    LIMIT 20
+  `)) as unknown as Array<{
+    id: number;
+    url: string;
+    source_name: string | null;
+    title: string;
+    snippet: string | null;
+    dt: string | null;
+  }>;
+  if (rows.length < REGULATORY_MIN_ITEMS) return [];
+
+  const items = rows.map((r) => ({
+    source: r.source_name ?? 'Source',
+    title: r.title,
+    url: r.url,
+    snippet: r.snippet ?? '',
+    date: r.dt,
+  }));
+  const grounding: GroundingFact[] = rows.map((r) => ({
+    key: `news:${r.id}`,
+    label: `${r.source_name ?? 'Source'}: ${r.title}`,
+    value: r.url,
+  }));
+
+  const brief =
+    `From the Indonesian gov/registry carbon-news items below, extract ONLY genuine regulatory ` +
+    `developments (new or upcoming regulations, ministerial decrees, permits, NDC/Article-6 rules, ` +
+    `registry policy changes). Ignore ordinary market news, opinion, or company PR. For each real ` +
+    `regulatory item, output a structured event with: eventDate (YYYY-MM-DD; the item's date if the ` +
+    `regulation date is unstated), ministry (e.g. KLHK/OJK if identifiable), documentType + ` +
+    `documentNumber if stated (else null), a concise factual title, documentUrl = the item's exact url, ` +
+    `summaryEn (1-3 sentences, original wording — never copy the source), optional summaryId (Bahasa), ` +
+    `importance (high|medium|low), tags[], and isUpcoming (true if the rule is future-dated). Do NOT ` +
+    `invent document numbers or dates. Return JSON { "events": [ ... ] } with only the items that are ` +
+    `genuinely regulatory (possibly empty). Items:\n` +
+    JSON.stringify(items, null, 2);
+
+  return [
+    {
+      jobType: 'regulatory',
+      ref: 'report:regulatory-update',
+      score: 80000,
+      reason: `${rows.length} recent gov/registry items to scan for regulatory developments.`,
+      targetQuery: 'regulatory-update',
+      targetUrl: '/regulatory',
+      brief,
+      grounding,
+      hints: { relatedUrls: ['/regulatory'] },
+    },
+  ];
+}
+
 export type OpportunityBundle = {
   generatedAt: string;
   counts: Record<string, number>;
@@ -555,21 +631,28 @@ export type OpportunityBundle = {
 
 /** Top opportunities across all live detectors, ranked by score. */
 export async function allOpportunities(perType = 8): Promise<OpportunityBundle> {
-  const [report, newsBrief, editorial, meta, glossary] = await Promise.all([
+  const [report, newsBrief, regulatory, editorial, meta, glossary] = await Promise.all([
     dataReportOpportunities(perType),
     newsBriefOpportunity(),
+    regulatoryOpportunity(),
     editorialOpportunities(perType),
     metaOpportunities(perType),
     glossaryOpportunities(perType),
   ]);
-  const opportunities = [...report, ...newsBrief, ...editorial, ...meta, ...glossary].sort(
-    (a, b) => b.score - a.score,
-  );
+  const opportunities = [
+    ...report,
+    ...newsBrief,
+    ...regulatory,
+    ...editorial,
+    ...meta,
+    ...glossary,
+  ].sort((a, b) => b.score - a.score);
   return {
     generatedAt: new Date().toISOString(),
     counts: {
       report: report.length,
       news_brief: newsBrief.length,
+      regulatory: regulatory.length,
       editorial: editorial.length,
       meta: meta.length,
       glossary: glossary.length,

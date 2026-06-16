@@ -107,4 +107,36 @@ export type NewsBriefArtifact = {
   internalLinks?: string[];
 };
 
-export type AutopilotArtifact = EditorialArtifact | MetaArtifact | NewsBriefArtifact;
+/** One structured regulatory event extracted from sourced news. */
+export type RegulatoryEventDraft = {
+  eventDate: string; // YYYY-MM-DD
+  ministry?: string | null;
+  documentType?: string | null;
+  documentNumber?: string | null;
+  title: string;
+  /** Source URL — must be an ingested carbon_news_items url (traceability). */
+  documentUrl: string;
+  summaryEn: string;
+  summaryId?: string | null;
+  importance?: 'high' | 'medium' | 'low' | null;
+  tags?: string[];
+  isUpcoming?: boolean;
+};
+
+/** A batch of regulatory events the LLM extracted from gov/registry news. */
+export type RegulatoryArtifact = {
+  jobType: 'regulatory';
+  ref: string;
+  externalId?: string;
+  llmModel?: string;
+  tokensIn?: number;
+  tokensOut?: number;
+  targetQuery?: string | null;
+  events: RegulatoryEventDraft[];
+};
+
+export type AutopilotArtifact =
+  | EditorialArtifact
+  | MetaArtifact
+  | NewsBriefArtifact
+  | RegulatoryArtifact;
