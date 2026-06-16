@@ -1,33 +1,58 @@
 /**
- * scripts/seo/fetch-gsc.ts — SEO Phase 1 dashboard cron.
+ * scripts/seo/fetch-gsc.ts — SEO Phase 1 dashboard cron (live GSC pull).
  *
- * Pulls indexation + Search Analytics from Google Search Console and writes
- * one row into seo_indexation_snapshots + N rows into seo_keyword_ranks per
- * run.
+ * Pulls Search Analytics (per query+page) and an indexation snapshot from
+ * Google Search Console and writes them to seo_keyword_ranks +
+ * seo_indexation_snapshots. Reads the SEO dashboard at /admin/seo.
  *
- * STUB STATE (Phase 1 ship): this script no-ops with a clear log line until
- * GSC API credentials land. The dashboard will display "no data yet" until
- * then. Wiring is deferred to a follow-up PR — the env contract below is
- * the integration point.
+ * Auth: service-account JWT-bearer flow, see lib/seo/gsc-client.ts.
  *
- * Required env (when credentials land):
+ * Required env:
  *   GSC_SERVICE_ACCOUNT_JSON_BASE64  — base64-encoded service account JSON
- *   GSC_SITE_URL                     — 'https://karbonlens.com/' (trailing slash matters in GSC API)
+ *   GSC_SITE_URL                     — 'https://karbonlens.com/' (trailing slash matters)
  *
- * Setup:
- *   1. GCP Console → IAM → Service Accounts → Create
- *   2. Add the service account email as a user on the GSC property
- *      (Settings → Users and permissions → Add user, Full permission)
- *   3. Generate a JSON key, base64-encode it, set GSC_SERVICE_ACCOUNT_JSON_BASE64.
+ * Indexation snapshot semantics (GSC has no clean "indexed page count" API):
+ *   - submitted = count of <url> entries in our own /sitemap.xml
+ *   - indexed   = count of DISTINCT pages that received >=1 impression in
+ *                 the trailing 28-day window. A page appearing in Search
+ *                 results is definitively indexed, so this is a true lower
+ *                 bound on indexed pages (cheap, no per-URL URL-Inspection
+ *                 rate-limit). Pages indexed but never shown for any query
+ *                 are undercounted; URL Inspection backfill is a follow-up.
  *
- * Cron: daily at 03:15 UTC (after the registry scrapers, before sitemap drift).
+ * Cron: daily 03:15 UTC.
  */
 
+import { sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { seoIndexationSnapshots, seoKeywordRanks } from '@/lib/schema';
+import { seoKeywordRanks, seoIndexationSnapshots } from '@/lib/schema';
+import {
+  parseServiceAccount,
+  getGscAccessToken,
+  gscSearchAnalytics,
+} from '@/lib/seo/gsc-client';
 
 function logJson(obj: Record<string, unknown>): void {
   console.log(JSON.stringify({ ts: new Date().toISOString(), ...obj }));
+}
+
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+async function fetchSitemapUrlCount(siteUrl: string): Promise<number> {
+  try {
+    const base = siteUrl.replace(/\/+$/, '');
+    const res = await fetch(`${base}/sitemap.xml`, {
+      headers: { 'User-Agent': 'KarbonLensSeoCron/1.0' },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return 0;
+    const xml = await res.text();
+    return (xml.match(/<url[\s>]/g) ?? []).length;
+  } catch {
+    return 0;
+  }
 }
 
 async function main(): Promise<void> {
@@ -47,23 +72,82 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  // TODO(Phase 2): integrate googleapis or the raw Webmasters API v3.
-  //   - /sites/<siteUrl>/searchAnalytics/query for clicks/impressions/position
-  //   - /sites/<siteUrl>/urlCrawlErrorsCounts for indexation deltas
-  // For now log a placeholder so cron logs show the script is wired.
-  logJson({
-    event: 'fetch_gsc_stub',
-    reason: 'integration_pending',
-    site: siteUrl,
-    will_write: [
-      `1 row into ${seoIndexationSnapshots._.name}`,
-      `~30 rows into ${seoKeywordRanks._.name}`,
-    ],
+  // GSC Search Analytics data lands with a ~2-3 day processing lag, so the
+  // window ends 3 days ago and spans the prior 28 days.
+  const end = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  const start = new Date(end.getTime() - 28 * 24 * 60 * 60 * 1000);
+  const observedDate = isoDate(new Date());
+
+  const creds = parseServiceAccount(credsB64);
+  const token = await getGscAccessToken(creds);
+
+  // ── Keyword ranks: per (query, page) over the 28-day window ──────────────
+  const rows = await gscSearchAnalytics(token, siteUrl, {
+    startDate: isoDate(start),
+    endDate: isoDate(end),
+    dimensions: ['query', 'page'],
+    rowLimit: 1000,
   });
 
-  // No-op insert to keep this file compile-time wired to the schema imports
-  // (so a missing column would break this script, not just /admin/seo).
-  void db;
+  let keywordRowsWritten = 0;
+  const distinctPages = new Set<string>();
+
+  for (const r of rows) {
+    const [query, page] = r.keys;
+    if (page) distinctPages.add(page);
+    if (!query || !page) continue;
+
+    await db
+      .insert(seoKeywordRanks)
+      .values({
+        observedDate,
+        query,
+        page,
+        position: r.position.toFixed(2),
+        impressions: Math.round(r.impressions),
+        clicks: Math.round(r.clicks),
+        ctr: Math.min(r.ctr, 9.9999).toFixed(4),
+        source: 'gsc',
+      })
+      .onConflictDoUpdate({
+        target: [
+          seoKeywordRanks.observedDate,
+          seoKeywordRanks.query,
+          seoKeywordRanks.page,
+        ],
+        set: {
+          position: r.position.toFixed(2),
+          impressions: Math.round(r.impressions),
+          clicks: Math.round(r.clicks),
+          ctr: Math.min(r.ctr, 9.9999).toFixed(4),
+        },
+      });
+    keywordRowsWritten += 1;
+  }
+
+  // ── Indexation snapshot ──────────────────────────────────────────────────
+  const submitted = await fetchSitemapUrlCount(siteUrl);
+  const indexed = distinctPages.size;
+
+  await db.insert(seoIndexationSnapshots).values({
+    source: 'gsc',
+    indexed,
+    submitted,
+    stragglers: [],
+    raw: sql`${JSON.stringify({
+      window: { start: isoDate(start), end: isoDate(end) },
+      keyword_rows: rows.length,
+      distinct_pages_with_impressions: indexed,
+    })}::jsonb`,
+  });
+
+  logJson({
+    event: 'fetch_gsc_ok',
+    window: { start: isoDate(start), end: isoDate(end) },
+    keyword_rows_written: keywordRowsWritten,
+    indexed,
+    submitted,
+  });
 }
 
 main()
@@ -71,11 +155,7 @@ main()
   .catch((e: unknown) => {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(
-      JSON.stringify({
-        ts: new Date().toISOString(),
-        event: 'fetch_gsc_fail',
-        error: msg,
-      }),
+      JSON.stringify({ ts: new Date().toISOString(), event: 'fetch_gsc_fail', error: msg }),
     );
     process.exit(1);
   });
