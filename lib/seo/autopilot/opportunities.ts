@@ -70,8 +70,12 @@ async function latestIdxFacts(): Promise<GroundingFact[]> {
 
 async function projectFacts(slug: string): Promise<GroundingFact[]> {
   const rows = (await db.execute(sql`
-    SELECT name_canonical, province, registry_name
-    FROM projects WHERE slug = ${slug} LIMIT 1
+    SELECT p.name_canonical, p.province,
+           (SELECT r.registry_name FROM registries r
+              WHERE r.project_id = p.id
+                AND r.registry_name IS NOT NULL AND r.registry_name <> ''
+              LIMIT 1) AS registry_name
+    FROM projects p WHERE p.slug = ${slug} LIMIT 1
   `)) as unknown as Array<{ name_canonical: string; province: string | null; registry_name: string | null }>;
   const r = rows[0];
   if (!r) return [];
