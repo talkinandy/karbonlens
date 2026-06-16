@@ -1,0 +1,117 @@
+{
+  "name": "KarbonLens — SEO Autopilot",
+  "meta": {
+    "description": "Twice-weekly LLM SEO content engine. Pulls verified opportunities from KarbonLens, generates a grounded editorial draft with OpenAI, and posts it to the gated publish endpoint. See docs/runbooks/seo-autopilot.md."
+  },
+  "settings": { "executionOrder": "v1", "saveExecutionProgress": true },
+  "nodes": [
+    {
+      "id": "trigger",
+      "name": "Schedule (Mon+Thu 07:00)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-360, 0],
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 0 7 * * 1,4" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "get_opps",
+      "name": "Get Opportunities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-140, 0],
+      "parameters": {
+        "method": "GET",
+        "url": "https://karbonlens.com/api/seo/opportunities",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "type", "value": "editorial" },
+            { "name": "limit", "value": "3" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "credentials": {
+        "httpHeaderAuth": { "id": "", "name": "KarbonLens Autopilot" }
+      }
+    },
+    {
+      "id": "build_prompt",
+      "name": "Pick Top + Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [80, 0],
+      "parameters": {
+        "jsCode": "const res = $input.first().json;\nconst opps = (res.opportunities || []).filter(o => o.jobType === 'editorial');\nif (opps.length === 0) { return []; } // nothing to do this run\nconst opp = opps[0];\n\nconst system = [\n  'You are a senior carbon-market analyst writing for KarbonLens, an Indonesian carbon-market intelligence terminal.',\n  'Write in clear, specific, professional English (or Bahasa Indonesia if the target query is Indonesian).',\n  '',\n  'HARD RULES:',\n  '- You may ONLY state numeric facts that appear in the provided grounding list. Never invent prices, volumes, dates, credit counts, or statistics.',\n  '- For every grounding number you use in the body, add an entry to claims with its factKey and the exact value you wrote (as a string).',\n  '- Only link to paths in relatedUrls or obvious on-site sections (/projects, /prices, /regulatory, /glossary, /methodology, /news).',\n  '- Do NOT use AI-tell phrases: \"in the ever-evolving\", \"in conclusion\", \"it is important to note\", \"delve into\", \"navigating the\", \"a testament to\", \"game-changer\", \"rich tapestry\". Lead with the concrete data point.',\n  '- 1,500 to 8,000 characters of Markdown. Title <= 70 chars. Summary <= 320 chars. slug is lowercase kebab-case.',\n  '',\n  'Return ONLY JSON: { \"kind\", \"slug\", \"title\", \"summary\", \"bodyMd\", \"claims\":[{\"factKey\",\"statedValue\"}], \"internalLinks\":[] }.'\n].join('\\n');\n\nconst user = [\n  'Target query: ' + (opp.targetQuery || ''),\n  '',\n  'Brief: ' + opp.brief,\n  '',\n  'Grounding facts (you may ONLY cite these numbers):',\n  JSON.stringify(opp.grounding, null, 2),\n  '',\n  'Suggested kind: ' + ((opp.hints && opp.hints.suggestedKind) || 'explainer'),\n  'Related on-site URLs you may link: ' + JSON.stringify((opp.hints && opp.hints.relatedUrls) || [])\n].join('\\n');\n\nconst openaiBody = {\n  model: 'gpt-4o',\n  response_format: { type: 'json_object' },\n  temperature: 0.4,\n  messages: [ { role: 'system', content: system }, { role: 'user', content: user } ]\n};\n\nreturn [{ json: { opp, openaiBody } }];"
+      }
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI — Generate Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [300, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.openaiBody) }}",
+        "options": { "timeout": 120000 }
+      },
+      "credentials": {
+        "httpHeaderAuth": { "id": "", "name": "OpenAI Autopilot" }
+      }
+    },
+    {
+      "id": "build_payload",
+      "name": "Build Publish Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 0],
+      "parameters": {
+        "jsCode": "const prev = $('Pick Top + Build Prompt').first().json;\nconst opp = prev.opp;\nconst ai = $input.first().json;\nconst content = ai.choices && ai.choices[0] && ai.choices[0].message ? ai.choices[0].message.content : '{}';\nlet artifact;\ntry { artifact = JSON.parse(content); } catch (e) { throw new Error('OpenAI did not return JSON: ' + String(content).slice(0, 200)); }\nconst usage = ai.usage || {};\nconst payload = {\n  jobType: 'editorial',\n  ref: opp.ref,\n  externalId: String($execution.id),\n  llmModel: prev.openaiBody.model,\n  tokensIn: usage.prompt_tokens,\n  tokensOut: usage.completion_tokens,\n  targetQuery: opp.targetQuery,\n  kind: artifact.kind || (opp.hints && opp.hints.suggestedKind) || 'explainer',\n  slug: artifact.slug,\n  title: artifact.title,\n  summary: artifact.summary,\n  bodyMd: artifact.bodyMd,\n  claims: artifact.claims || [],\n  internalLinks: artifact.internalLinks || [],\n  grounding: opp.grounding\n};\nreturn [{ json: payload }];"
+      }
+    },
+    {
+      "id": "publish",
+      "name": "Publish (gated)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "https://karbonlens.com/api/seo/autopilot/publish",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 60000,
+          "response": { "response": { "neverError": true, "fullResponse": true } }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": { "id": "", "name": "KarbonLens Autopilot" }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule (Mon+Thu 07:00)": { "main": [[{ "node": "Get Opportunities", "type": "main", "index": 0 }]] },
+    "Get Opportunities": { "main": [[{ "node": "Pick Top + Build Prompt", "type": "main", "index": 0 }]] },
+    "Pick Top + Build Prompt": { "main": [[{ "node": "OpenAI — Generate Draft", "type": "main", "index": 0 }]] },
+    "OpenAI — Generate Draft": { "main": [[{ "node": "Build Publish Payload", "type": "main", "index": 0 }]] },
+    "Build Publish Payload": { "main": [[{ "node": "Publish (gated)", "type": "main", "index": 0 }]] }
+  }
+}

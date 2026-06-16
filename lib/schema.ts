@@ -525,3 +525,52 @@ export const seoTasks = pgTable(
   },
   (t) => [index('idx_seo_tasks_status').on(t.status)],
 );
+
+// ─── SEO Autopilot — N8N-driven, LLM content engine ──────────────────────────
+// See scrapers/migrations/012_seo_autopilot_jobs.sql for the SQL source of
+// truth. Written by the publish endpoint (app/api/seo/autopilot/publish), read
+// by app/admin/seo. One row per unit of autopilot work.
+
+export type SeoJobType = 'editorial' | 'meta' | 'internal_link' | 'glossary' | 'programmatic';
+export type SeoJobStatus =
+  | 'queued'
+  | 'generating'
+  | 'qa_failed'
+  | 'published'
+  | 'applied'
+  | 'skipped'
+  | 'error';
+
+/** Gate result persisted to seo_jobs.qa — see lib/seo/autopilot/gate.ts. */
+export type SeoJobQa = {
+  passed: boolean;
+  checks: Array<{ name: string; ok: boolean; detail?: string }>;
+};
+
+export const seoJobs = pgTable(
+  'seo_jobs',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    jobType: text('job_type').$type<SeoJobType>().notNull(),
+    status: text('status').$type<SeoJobStatus>().notNull().default('queued'),
+    targetQuery: text('target_query'),
+    targetUrl: text('target_url'),
+    title: text('title'),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull().default({}),
+    grounding: jsonb('grounding').$type<Record<string, unknown>>().notNull().default({}),
+    qa: jsonb('qa').$type<SeoJobQa | Record<string, never>>().notNull().default({}),
+    resultRef: text('result_ref'),
+    llmModel: text('llm_model'),
+    tokensIn: integer('tokens_in'),
+    tokensOut: integer('tokens_out'),
+    error: text('error'),
+    externalId: text('external_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_seo_jobs_status_time').on(t.status, t.createdAt.desc()),
+    index('idx_seo_jobs_type_time').on(t.jobType, t.createdAt.desc()),
+    index('idx_seo_jobs_query').on(t.targetQuery),
+  ],
+);
