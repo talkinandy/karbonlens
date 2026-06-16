@@ -56,8 +56,12 @@ export async function POST(request: Request): Promise<Response> {
   for (const f of required) {
     if (!body[f]) return bad(`Missing required field '${String(f)}'`);
   }
-  if (!['explainer', 'evergreen', 'comparison', 'investigation'].includes(body.kind)) {
-    return bad(`Invalid kind '${body.kind}'`);
+  // Harden `kind`: LLMs occasionally emit an off-list label (e.g. "guide").
+  // Rather than 400 and lose the whole generation, coerce unknown kinds to a
+  // safe default so the gate still decides on the substance.
+  const ALLOWED_KINDS = ['explainer', 'evergreen', 'comparison', 'investigation', 'market_report'];
+  if (!ALLOWED_KINDS.includes(body.kind)) {
+    body.kind = 'explainer';
   }
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(body.slug)) {
     return bad(`Slug '${body.slug}' must be lowercase kebab-case`);

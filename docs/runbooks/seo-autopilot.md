@@ -194,7 +194,16 @@ A `Code` node then merges the model output with the original `grounding` array
 | Type | Detector | Apply surface needed | Status |
 |------|----------|----------------------|--------|
 | editorial | ✅ striking-distance queries | news_posts (exists) | **live** |
+| data_report | ✅ monthly IDX recap + quarterly league table | news_posts, kind=`market_report` | **live** |
 | meta / CTR | ✅ low-CTR pages | `seo_meta_overrides` table + `generateMetadata` merge | next |
 | glossary | ✅ orphan methodology codes | glossary data write + rebuild | next |
 | internal_link | pending | MD/anchor injection | later |
+
+> **Data reports (WS2b):** these publish as editorial `news_posts` with
+> `kind='market_report'` but surface from the data itself, not from GSC — a new
+> IDXCarbon snapshot month fires the monthly recap; a quarter-start snapshot
+> (Jan/Apr/Jul/Oct) fires the top-projects league table. They carry deep,
+> reverifiable grounding (idx_price series · proj_metric:`<slug>`:vcus_issued ·
+> stat:total_issued_credits) and score above striking-distance editorials so
+> they lead the queue when due (deduped once per period via `target_query`).
 | programmatic | pending | hub-page generator (P2 backlog) | later |

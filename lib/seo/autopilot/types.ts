@@ -37,7 +37,7 @@ export type Opportunity = {
   grounding: GroundingFact[];
   /** For editorial: suggested kind + internal-link anchors that exist. */
   hints?: {
-    suggestedKind?: 'explainer' | 'evergreen' | 'comparison' | 'investigation';
+    suggestedKind?: 'explainer' | 'evergreen' | 'comparison' | 'investigation' | 'market_report';
     relatedUrls?: string[];
   };
 };
@@ -57,7 +57,7 @@ export type EditorialArtifact = {
   tokensIn?: number;
   tokensOut?: number;
   targetQuery: string | null;
-  kind: 'explainer' | 'evergreen' | 'comparison' | 'investigation';
+  kind: 'explainer' | 'evergreen' | 'comparison' | 'investigation' | 'market_report';
   slug: string;
   title: string;
   summary: string;

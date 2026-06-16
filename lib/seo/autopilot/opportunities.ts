@@ -308,6 +308,170 @@ export async function glossaryOpportunities(limit = 6): Promise<Opportunity[]> {
   return out;
 }
 
+// ── Data reports: recurring, proprietary-data-grounded authority assets ───────
+//
+// Unlike the GSC-driven editorial detector, these surface from the data itself
+// (a new IDXCarbon month lands; a quarter turns) and carry DEEP grounding so the
+// LLM writes a genuinely data-rich report — the linkable "authority node" the
+// SEO strategy is built on. They publish as editorial news_posts with
+// kind='market_report'. Every fact is reverifiable in gate.ts (idx_price,
+// proj_metric, stat families).
+
+/** True once a report period has been attempted (any non-error status) — so a
+ *  given month/quarter is generated exactly once. ('error' is allowed to retry.) */
+async function reportHandled(targetQuery: string): Promise<boolean> {
+  const rows = (await db.execute(sql`
+    SELECT 1 FROM seo_jobs
+    WHERE target_query = ${targetQuery}
+      AND status IN ('queued', 'generating', 'qa_passed', 'qa_failed', 'published', 'rejected', 'skipped')
+    LIMIT 1
+  `)) as unknown as unknown[];
+  return rows.length > 0;
+}
+
+async function totalIssuedCreditsFact(): Promise<GroundingFact> {
+  const rows = (await db.execute(
+    sql`SELECT COALESCE(SUM(total_vcus_issued), 0)::text AS v FROM projects WHERE country = 'ID'`,
+  )) as unknown as Array<{ v: string }>;
+  return {
+    key: 'stat:total_issued_credits',
+    label: 'Total credits issued (Indonesian projects tracked)',
+    value: rows[0]?.v ?? '0',
+    unit: 'tCO2e',
+  };
+}
+
+/** Latest two IDXCarbon months × {avg price, volume, value} — all idx_price keys. */
+async function idxRecapFacts(): Promise<GroundingFact[]> {
+  const rows = (await db.execute(sql`
+    SELECT TO_CHAR(period_month, 'YYYY-MM') AS month,
+           avg_price_idr::text       AS avg_price_idr,
+           total_volume_tco2e::text  AS total_volume_tco2e,
+           total_value_idr::text     AS total_value_idr
+    FROM idx_monthly_snapshots
+    ORDER BY period_month DESC
+    LIMIT 2
+  `)) as unknown as Array<{
+    month: string;
+    avg_price_idr: string | null;
+    total_volume_tco2e: string | null;
+    total_value_idr: string | null;
+  }>;
+  const facts: GroundingFact[] = [];
+  for (const r of rows) {
+    if (r.avg_price_idr !== null)
+      facts.push({
+        key: `idx_price:${r.month}:avg_price_idr`,
+        label: `IDXCarbon avg price ${r.month}`,
+        value: r.avg_price_idr,
+        unit: 'IDR/tCO2e',
+      });
+    if (r.total_volume_tco2e !== null)
+      facts.push({
+        key: `idx_price:${r.month}:total_volume_tco2e`,
+        label: `IDXCarbon traded volume ${r.month}`,
+        value: r.total_volume_tco2e,
+        unit: 'tCO2e',
+      });
+    if (r.total_value_idr !== null)
+      facts.push({
+        key: `idx_price:${r.month}:total_value_idr`,
+        label: `IDXCarbon traded value ${r.month}`,
+        value: r.total_value_idr,
+        unit: 'IDR',
+      });
+  }
+  return facts;
+}
+
+/** Top-N Indonesian projects by issued credits — name + proj_metric facts. */
+async function leagueTableFacts(n: number): Promise<GroundingFact[]> {
+  const rows = (await db.execute(sql`
+    SELECT slug, name_canonical, total_vcus_issued::text AS issued
+    FROM projects
+    WHERE country = 'ID' AND total_vcus_issued IS NOT NULL
+    ORDER BY total_vcus_issued DESC
+    LIMIT ${n}
+  `)) as unknown as Array<{ slug: string; name_canonical: string; issued: string }>;
+  const facts: GroundingFact[] = [];
+  for (const r of rows) {
+    facts.push({ key: `project:${r.slug}:name`, label: 'Project name', value: r.name_canonical });
+    facts.push({
+      key: `proj_metric:${r.slug}:vcus_issued`,
+      label: `${r.name_canonical} — credits issued`,
+      value: r.issued,
+      unit: 'tCO2e',
+    });
+  }
+  return facts;
+}
+
+export async function dataReportOpportunities(limit = 4): Promise<Opportunity[]> {
+  const out: Opportunity[] = [];
+
+  // 1. Monthly IDXCarbon recap — fires once per new snapshot month.
+  const monthRows = (await db.execute(
+    sql`SELECT TO_CHAR(period_month, 'YYYY-MM') AS month, EXTRACT(MONTH FROM period_month)::int AS m
+        FROM idx_monthly_snapshots ORDER BY period_month DESC LIMIT 1`,
+  )) as unknown as Array<{ month: string; m: number }>;
+  const latest = monthRows[0];
+  if (latest) {
+    const key = `idxcarbon-recap-${latest.month}`;
+    if (!(await reportHandled(key))) {
+      const grounding = [
+        ...(await idxRecapFacts()),
+        await totalProjectsFact(),
+        await totalIssuedCreditsFact(),
+      ];
+      out.push({
+        jobType: 'editorial',
+        ref: `report:${key}`,
+        score: 100000, // reports lead the queue whenever one is due
+        reason: `New IDXCarbon snapshot for ${latest.month} — publish the monthly market recap.`,
+        targetQuery: key,
+        targetUrl: '/prices',
+        brief:
+          `Write the KarbonLens IDXCarbon monthly market report for ${latest.month}. Lead with the headline ` +
+          `average price, then a compact Markdown table comparing the latest two months' average price, traded ` +
+          `volume, and traded value, followed by 2–4 short paragraphs of analysis on the trend and what it means ` +
+          `for Indonesian carbon-market participants. Use ONLY the exact numbers in the grounding facts — do not ` +
+          `compute new figures (no percentages, growth rates, or totals that aren't provided); describe direction ` +
+          `in words. Link to /prices and /projects. Set kind to "market_report".`,
+        grounding,
+        hints: { suggestedKind: 'market_report', relatedUrls: ['/prices', '/projects'] },
+      });
+    }
+  }
+
+  // 2. Top-projects league table — fires once a quarter (Jan/Apr/Jul/Oct snapshot).
+  if (latest && [1, 4, 7, 10].includes(latest.m)) {
+    const q = Math.floor((latest.m - 1) / 3) + 1;
+    const year = latest.month.slice(0, 4);
+    const key = `top-projects-league-${year}-q${q}`;
+    if (!(await reportHandled(key))) {
+      const grounding = [...(await leagueTableFacts(10)), await totalProjectsFact(), await totalIssuedCreditsFact()];
+      out.push({
+        jobType: 'editorial',
+        ref: `report:${key}`,
+        score: 90000,
+        reason: `Quarterly league table due (${year} Q${q}) — rank Indonesia's top carbon projects by issued credits.`,
+        targetQuery: key,
+        targetUrl: '/projects',
+        brief:
+          `Write the KarbonLens ${year} Q${q} league table of Indonesia's largest carbon projects by credits issued. ` +
+          `Present a ranked Markdown table (rank · project · credits issued) using ONLY the projects and exact ` +
+          `issued-credit numbers in the grounding facts, then 2–3 paragraphs on what the ranking shows. Do NOT ` +
+          `compute shares, sums, or any figure not in grounding. Link to /projects and each project's page where ` +
+          `relevant. Set kind to "market_report".`,
+        grounding,
+        hints: { suggestedKind: 'market_report', relatedUrls: ['/projects'] },
+      });
+    }
+  }
+
+  return out.slice(0, limit);
+}
+
 export type OpportunityBundle = {
   generatedAt: string;
   counts: Record<string, number>;
@@ -316,15 +480,23 @@ export type OpportunityBundle = {
 
 /** Top opportunities across all live detectors, ranked by score. */
 export async function allOpportunities(perType = 8): Promise<OpportunityBundle> {
-  const [editorial, meta, glossary] = await Promise.all([
+  const [report, editorial, meta, glossary] = await Promise.all([
+    dataReportOpportunities(perType),
     editorialOpportunities(perType),
     metaOpportunities(perType),
     glossaryOpportunities(perType),
   ]);
-  const opportunities = [...editorial, ...meta, ...glossary].sort((a, b) => b.score - a.score);
+  const opportunities = [...report, ...editorial, ...meta, ...glossary].sort(
+    (a, b) => b.score - a.score,
+  );
   return {
     generatedAt: new Date().toISOString(),
-    counts: { editorial: editorial.length, meta: meta.length, glossary: glossary.length },
+    counts: {
+      report: report.length,
+      editorial: editorial.length,
+      meta: meta.length,
+      glossary: glossary.length,
+    },
     opportunities,
   };
 }

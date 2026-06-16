@@ -147,6 +147,26 @@ async function reverifyFact(fact: GroundingFact): Promise<Check> {
       return { name, ok: valuesMatch(r.title, fact.value), detail: `db title` };
     }
 
+    if (family === 'proj_metric') {
+      // proj_metric:<slug>:<metric>  (metric: vcus_issued | vcus_retired | vcus_available)
+      const [, slug, metric] = parts;
+      const col =
+        metric === 'vcus_issued'
+          ? sql`total_vcus_issued`
+          : metric === 'vcus_retired'
+            ? sql`total_vcus_retired`
+            : metric === 'vcus_available'
+              ? sql`total_vcus_available`
+              : null;
+      if (!col) return { name, ok: false, detail: `unknown project metric '${metric}'` };
+      const rows = (await db.execute(sql`
+        SELECT ${col}::text AS v FROM projects WHERE slug = ${slug} LIMIT 1
+      `)) as unknown as Array<{ v: string | null }>;
+      const v = rows[0]?.v ?? null;
+      if (v === null) return { name, ok: false, detail: `null ${metric}` };
+      return { name, ok: valuesMatch(v, fact.value), detail: `db=${v}` };
+    }
+
     if (family === 'stat') {
       // stat:<which>  (total_projects | total_issued_credits)
       const which = parts[1];
@@ -155,6 +175,12 @@ async function reverifyFact(fact: GroundingFact): Promise<Check> {
           sql`SELECT COUNT(*)::int AS n FROM projects WHERE country = 'ID'`,
         )) as unknown as Array<{ n: number }>;
         return { name, ok: valuesMatch(rows[0]?.n ?? 0, fact.value), detail: `db=${rows[0]?.n}` };
+      }
+      if (which === 'total_issued_credits') {
+        const rows = (await db.execute(
+          sql`SELECT COALESCE(SUM(total_vcus_issued), 0)::text AS v FROM projects WHERE country = 'ID'`,
+        )) as unknown as Array<{ v: string }>;
+        return { name, ok: valuesMatch(rows[0]?.v ?? '0', fact.value), detail: `db=${rows[0]?.v}` };
       }
       return { name, ok: false, detail: `unknown stat '${which}'` };
     }
