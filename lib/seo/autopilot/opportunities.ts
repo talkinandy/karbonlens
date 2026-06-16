@@ -569,7 +569,7 @@ export async function regulatoryOpportunity(): Promise<Opportunity[]> {
            TO_CHAR(COALESCE(published_at, fetched_at), 'YYYY-MM-DD') AS dt
     FROM carbon_news_items
     WHERE source_category = 'gov_registry'
-      AND COALESCE(published_at, fetched_at) >= NOW() - INTERVAL '21 days'
+      AND fetched_at >= NOW() - INTERVAL '30 days'
     ORDER BY COALESCE(published_at, fetched_at) DESC
     LIMIT 20
   `)) as unknown as Array<{
