@@ -42,11 +42,13 @@ import {
   getPunchList,
   summarisePunchList,
   getContentCadence,
+  getAutopilotSummary,
   type PunchListRow,
   type KeywordRankRow,
   type IndexationRow,
   type BacklinksSummary,
   type ContentCadence,
+  type AutopilotSummary,
 } from '@/lib/queries/seo/dashboard';
 import type { SeoTaskPriority } from '@/lib/seo/plan';
 import { updateSeoTaskStatus } from './punch-list-actions';
@@ -179,7 +181,7 @@ export default async function SeoDashboardPage() {
     redirect('/');
   }
 
-  const [metrics, sitemap, indexation, backlinks, topKeywords, punchList, cadence] =
+  const [metrics, sitemap, indexation, backlinks, topKeywords, punchList, cadence, autopilot] =
     await Promise.all([
       getSeoMetrics(),
       fetchSitemapStats(),
@@ -188,6 +190,7 @@ export default async function SeoDashboardPage() {
       getTopKeywords(),
       getPunchList(),
       getContentCadence(),
+      getAutopilotSummary(),
     ]);
   const punchSummary = summarisePunchList(punchList);
 
@@ -479,6 +482,9 @@ export default async function SeoDashboardPage() {
 
         {/* ── Tile D: Top keywords (SEO Phase 1) ────────────────────────── */}
         <TopKeywordsTile rows={topKeywords} />
+
+        {/* ── Tile E: SEO Autopilot (N8N-driven LLM engine) ─────────────── */}
+        <AutopilotTile autopilot={autopilot} />
 
         {/* ── Card 5: Indexation hints ──────────────────────────────────── */}
         <section className="kl-card" aria-labelledby="seo-indexation-h">
@@ -825,6 +831,89 @@ function TopKeywordsTile({ rows }: { rows: KeywordRankRow[] }) {
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+function AutopilotTile({ autopilot }: { autopilot: AutopilotSummary }) {
+  const { counts, published30d, qaFailed30d, passRate, lastRunAt, recent } = autopilot;
+  const statusColor: Record<string, string> = {
+    published: 'var(--success, #16a34a)',
+    applied: 'var(--success, #16a34a)',
+    qa_failed: 'var(--danger, #dc2626)',
+    error: 'var(--danger, #dc2626)',
+    skipped: 'var(--text-3)',
+    queued: 'var(--text-3)',
+    generating: 'var(--text-3)',
+  };
+  return (
+    <section className="kl-card" aria-labelledby="seo-autopilot-h">
+      <div className="kl-section-label" id="seo-autopilot-h">
+        Autopilot (N8N · LLM)
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <StatRow label="Published (30d)" value={published30d.toLocaleString()} />
+        <StatRow label="Rejected by gate (30d)" value={qaFailed30d.toLocaleString()} />
+        <StatRow
+          label="Gate pass rate"
+          value={passRate === null ? '—' : `${Math.round(passRate * 100)}%`}
+        />
+        <StatRow
+          label="Last run"
+          value={lastRunAt ? lastRunAt.toISOString().slice(0, 16).replace('T', ' ') : 'never'}
+        />
+      </div>
+      {recent.length === 0 ? (
+        <p style={{ margin: '12px 0 0', fontSize: 12, color: 'var(--text-3)' }}>
+          No jobs yet — N8N posts here once the autopilot workflow runs. See{' '}
+          <code>docs/runbooks/seo-autopilot.md</code>.
+        </p>
+      ) : (
+        <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0 0', fontSize: 13 }}>
+          {recent.map((j) => {
+            const failedChecks =
+              j.status === 'qa_failed' && j.qa
+                ? j.qa.checks.filter((c) => !c.ok).map((c) => c.name)
+                : [];
+            return (
+              <li
+                key={j.id}
+                style={{
+                  padding: '6px 0',
+                  borderBottom: '0.5px solid var(--border)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                }}
+              >
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ color: 'var(--text-3)', fontSize: 11 }}>{j.jobType}</span>{' '}
+                  {j.title ?? j.targetQuery ?? '—'}
+                  {failedChecks.length > 0 && (
+                    <span style={{ color: 'var(--danger, #dc2626)', fontSize: 11 }}>
+                      {' '}
+                      ✕ {failedChecks.join(', ')}
+                    </span>
+                  )}
+                </span>
+                <span
+                  style={{
+                    color: statusColor[j.status] ?? 'var(--text-3)',
+                    fontSize: 12,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {j.status}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <p style={{ margin: '10px 0 0', fontSize: 11, color: 'var(--text-3)' }}>
+        Queued {counts['queued'] ?? 0} · generating {counts['generating'] ?? 0} · skipped{' '}
+        {counts['skipped'] ?? 0} · error {counts['error'] ?? 0}
+      </p>
     </section>
   );
 }

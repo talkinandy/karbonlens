@@ -68,3 +68,4 @@ scrapers/.ruff_cache/
 *.ts.net.crt
 *.ts.net.key
 
+.gstack/

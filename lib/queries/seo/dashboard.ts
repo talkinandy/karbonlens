@@ -9,7 +9,7 @@
 import 'server-only';
 import { sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { seoTasks, type SeoTaskStatus } from '@/lib/schema';
+import { seoTasks, type SeoJobQa, type SeoTaskStatus } from '@/lib/schema';
 import { SEO_PLAN, type SeoTaskDef, type SeoTaskPriority } from '@/lib/seo/plan';
 
 // ─── Indexation tile ─────────────────────────────────────────────────────────
@@ -288,5 +288,78 @@ export async function getContentCadence(): Promise<ContentCadence> {
     nextMarketWrap: next,
     glossaryEntries,
     glossaryTarget: 80,
+  };
+}
+
+// ─── Autopilot tile (N8N-driven LLM SEO engine) ──────────────────────────────
+
+export type AutopilotJobRow = {
+  id: number;
+  jobType: string;
+  status: string;
+  title: string | null;
+  targetQuery: string | null;
+  resultRef: string | null;
+  qa: SeoJobQa | null;
+  createdAt: Date;
+};
+
+export type AutopilotSummary = {
+  /** Per-status counts over the trailing 30 days. */
+  counts: Record<string, number>;
+  published30d: number;
+  qaFailed30d: number;
+  /** Pass rate over jobs that reached the gate (published / (published+qa_failed)). */
+  passRate: number | null;
+  lastRunAt: Date | null;
+  recent: AutopilotJobRow[];
+};
+
+export async function getAutopilotSummary(): Promise<AutopilotSummary> {
+  const countRows = (await db.execute(sql`
+    SELECT status, COUNT(*)::int AS n
+    FROM seo_jobs
+    WHERE created_at >= NOW() - INTERVAL '30 days'
+    GROUP BY status
+  `)) as unknown as Array<{ status: string; n: number }>;
+
+  const counts: Record<string, number> = {};
+  for (const r of countRows) counts[r.status] = Number(r.n);
+  const published30d = counts['published'] ?? 0;
+  const qaFailed30d = counts['qa_failed'] ?? 0;
+  const gateTotal = published30d + qaFailed30d;
+
+  const recentRows = (await db.execute(sql`
+    SELECT id, job_type, status, title, target_query, result_ref, qa, created_at
+    FROM seo_jobs
+    ORDER BY created_at DESC
+    LIMIT 12
+  `)) as unknown as Array<{
+    id: number;
+    job_type: string;
+    status: string;
+    title: string | null;
+    target_query: string | null;
+    result_ref: string | null;
+    qa: SeoJobQa | null;
+    created_at: string;
+  }>;
+
+  return {
+    counts,
+    published30d,
+    qaFailed30d,
+    passRate: gateTotal > 0 ? published30d / gateTotal : null,
+    lastRunAt: recentRows[0] ? new Date(recentRows[0].created_at) : null,
+    recent: recentRows.map((r) => ({
+      id: Number(r.id),
+      jobType: r.job_type,
+      status: r.status,
+      title: r.title,
+      targetQuery: r.target_query,
+      resultRef: r.result_ref,
+      qa: r.qa && typeof r.qa === 'object' && 'passed' in r.qa ? r.qa : null,
+      createdAt: new Date(r.created_at),
+    })),
   };
 }
