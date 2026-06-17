@@ -25,6 +25,7 @@ import { authorizeAutopilot } from '@/lib/seo/autopilot/auth';
 import { runEditorialGate } from '@/lib/seo/autopilot/gate';
 import { runNewsBriefGate } from '@/lib/seo/autopilot/news-gate';
 import { runRegulatoryGate } from '@/lib/seo/autopilot/regulatory-gate';
+import { notifyReviewQueued } from '@/lib/telegram';
 import type {
   EditorialArtifact,
   NewsBriefArtifact,
@@ -182,6 +183,21 @@ export async function POST(request: Request): Promise<Response> {
     .insert(seoJobs)
     .values({ ...baseRow, status: 'qa_passed' })
     .returning({ id: seoJobs.id });
+
+  // Ping the admin on Telegram with Approve/Reject buttons (fail-soft).
+  if (job?.id) {
+    try {
+      await notifyReviewQueued({
+        id: job.id,
+        jobType: baseRow.jobType,
+        title: baseRow.title,
+        summary: typeof baseRow.payload.summary === 'string' ? baseRow.payload.summary : '',
+        slug: typeof baseRow.payload.slug === 'string' ? baseRow.payload.slug : null,
+      });
+    } catch {
+      // notification failure must not fail the publish
+    }
+  }
 
   return NextResponse.json(
     { ok: true, published: false, queuedForReview: true, status: 'qa_passed', jobId: job?.id ?? null, qa },
