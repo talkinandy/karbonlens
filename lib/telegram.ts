@@ -68,22 +68,47 @@ const TYPE_LABEL: Record<string, string> = {
   regulatory: 'Regulatory',
 };
 
-/** Notify the configured admin chat that a job needs review, with action buttons. */
+/** Strip the heaviest Markdown so an excerpt reads cleanly in a Telegram message. */
+function mdToText(md: string): string {
+  return md
+    .replace(/```[\s\S]*?```/g, '')          // code fences
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')     // images
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // links -> visible text
+    .replace(/^#{1,6}\s*/gm, '')              // headings
+    .replace(/\*\*/g, '')                     // bold markers
+    .replace(/`/g, '')                        // inline code ticks
+    .replace(/\n{3,}/g, '\n\n')               // collapse blank runs
+    .trim();
+}
+
+/** Notify the configured admin chat that a job needs review, with action buttons.
+ *  The content is shown INLINE — the post isn't published yet, so a link 404s. */
 export async function notifyReviewQueued(job: {
   id: number;
   jobType: string;
   title: string;
   summary: string;
-  slug?: string | null;
+  body?: string | null;
 }): Promise<void> {
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!isTelegramConfigured() || !chatId) return;
-  const base = process.env.NEXTAUTH_URL ?? 'https://karbonlens.com';
   const label = TYPE_LABEL[job.jobType] ?? job.jobType;
-  let text = `📝 <b>Review needed — ${escapeHtml(label)}</b>\n\n<b>${escapeHtml(job.title)}</b>`;
-  if (job.summary) text += `\n\n${escapeHtml(job.summary.slice(0, 700))}`;
-  if (job.slug) text += `\n\n🔗 ${base}/news/${escapeHtml(job.slug)}`;
-  text += `\n\n<i>Job #${job.id}</i>`;
+  const header = `📝 <b>Review needed — ${escapeHtml(label)}</b>\n\n<b>${escapeHtml(job.title)}</b>`;
+  const footer = `\n\n<i>Job #${job.id} · approve to publish</i>`;
+
+  // Editorial/report/brief carry bodyMd; for regulatory the summary IS the content.
+  const hasBody = !!(job.body && job.body.trim());
+  const lead = hasBody && job.summary ? `\n\n<i>${escapeHtml(job.summary.slice(0, 280))}</i>` : '';
+  const content = hasBody ? mdToText(job.body as string) : (job.summary ?? '');
+
+  // Telegram caps messages at 4096 chars — keep headroom and truncate cleanly.
+  const budget = 3800 - header.length - lead.length - footer.length;
+  let snippet = content;
+  if (snippet.length > budget) {
+    snippet = snippet.slice(0, Math.max(0, budget - 60)).trimEnd() + '\n\n… (truncated — full text on /admin/seo)';
+  }
+
+  const text = `${header}${lead}\n\n${escapeHtml(snippet)}${footer}`;
   const keyboard: InlineKeyboard = {
     inline_keyboard: [[
       { text: '✅ Approve & publish', callback_data: `a:${job.id}` },

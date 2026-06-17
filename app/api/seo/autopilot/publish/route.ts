@@ -192,7 +192,7 @@ export async function POST(request: Request): Promise<Response> {
         jobType: baseRow.jobType,
         title: baseRow.title,
         summary: typeof baseRow.payload.summary === 'string' ? baseRow.payload.summary : '',
-        slug: typeof baseRow.payload.slug === 'string' ? baseRow.payload.slug : null,
+        body: typeof baseRow.payload.bodyMd === 'string' ? baseRow.payload.bodyMd : null,
       });
     } catch {
       // notification failure must not fail the publish
