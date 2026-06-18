@@ -43,7 +43,8 @@ export type Opportunity = {
       | 'comparison'
       | 'investigation'
       | 'market_report'
-      | 'news_brief';
+      | 'news_brief'
+      | 'analysis';
     relatedUrls?: string[];
   };
 };
@@ -63,7 +64,7 @@ export type EditorialArtifact = {
   tokensIn?: number;
   tokensOut?: number;
   targetQuery: string | null;
-  kind: 'explainer' | 'evergreen' | 'comparison' | 'investigation' | 'market_report';
+  kind: 'explainer' | 'evergreen' | 'comparison' | 'investigation' | 'market_report' | 'analysis';
   slug: string;
   title: string;
   summary: string;

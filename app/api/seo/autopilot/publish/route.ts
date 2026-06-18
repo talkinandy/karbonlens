@@ -57,7 +57,7 @@ type BaseRow = {
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ALLOWED_EDITORIAL_KINDS = [
-  'explainer', 'evergreen', 'comparison', 'investigation', 'market_report',
+  'explainer', 'evergreen', 'comparison', 'investigation', 'market_report', 'analysis',
 ];
 
 function bad(detail: string, status = 400): Response {

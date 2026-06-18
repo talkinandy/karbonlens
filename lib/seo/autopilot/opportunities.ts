@@ -486,7 +486,7 @@ export async function newsBriefOpportunity(): Promise<Opportunity[]> {
     SELECT 1 FROM seo_jobs
     WHERE job_type = 'news_brief'
       AND status IN ('queued', 'generating', 'qa_passed', 'qa_failed', 'published', 'rejected', 'skipped')
-      AND created_at >= NOW() - INTERVAL '7 days'
+      AND created_at >= NOW() - INTERVAL '20 hours'
     LIMIT 1
   `)) as unknown as unknown[];
   if (recent.length > 0) return [];
@@ -623,6 +623,82 @@ export async function regulatoryOpportunity(): Promise<Opportunity[]> {
   ];
 }
 
+// ── Angle: a fresh news hook + KarbonLens proprietary data → original analysis ─
+//
+// Reuses the editorial pipeline (jobType 'editorial', kind 'analysis'): the news
+// item is the timely hook, but the value + the only citable numbers come from our
+// own data. Attribute the source by name (no external links) so the editorial
+// gate's number-grounding + internal-links checks apply unchanged.
+
+const ANGLE_KEYWORDS = [
+  '%carbon%', '%deforest%', '%peat%', '%redd%', '%emission%',
+  '%forest%', '%mangrove%', '%eudr%', '%offset%',
+];
+
+export async function angleOpportunity(): Promise<Opportunity[]> {
+  // Cadence: at most one angle every ~4 days.
+  const recent = (await db.execute(sql`
+    SELECT 1 FROM seo_jobs
+    WHERE target_query LIKE 'angle:%'
+      AND status IN ('queued', 'generating', 'qa_passed', 'qa_failed', 'published', 'rejected', 'skipped')
+      AND created_at >= NOW() - INTERVAL '4 days'
+    LIMIT 1
+  `)) as unknown as unknown[];
+  if (recent.length > 0) return [];
+
+  // Pick the freshest carbon-adjacent news item we haven't angled yet.
+  const kw = ANGLE_KEYWORDS.map((k) => `'${k}'`).join(', ');
+  const hookRows = (await db.execute(sql`
+    SELECT id, url, source_name, title, snippet,
+           TO_CHAR(COALESCE(published_at, fetched_at), 'YYYY-MM-DD') AS dt
+    FROM carbon_news_items c
+    WHERE fetched_at >= NOW() - INTERVAL '10 days'
+      AND (title ILIKE ANY (ARRAY[${sql.raw(kw)}]) OR snippet ILIKE ANY (ARRAY[${sql.raw(kw)}]))
+      AND NOT EXISTS (
+        SELECT 1 FROM seo_jobs j
+        WHERE j.target_query = 'angle:' || c.id
+          AND j.status IN ('queued', 'generating', 'qa_passed', 'qa_failed', 'published', 'rejected', 'skipped')
+      )
+    ORDER BY COALESCE(published_at, fetched_at) DESC
+    LIMIT 1
+  `)) as unknown as Array<{
+    id: number; url: string; source_name: string | null; title: string; snippet: string | null; dt: string | null;
+  }>;
+  const hook = hookRows[0];
+  if (!hook) return [];
+
+  const grounding = [
+    ...(await latestIdxFacts()),
+    await totalProjectsFact(),
+    await totalIssuedCreditsFact(),
+  ];
+  const outlet = hook.source_name ?? 'reports';
+
+  const brief =
+    `A recent development to react to — ${outlet} (${hook.dt ?? 'recent'}): "${hook.title}". ` +
+    `Context: ${hook.snippet ?? ''}\n\n` +
+    `Write an ORIGINAL 1,500–3,500 character KarbonLens analysis of what this means for Indonesia's ` +
+    `carbon market. Lead with the development, then bring KarbonLens's own market data to bear and add ` +
+    `genuine interpretation a reader can't get from the news item itself. Attribute the development to ` +
+    `${outlet} by name in prose — do NOT include any external links or quote the source verbatim. ` +
+    `State ONLY the exact numbers in the grounding facts (no computed figures); link only to on-site ` +
+    `/projects, /prices, /regulatory where relevant. Set kind to "analysis".`;
+
+  return [
+    {
+      jobType: 'editorial',
+      ref: `angle:${hook.id}`,
+      score: 60000, // above striking-distance editorials, below data reports
+      reason: `Timely hook from ${outlet}: "${hook.title.slice(0, 60)}" — data-anchored analysis.`,
+      targetQuery: `angle:${hook.id}`,
+      targetUrl: '/news',
+      brief,
+      grounding,
+      hints: { suggestedKind: 'analysis', relatedUrls: ['/projects', '/prices', '/regulatory'] },
+    },
+  ];
+}
+
 export type OpportunityBundle = {
   generatedAt: string;
   counts: Record<string, number>;
@@ -631,10 +707,11 @@ export type OpportunityBundle = {
 
 /** Top opportunities across all live detectors, ranked by score. */
 export async function allOpportunities(perType = 8): Promise<OpportunityBundle> {
-  const [report, newsBrief, regulatory, editorial, meta, glossary] = await Promise.all([
+  const [report, newsBrief, regulatory, angle, editorial, meta, glossary] = await Promise.all([
     dataReportOpportunities(perType),
     newsBriefOpportunity(),
     regulatoryOpportunity(),
+    angleOpportunity(),
     editorialOpportunities(perType),
     metaOpportunities(perType),
     glossaryOpportunities(perType),
@@ -643,6 +720,7 @@ export async function allOpportunities(perType = 8): Promise<OpportunityBundle> 
     ...report,
     ...newsBrief,
     ...regulatory,
+    ...angle,
     ...editorial,
     ...meta,
     ...glossary,
@@ -653,6 +731,7 @@ export async function allOpportunities(perType = 8): Promise<OpportunityBundle> 
       report: report.length,
       news_brief: newsBrief.length,
       regulatory: regulatory.length,
+      angle: angle.length,
       editorial: editorial.length,
       meta: meta.length,
       glossary: glossary.length,
