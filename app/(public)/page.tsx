@@ -28,7 +28,9 @@ import {
   isLikelyDbDown,
 } from '@/lib/queries/landing-stats';
 import { getLandingMapData } from '@/lib/queries/landing-map';
+import { listNewsPosts } from '@/lib/queries/news';
 import { HeroSection } from '@/components/landing/HeroSection';
+import { LatestNews } from '@/components/landing/LatestNews';
 import { HeroCtaSlot, HeroCtaFallback } from '@/components/landing/HeroCtaSlot';
 import { FeaturedProjects } from '@/components/landing/FeaturedProjects';
 import { DataFreshness } from '@/components/landing/DataFreshness';
@@ -78,9 +80,10 @@ export const metadata: Metadata = {
 };
 
 export default async function LandingPage() {
-  const [stats, mapData] = await Promise.all([
+  const [stats, mapData, latestNews] = await Promise.all([
     getLandingStats(),
     getLandingMapData(),
+    listNewsPosts(3),
   ]);
 
   const dbDown = isLikelyDbDown(stats);
@@ -146,6 +149,9 @@ export default async function LandingPage() {
         projects={stats.featuredProjects}
         totalCount={stats.projectCount}
       />
+
+      {/* ============ LATEST NEWS ============ */}
+      <LatestNews posts={latestNews} />
 
       {/* ============ BUILT FOR ============ */}
       <RolesGrid />
