@@ -47,10 +47,7 @@ export function SiteNav({ rightSlot }: Props = {}) {
             </Link>
           ))}
         </div>
-        <div
-          className="kl-topnav-right"
-          style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}
-        >
+        <div className="kl-topnav-right">
           {rightSlot ?? (
             <span
               className="kl-pill kl-pill--info"

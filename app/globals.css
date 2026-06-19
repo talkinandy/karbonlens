@@ -196,6 +196,16 @@ button {
   background: var(--surface-2);
 }
 
+/* Top-bar right cluster (auth / bell). Class-based (not inline) so the mobile
+   media query can hide it — an inline display:flex was overriding the hide and
+   duplicating the auth into the menu. */
+.kl-topnav-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 /* Mobile nav (hamburger) — replaces the inline nav links <=768px (see media block). */
 .kl-mobile-nav { display: none; }
 .kl-nav-toggle {
