@@ -909,8 +909,13 @@ button {
 
   /* Product pages — first mobile rules for .kl-* */
   .kl-topnav        { padding: 0 12px; }
+  .kl-topnav-inner  { gap: 10px; }
   .kl-nav-links     { display: none; }   /* replaced by the hamburger (.kl-mobile-nav) */
   .kl-mobile-nav    { display: block; }
+  /* Declutter the top bar: drop the long name, keep avatar + a compact action. */
+  .kl-user-menu-email { display: none; }
+  .kl-user-menu     { gap: 8px !important; }
+  .kl-topnav .kl-btn { white-space: nowrap; padding: 6px 10px; font-size: 13px; }
   .kl-page          { padding: 16px 12px 48px; }
   .kl-page-title    { font-size: 22px; letter-spacing: -0.2px; }
   .kl-stat-grid     { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
