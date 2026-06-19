@@ -13,7 +13,7 @@ import Link from 'next/link';
 
 type NavItem = { href: string; label: string };
 
-export function MobileNav({ items }: { items: NavItem[] }) {
+export function MobileNav({ items, rightSlot }: { items: NavItem[]; rightSlot?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="kl-mobile-nav">
@@ -42,6 +42,7 @@ export function MobileNav({ items }: { items: NavItem[] }) {
                 {it.label}
               </Link>
             ))}
+            {rightSlot ? <div className="kl-mobile-menu-auth">{rightSlot}</div> : null}
           </div>
         </>
       )}

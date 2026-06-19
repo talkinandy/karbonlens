@@ -47,7 +47,10 @@ export function SiteNav({ rightSlot }: Props = {}) {
             </Link>
           ))}
         </div>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+        <div
+          className="kl-topnav-right"
+          style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}
+        >
           {rightSlot ?? (
             <span
               className="kl-pill kl-pill--info"
@@ -57,7 +60,7 @@ export function SiteNav({ rightSlot }: Props = {}) {
             </span>
           )}
         </div>
-        <MobileNav items={NAV_ITEMS} />
+        <MobileNav items={NAV_ITEMS} rightSlot={rightSlot} />
       </div>
     </nav>
   );
