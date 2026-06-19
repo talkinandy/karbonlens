@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { MobileNav } from "./mobile-nav";
 
 type NavItem = { href: string; label: string };
 
@@ -56,6 +57,7 @@ export function SiteNav({ rightSlot }: Props = {}) {
             </span>
           )}
         </div>
+        <MobileNav items={NAV_ITEMS} />
       </div>
     </nav>
   );

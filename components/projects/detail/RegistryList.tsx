@@ -74,6 +74,7 @@ export function RegistryList({ rows }: Props) {
     <section id="registries" style={{ marginBottom: 32 }}>
       <p className="kl-section-label">Registries</p>
       <div className="kl-card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="kl-table-scroll">
         <table className="kl-table">
           <thead>
             <tr>
@@ -124,6 +125,7 @@ export function RegistryList({ rows }: Props) {
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </section>
   );

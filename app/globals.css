@@ -196,6 +196,53 @@ button {
   background: var(--surface-2);
 }
 
+/* Mobile nav (hamburger) — replaces the inline nav links <=768px (see media block). */
+.kl-mobile-nav { display: none; }
+.kl-nav-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.kl-nav-toggle:hover { background: var(--surface-2); }
+.kl-mobile-menu-backdrop {
+  position: fixed;
+  inset: 52px 0 0 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 55;
+}
+.kl-mobile-menu {
+  position: absolute;
+  top: 52px;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  z-index: 60;
+}
+.kl-mobile-menu-link {
+  padding: 13px 14px;
+  border-radius: 8px;
+  font-size: 15px;
+  color: var(--text);
+}
+.kl-mobile-menu-link:hover,
+.kl-mobile-menu-link:active {
+  background: var(--surface-2);
+}
+
 .kl-page {
   max-width: 1200px;
   margin: 0 auto;
@@ -862,8 +909,8 @@ button {
 
   /* Product pages — first mobile rules for .kl-* */
   .kl-topnav        { padding: 0 12px; }
-  .kl-nav-links     { gap: 4px; }
-  .kl-nav-link      { padding: 6px 8px; font-size: 12px; }
+  .kl-nav-links     { display: none; }   /* replaced by the hamburger (.kl-mobile-nav) */
+  .kl-mobile-nav    { display: block; }
   .kl-page          { padding: 16px 12px 48px; }
   .kl-page-title    { font-size: 22px; letter-spacing: -0.2px; }
   .kl-stat-grid     { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
